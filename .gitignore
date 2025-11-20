@@ -1,0 +1,42 @@
+# WordPress core
+wp-admin/
+wp-includes/
+index.php
+license.txt
+readme.html
+xmlrpc.php
+wp-*.php
+
+# Config & secrets
+wp-config.php
+.env
+
+# Uploads & dynamic content
+wp-content/uploads/
+wp-content/cache/
+wp-content/upgrade/
+wp-content/debug.log
+
+# Third-party plugins (keep only your own)
+wp-content/plugins/!myshop-core/
+wp-content/plugins/myshop-core/*/
+!wp-content/plugins/myshop-core/
+
+# Themes (unless you built one)
+wp-content/themes/!your-custom-theme-name/
+wp-content/themes/twenty*/
+wp-content/themes/storefront/
+wp-content/themes/astra/
+
+# Logs & temp
+error_log
+*.log
+*.tmp
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
