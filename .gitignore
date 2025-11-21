@@ -6,10 +6,12 @@ license.txt
 readme.html
 xmlrpc.php
 wp-*.php
+.htaccess
 
 # Config & secrets
 wp-config.php
 .env
+
 
 # Uploads & dynamic content
 wp-content/uploads/
@@ -19,7 +21,8 @@ wp-content/debug.log
 
 # Third-party plugins (keep only your own)
 wp-content/plugins/!myshop-core/
-wp-content/plugins/myshop-core/*/
+wp-content/languages
+wp-content/plugins/*
 !wp-content/plugins/myshop-core/
 
 # Themes (unless you built one)
@@ -40,3 +43,13 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 忽略依赖安装目录（如 node_modules）
+node_modules/
+
+# 忽略日志文件
+*.log
