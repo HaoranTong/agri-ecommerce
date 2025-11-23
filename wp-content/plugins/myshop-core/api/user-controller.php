@@ -1,14 +1,18 @@
 <?php
 class User_Controller {
-    public static function get_profile($request) {
-        $headers = $request->get_headers();
-        $auth = $headers['authorization'][0] ?? '';
-        if (strpos($auth, 'Bearer ') !== 0) {
-            return new WP_Error('missing_token', '缺少授权令牌', ['status' => 401]);
-        }
+    public static function register_routes() {
+        register_rest_route('myshop/v1', '/user/profile', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_profile'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+    }
 
-        $user = MyShop_Auth::validate_token(substr($auth, 7));
-        if (!$user) return new WP_Error('invalid_token', '令牌无效', ['status' => 401]);
+    public static function get_profile($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
 
         $openid = get_user_meta($user->ID, '_wechat_openid', true);
         $referral_code = 'REF' . str_pad($user->ID, 6, '0', STR_PAD_LEFT);

@@ -2,6 +2,21 @@
 
 class Product_Controller {
 
+    public static function register_routes() {
+        register_rest_route('myshop/v1', '/products', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'list_products'],
+            'permission_callback' => '__return_true'
+        ]);
+
+        register_rest_route('myshop/v1', '/products/(?P<id>\d+)', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_detail'],
+            'permission_callback' => '__return_true',
+            'args' => ['id' => ['required' => true, 'type' => 'integer']]
+        ]);
+    }
+
     public static function list_products() {
         $products = get_posts([
             'post_type'      => 'product',

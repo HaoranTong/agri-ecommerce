@@ -1,5 +1,13 @@
 <?php
 class Auth_Controller {
+    public static function register_routes() {
+        register_rest_route('myshop/v1', '/auth/login', [
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'login'],
+            'permission_callback' => '__return_true'
+        ]);
+    }
+
     public static function login($request) {
         $code = $request->get_param('code');
         if (!$code) return new WP_Error('missing_code', '缺少登录码', ['status' => 400]);

@@ -2,6 +2,30 @@
 
 class Order_Controller {
 
+    public static function register_routes() {
+        register_rest_route('myshop/v1', '/orders', [
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'create'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'variation_id' => ['required' => true, 'type' => 'integer'],
+                'quantity'     => ['required' => true, 'type' => 'integer']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/orders', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'list_orders'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+
+        register_rest_route('myshop/v1', '/orders/upload-payment-proof', [
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'upload_payment_proof'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+    }
+
     public static function create($request) {
         $params = $request->get_json_params();
         if (!isset($params['variation_id']) || !isset($params['quantity'])) {
@@ -22,11 +46,9 @@ class Order_Controller {
         $order = wc_create_order();
         $order->add_product($variation, $quantity);
 
-        // ✅ 从 token 获取 user_id（与 list_orders 一致）
-        $token = preg_replace('/^Bearer\s+/', '', $request->get_header('Authorization'));
-        $user = MyShop_Auth::validate_token($token);
-        if (!$user || !isset($user->ID)) {
-            return new WP_Error('unauthorized', '用户未登录', ['status' => 401]);
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
         }
         $order->set_customer_id($user->ID);
         $order->set_payment_method('cod'); // 设置为货到付款
@@ -35,9 +57,17 @@ class Order_Controller {
         if (isset($params['shipping_address'])) {
             $addr = $params['shipping_address'];
 
+            // detail_address 与 address 兼容处理
+            $detail_address = null;
+            if (isset($addr['detail_address']) && $addr['detail_address'] !== '') {
+                $detail_address = $addr['detail_address'];
+            } elseif (isset($addr['address']) && $addr['address'] !== '') {
+                $detail_address = $addr['address'];
+            }
+
             // 验证必要字段
             if (!isset($addr['name']) || !isset($addr['phone']) || !isset($addr['province']) ||
-                !isset($addr['city']) || !isset($addr['district']) || !isset($addr['detail_address'])) {
+                !isset($addr['city']) || !isset($addr['district']) || !$detail_address) {
                 return new WP_Error('invalid_address', '收货地址信息不完整', ['status' => 400]);
             }
 
@@ -45,7 +75,7 @@ class Order_Controller {
             $order->set_address([
                 'first_name' => sanitize_text_field($addr['name']),
                 'last_name'  => '',
-                'address_1'  => sanitize_text_field($addr['detail_address']),
+                'address_1'  => sanitize_text_field($detail_address),
                 'city'       => sanitize_text_field($addr['city']),
                 'state'      => sanitize_text_field($addr['province']), // WooCommerce 的 state 对应“省”
                 'postcode'   => isset($addr['postcode']) ? sanitize_text_field($addr['postcode']) : '',
@@ -106,11 +136,9 @@ class Order_Controller {
             return $auth;
         }
 
-        // 从 token 中获取 user_id（不能依赖 get_current_user_id）
-        $token = preg_replace('/^Bearer\s+/', '', $request->get_header('Authorization'));
-        $user = MyShop_Auth::validate_token($token);
-        if (!$user || !isset($user->ID)) {
-            return new WP_Error('unauthorized', '用户未登录', ['status' => 401]);
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
         }
         $user_id = $user->ID;
 
@@ -146,5 +174,68 @@ class Order_Controller {
         }
 
         return rest_ensure_response($data);
+    }
+
+    public static function upload_payment_proof($request) {
+        $auth = MyShop_Auth::check_permission($request);
+        if (is_wp_error($auth)) {
+            return $auth;
+        }
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $order_id = absint($request->get_param('order_id'));
+        if (!$order_id) {
+            return new WP_Error('missing_order_id', '缺少订单 ID', ['status' => 400]);
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order || (int) $order->get_customer_id() !== (int) $user->ID) {
+            return new WP_Error('order_not_found', '订单不存在或无权访问', ['status' => 404]);
+        }
+
+        if (empty($_FILES['proof_image'])) {
+            return new WP_Error('upload_failed', '请上传付款截图', ['status' => 422]);
+        }
+
+        $file = $_FILES['proof_image'];
+        $allowed = ['image/jpeg', 'image/png'];
+        if (!in_array($file['type'], $allowed, true)) {
+            return new WP_Error('upload_failed', '仅支持 JPG/PNG 图片', ['status' => 422]);
+        }
+
+        if ($file['size'] > 5 * MB_IN_BYTES) {
+            return new WP_Error('upload_failed', '图片大小超出 5MB 限制', ['status' => 422]);
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        add_filter('upload_mimes', [self::class, 'filter_payment_proof_mimes']);
+        $attachment_id = media_handle_upload('proof_image', $order_id);
+        remove_filter('upload_mimes', [self::class, 'filter_payment_proof_mimes']);
+
+        if (is_wp_error($attachment_id)) {
+            return new WP_Error('upload_failed', '附件保存失败', ['status' => 422]);
+        }
+
+        update_post_meta($order_id, '_myshop_payment_proof', $attachment_id);
+        $order->add_order_note(__('用户上传付款凭证，待人工审核。', 'myshop-core'));
+
+        return rest_ensure_response([
+            'order_id'             => $order_id,
+            'payment_proof_status' => 'submitted',
+            'preview_url'          => wp_get_attachment_url($attachment_id)
+        ]);
+    }
+
+    public static function filter_payment_proof_mimes($mimes) {
+        $mimes['jpg'] = 'image/jpeg';
+        $mimes['jpeg'] = 'image/jpeg';
+        $mimes['png'] = 'image/png';
+        return $mimes;
     }
 }

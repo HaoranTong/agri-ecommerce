@@ -2,17 +2,39 @@
 
 class Cart_Controller {
 
+    public static function register_routes() {
+        register_rest_route('myshop/v1', '/cart', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_cart'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+
+        register_rest_route('myshop/v1', '/cart', [
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'add_to_cart'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'variation_id' => ['required' => true, 'type' => 'integer'],
+                'quantity'     => ['required' => true, 'type' => 'integer']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/cart', [
+            'methods' => \WP_REST_Server::DELETABLE,
+            'callback' => [self::class, 'clear_cart'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+    }
+
     public static function get_cart($request) {
         $auth = MyShop_Auth::check_permission($request);
         if (is_wp_error($auth)) {
             return $auth;
         }
 
-        // ✅ 从 Authorization 头解析 token 获取 user_id（无状态）
-        $token = preg_replace('/^Bearer\s+/', '', $request->get_header('Authorization'));
-        $user = MyShop_Auth::validate_token($token);
-        if (!$user || !isset($user->ID)) {
-            return new WP_Error('unauthorized', '用户未登录', ['status' => 401]);
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
         }
         $user_id = $user->ID;
 
@@ -48,11 +70,9 @@ class Cart_Controller {
             return $auth;
         }
 
-        // ✅ 同样从 token 获取 user_id
-        $token = preg_replace('/^Bearer\s+/', '', $request->get_header('Authorization'));
-        $user = MyShop_Auth::validate_token($token);
-        if (!$user || !isset($user->ID)) {
-            return new WP_Error('unauthorized', '用户未登录', ['status' => 401]);
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
         }
         $user_id = $user->ID;
 
@@ -86,6 +106,25 @@ class Cart_Controller {
             'success' => true,
             'message' => '已添加到购物车',
             'cart_count' => count($cart)
+        ]);
+    }
+
+    public static function clear_cart($request) {
+        $auth = MyShop_Auth::check_permission($request);
+        if (is_wp_error($auth)) {
+            return $auth;
+        }
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        delete_user_meta($user->ID, '_myshop_cart');
+
+        return rest_ensure_response([
+            'success' => true,
+            'message' => '购物车已清空'
         ]);
     }
 }
