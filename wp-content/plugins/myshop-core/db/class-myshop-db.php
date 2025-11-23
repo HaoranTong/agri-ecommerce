@@ -1,6 +1,6 @@
 <?php
 class MyShop_DB {
-    const VERSION = '1.1.0';
+    const VERSION = '1.4.0';
     const OPTION_KEY = 'myshop_db_version';
 
     public static function install() {
@@ -161,7 +161,13 @@ class MyShop_DB {
                 parent_agent_id BIGINT UNSIGNED NULL,
                 agent_code VARCHAR(20) NOT NULL,
                 level TINYINT NOT NULL DEFAULT 1,
+                region_zone VARCHAR(50) NULL,
+                region_province VARCHAR(50) NULL,
+                region_city VARCHAR(50) NULL,
                 region VARCHAR(50) NULL,
+                region_key VARCHAR(191) NOT NULL DEFAULT '',
+                active_until DATETIME NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
                 status ENUM('active','frozen','terminated') NOT NULL DEFAULT 'active',
                 joined_at DATETIME NOT NULL,
                 invite_qr VARCHAR(255) NULL,
@@ -169,9 +175,14 @@ class MyShop_DB {
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
-                UNIQUE KEY uniq_agent_user (agent_user_id),
                 UNIQUE KEY uniq_agent_code (agent_code),
-                KEY idx_parent (parent_agent_id)
+                KEY idx_agent_user (agent_user_id),
+                KEY idx_parent (parent_agent_id),
+                KEY idx_region_zone (region_zone),
+                KEY idx_region_province (region_province),
+                KEY idx_region_key (region_key),
+                KEY idx_region_combo (region_zone, region_province, region_city),
+                KEY idx_active_until (active_until)
             ) ENGINE=InnoDB $charset",
 
             "CREATE TABLE {$prefix}myshop_agent_audit_logs (
@@ -220,5 +231,84 @@ class MyShop_DB {
         foreach ($tables as $sql) {
             dbDelta($sql);
         }
+
+        $agent_table = $prefix . 'myshop_agents';
+        self::ensure_agent_table_schema($agent_table);
+        $wpdb->query("UPDATE {$agent_table} SET is_active = 1 WHERE is_active IS NULL");
+        $wpdb->query("UPDATE {$agent_table} SET active_until = DATE_ADD(joined_at, INTERVAL 365 DAY) WHERE active_until IS NULL AND joined_at IS NOT NULL");
+    }
+
+    private static function ensure_agent_table_schema($agent_table) {
+        self::ensure_agent_indexes($agent_table);
+        self::backfill_agent_region_keys($agent_table);
+    }
+
+    private static function ensure_agent_indexes($agent_table) {
+        global $wpdb;
+
+        $column_exists = $wpdb->get_row($wpdb->prepare("SHOW COLUMNS FROM {$agent_table} LIKE %s", 'region_key'));
+        if (!$column_exists) {
+            $wpdb->query("ALTER TABLE {$agent_table} ADD COLUMN region_key VARCHAR(191) NOT NULL DEFAULT '' AFTER region");
+        }
+
+        $indexes = $wpdb->get_results("SHOW INDEX FROM {$agent_table}");
+        $index_names = array_map(static function ($index) {
+            return isset($index->Key_name) ? $index->Key_name : '';
+        }, $indexes);
+
+        if (in_array('uniq_agent_user', $index_names, true)) {
+            $wpdb->query("ALTER TABLE {$agent_table} DROP INDEX uniq_agent_user");
+        }
+
+        if (!in_array('idx_agent_user', $index_names, true)) {
+            $wpdb->query("ALTER TABLE {$agent_table} ADD KEY idx_agent_user (agent_user_id)");
+        }
+
+        if (!in_array('idx_region_key', $index_names, true)) {
+            $wpdb->query("ALTER TABLE {$agent_table} ADD KEY idx_region_key (region_key)");
+        }
+    }
+
+    private static function backfill_agent_region_keys($agent_table) {
+        global $wpdb;
+
+        $rows = $wpdb->get_results("SELECT id, region_zone, region_province, region_city, region_key FROM {$agent_table} WHERE region_key = '' OR region_key IS NULL");
+        foreach ($rows as $row) {
+            $region_key = self::build_region_key($row->region_zone, $row->region_province, $row->region_city);
+            $wpdb->update(
+                $agent_table,
+                ['region_key' => $region_key],
+                ['id' => $row->id],
+                ['%s'],
+                ['%d']
+            );
+        }
+    }
+
+    public static function build_region_key($zone, $province, $city) {
+        $segments = [
+            self::normalize_region_part($zone),
+            self::normalize_region_part($province),
+            self::normalize_region_part($city)
+        ];
+
+        return implode('#', $segments);
+    }
+
+    private static function normalize_region_part($value) {
+        if ($value === null) {
+            return '__';
+        }
+
+        if (!is_scalar($value)) {
+            return '__';
+        }
+
+        $text = trim((string) $value);
+        if ($text === '') {
+            return '__';
+        }
+
+        return function_exists('mb_strtolower') ? mb_strtolower($text, 'UTF-8') : strtolower($text);
     }
 }
