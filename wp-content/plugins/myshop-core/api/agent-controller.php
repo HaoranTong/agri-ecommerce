@@ -131,12 +131,9 @@ class Agent_Controller {
         $parent_agent_id = null;
         if ($parent_code) {
             $parent_agent_id = $wpdb->get_var($wpdb->prepare(
-                "SELECT id FROM {$agent_table} WHERE agent_code = %s",
+                "SELECT id FROM {$agent_table} WHERE agent_code = %s AND is_active = 1",
                 $parent_code
             ));
-            if (!$parent_agent_id) {
-                return new WP_Error('parent_agent_not_found', '上级代理不存在', ['status' => 404]);
-            }
         }
 
         if ($parent_agent_id === null) {
@@ -186,6 +183,10 @@ class Agent_Controller {
 
         if ($inserted === false) {
             return new WP_Error('agent_apply_failed', '代理商创建失败', ['status' => 500]);
+        }
+
+        if ($region_province === null && $region_city === null) {
+            self::refresh_zone_child_bindings($region_zone);
         }
 
         if ($region_province !== null && $region_city === null) {
@@ -341,11 +342,19 @@ class Agent_Controller {
     }
 
     private static function auto_assign_parent_id($zone, $province, $city) {
-        if ($city === null) {
+        if ($province === null && $city === null) {
             return null;
         }
 
-        return self::find_active_agent_id($zone, $province, null);
+        if ($city !== null) {
+            return self::find_active_agent_id($zone, $province, null);
+        }
+
+        if ($province !== null && $city === null) {
+            return self::find_active_agent_id($zone, null, null);
+        }
+
+        return null;
     }
 
     private static function find_active_agent_id($zone, $province = null, $city = null) {
@@ -405,6 +414,26 @@ class Agent_Controller {
         }
     }
 
+    private static function refresh_zone_child_bindings($zone) {
+        global $wpdb;
+        $agent_table = $wpdb->prefix . 'myshop_agents';
+
+        $zone_parent_id = self::find_active_agent_id($zone, null, null);
+
+        if ($zone_parent_id) {
+            $wpdb->query($wpdb->prepare(
+                "UPDATE {$agent_table} SET parent_agent_id = %d WHERE region_zone = %s AND region_province IS NOT NULL AND region_city IS NULL",
+                $zone_parent_id,
+                $zone
+            ));
+        } else {
+            $wpdb->query($wpdb->prepare(
+                "UPDATE {$agent_table} SET parent_agent_id = NULL WHERE region_zone = %s AND region_province IS NOT NULL AND region_city IS NULL",
+                $zone
+            ));
+        }
+    }
+
     private static function collect_descendant_agents($root_agent_id) {
         global $wpdb;
         $agent_table = $wpdb->prefix . 'myshop_agents';
@@ -442,15 +471,39 @@ class Agent_Controller {
             $now
         ));
 
-        $inactive_parents = $wpdb->get_results(
+        // 处理过期后解除绑定的层级（失效的父级先重置其子）
+        $inactive_zones = $wpdb->get_results(
+            "SELECT DISTINCT region_zone FROM {$agent_table} WHERE is_active = 0 AND region_province IS NULL AND region_city IS NULL"
+        );
+        foreach ($inactive_zones as $row) {
+            self::refresh_zone_child_bindings($row->region_zone);
+        }
+
+        $inactive_provinces = $wpdb->get_results(
             "SELECT DISTINCT region_zone, region_province FROM {$agent_table} WHERE is_active = 0 AND region_city IS NULL AND region_province IS NOT NULL"
         );
-
-        foreach ($inactive_parents as $row) {
+        foreach ($inactive_provinces as $row) {
             self::refresh_child_bindings($row->region_zone, $row->region_province);
         }
 
+        // 自愈：主动刷新当前所有活跃的大区与省级的子绑定，覆盖“先子后父”创建顺序的场景
+        $active_zones = $wpdb->get_results(
+            "SELECT DISTINCT region_zone FROM {$agent_table} WHERE is_active = 1 AND region_zone IS NOT NULL AND region_province IS NULL AND region_city IS NULL"
+        );
+        foreach ($active_zones as $row) {
+            self::refresh_zone_child_bindings($row->region_zone);
+        }
+
+        $active_provinces = $wpdb->get_results(
+            "SELECT DISTINCT region_zone, region_province FROM {$agent_table} WHERE is_active = 1 AND region_province IS NOT NULL AND region_city IS NULL"
+        );
+        foreach ($active_provinces as $row) {
+            self::refresh_child_bindings($row->region_zone, $row->region_province);
+        }
+
+        // 修复孤儿
         self::repair_orphan_city_agents();
+        self::repair_orphan_province_agents();
     }
 
     private static function repair_orphan_city_agents() {
@@ -463,6 +516,28 @@ class Agent_Controller {
 
         foreach ($orphans as $orphan) {
             $parent_id = self::find_active_agent_id($orphan->region_zone, $orphan->region_province, null);
+            if ($parent_id) {
+                $wpdb->update(
+                    $agent_table,
+                    ['parent_agent_id' => $parent_id],
+                    ['id' => $orphan->id],
+                    ['%d'],
+                    ['%d']
+                );
+            }
+        }
+    }
+
+    private static function repair_orphan_province_agents() {
+        global $wpdb;
+        $agent_table = $wpdb->prefix . 'myshop_agents';
+
+        $orphans = $wpdb->get_results(
+            "SELECT id, region_zone FROM {$agent_table} WHERE parent_agent_id IS NULL AND region_province IS NOT NULL AND region_city IS NULL"
+        );
+
+        foreach ($orphans as $orphan) {
+            $parent_id = self::find_active_agent_id($orphan->region_zone, null, null);
             if ($parent_id) {
                 $wpdb->update(
                     $agent_table,
