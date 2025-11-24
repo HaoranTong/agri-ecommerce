@@ -54,17 +54,37 @@ class Product_Controller {
                 }
             }
 
+            // 提取纯文本描述（去除 HTML）
+            $description = $p->post_content;
+            $description = wp_strip_all_tags($description); // 去除所有 HTML 标签
+            $description = preg_replace('/\s+/', ' ', $description); // 多空格/换行合并为单空格
+            $description = trim($description);
+
+            // 计算价格区间（仅 variable 类型）
+            $min_price = null;
+            $max_price = null;
+            if (!empty($variations)) {
+                $prices = array_column($variations, 'price');
+                $min_price = min($prices);
+                $max_price = max($prices);
+            } else {
+                // simple 商品使用单一价格
+                $min_price = $max_price = $product->get_price();
+            }
+
             $data[] = [
                 'id'          => $p->ID,
-                'name'        => $p->post_title, // ← title → name
-                'description' => $p->post_content, // 父商品通用描述
+                'name'        => $p->post_title,
+                'description' => $description, // 纯文本描述
                 'price'       => $product->get_price(),
+                'min_price'   => $min_price,
+                'max_price'   => $max_price,
                 'image_url'   => get_the_post_thumbnail_url($p->ID, 'full'),
                 'type'        => $product->get_type(),
-                'variations'  => $variations // simple 商品为空数组
+                'variations'  => $variations
             ];
         }
-        return rest_ensure_response($data);
+        return rest_ensure_response(['products' => $data]);
     }
 
     public static function get_detail($request) {

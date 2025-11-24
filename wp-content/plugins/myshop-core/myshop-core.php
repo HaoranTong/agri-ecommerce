@@ -20,6 +20,14 @@ define('MYSHOP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 require_once MYSHOP_PLUGIN_DIR . 'db/class-myshop-db.php';
 require_once MYSHOP_PLUGIN_DIR . 'includes/class-myshop-loader.php';
 
+// 引入后台管理页面
+if (is_admin()) {
+    require_once MYSHOP_PLUGIN_DIR . 'admin/config-page.php';
+}
+
+// 引入轮播图短代码（PC端使用）
+require_once MYSHOP_PLUGIN_DIR . 'admin/slider-shortcode.php';
+
 add_action('before_woocommerce_init', function () {
     if (class_exists('\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil')) {
         \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
