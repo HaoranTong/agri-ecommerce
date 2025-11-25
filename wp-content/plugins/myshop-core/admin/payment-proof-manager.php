@@ -8,6 +8,55 @@ class MyShop_Payment_Proof_Manager {
     public static function init() {
         add_action('admin_menu', [self::class, 'add_menu_page']);
         add_action('add_meta_boxes', [self::class, 'add_order_meta_box']);
+        
+        // 处理清理操作
+        if (isset($_POST['myshop_cleanup_proofs']) && check_admin_referer('myshop_cleanup_proofs')) {
+            add_action('admin_notices', [self::class, 'handle_cleanup_action']);
+        }
+    }
+    
+    /**
+     * 清理指定天数之前的已完成订单凭证
+     */
+    public static function handle_cleanup_action() {
+        if (!current_user_can('manage_woocommerce')) {
+            return;
+        }
+        
+        $days = absint($_POST['cleanup_days'] ?? 90);
+        $date_before = date('Y-m-d', strtotime("-{$days} days"));
+        
+        $args = [
+            'limit' => -1,
+            'status' => ['completed'],
+            'date_before' => $date_before,
+            'meta_query' => [
+                [
+                    'key' => '_myshop_payment_proof_path',
+                    'compare' => 'EXISTS'
+                ]
+            ]
+        ];
+        
+        $orders = wc_get_orders($args);
+        $deleted_count = 0;
+        $total_size = 0;
+        
+        foreach ($orders as $order) {
+            $proof_path = get_post_meta($order->get_id(), '_myshop_payment_proof_path', true);
+            if ($proof_path && file_exists($proof_path)) {
+                $total_size += filesize($proof_path);
+                if (unlink($proof_path)) {
+                    delete_post_meta($order->get_id(), '_myshop_payment_proof_path');
+                    delete_post_meta($order->get_id(), '_myshop_payment_proof_url');
+                    $deleted_count++;
+                }
+            }
+        }
+        
+        echo '<div class="notice notice-success"><p>';
+        echo sprintf('已清理 %d 个已完成订单的付款凭证，释放空间 %s', $deleted_count, size_format($total_size));
+        echo '</p></div>';
     }
 
     /**
@@ -43,24 +92,53 @@ class MyShop_Payment_Proof_Manager {
      */
     public static function render_order_meta_box($post) {
         $order_id = $post->ID;
-        $proof_id = get_post_meta($order_id, '_myshop_payment_proof', true);
+        
+        // 优先使用新存储方式
+        $proof_url = get_post_meta($order_id, '_myshop_payment_proof_url', true);
+        $proof_path = get_post_meta($order_id, '_myshop_payment_proof_path', true);
+        
+        // 兼容旧版本媒体库存储
+        if (!$proof_url) {
+            $proof_id = get_post_meta($order_id, '_myshop_payment_proof', true);
+            if ($proof_id) {
+                $proof_url = wp_get_attachment_url($proof_id);
+            }
+        }
+        
         $submitted_at = get_post_meta($order_id, '_myshop_payment_proof_submitted_at', true);
 
-        if (!$proof_id) {
+        if (!$proof_url) {
             echo '<p style="color: #999;">用户尚未上传付款凭证</p>';
             return;
         }
 
-        $proof_url = wp_get_attachment_url($proof_id);
-        $proof_image = wp_get_attachment_image($proof_id, 'medium', false, ['style' => 'max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 4px;']);
+        // 检查文件是否存在
+        $file_exists = $proof_path ? file_exists($proof_path) : true;
+        $file_size = $proof_path && $file_exists ? size_format(filesize($proof_path)) : '未知';
 
         ?>
         <div class="myshop-payment-proof-box">
             <p><strong>提交时间：</strong><br><?php echo esc_html($submitted_at ?: '未知'); ?></p>
             
+            <?php if ($proof_path): ?>
+                <p style="font-size: 12px; color: #666;">
+                    <strong>文件大小：</strong><?php echo esc_html($file_size); ?><br>
+                    <strong>存储方式：</strong>独立目录
+                    <?php if (!$file_exists): ?>
+                        <br><span style="color: #d63638;">⚠️ 文件不存在</span>
+                    <?php endif; ?>
+                </p>
+            <?php else: ?>
+                <p style="font-size: 12px; color: #999;">
+                    <em>（旧版本数据：存储在媒体库）</em>
+                </p>
+            <?php endif; ?>
+            
             <div style="margin: 15px 0;">
                 <a href="<?php echo esc_url($proof_url); ?>" target="_blank">
-                    <?php echo $proof_image; ?>
+                    <img src="<?php echo esc_url($proof_url); ?>" 
+                         style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 4px;" 
+                         alt="付款凭证" />
                 </a>
             </div>
             
@@ -68,10 +146,11 @@ class MyShop_Payment_Proof_Manager {
                 <a href="<?php echo esc_url($proof_url); ?>" class="button button-primary" target="_blank">
                     🔍 查看原图
                 </a>
-                <a href="<?php echo esc_url(admin_url('post.php?post=' . $proof_id . '&action=edit')); ?>" 
-                   class="button" target="_blank">
-                    📎 媒体详情
-                </a>
+                <?php if ($proof_path): ?>
+                    <button type="button" class="button" onclick="navigator.clipboard.writeText('<?php echo esc_js($proof_path); ?>'); alert('文件路径已复制');">
+                        📋 复制路径
+                    </button>
+                <?php endif; ?>
             </p>
             
             <p style="font-size: 12px; color: #666; margin-top: 15px;">
@@ -85,13 +164,22 @@ class MyShop_Payment_Proof_Manager {
      * 渲染付款凭证管理页面
      */
     public static function render_admin_page() {
-        // 获取所有包含付款凭证的订单
+        // 获取所有包含付款凭证的订单（支持新旧两种存储方式）
         $args = [
             'limit' => -1,
-            'meta_key' => '_myshop_payment_proof',
-            'meta_compare' => 'EXISTS',
             'orderby' => 'date',
-            'order' => 'DESC'
+            'order' => 'DESC',
+            'meta_query' => [
+                'relation' => 'OR',
+                [
+                    'key' => '_myshop_payment_proof_url',
+                    'compare' => 'EXISTS'
+                ],
+                [
+                    'key' => '_myshop_payment_proof',
+                    'compare' => 'EXISTS'
+                ]
+            ]
         ];
         
         $orders = wc_get_orders($args);
@@ -100,6 +188,25 @@ class MyShop_Payment_Proof_Manager {
         <div class="wrap">
             <h1>💳 付款凭证管理</h1>
             <p>共有 <strong><?php echo count($orders); ?></strong> 个订单上传了付款凭证</p>
+            
+            <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+                <h3 style="margin-top: 0;">🗑️ 清理工具</h3>
+                <form method="post" onsubmit="return confirm('确定要清理已完成订单的付款凭证吗？此操作不可恢复！');">
+                    <?php wp_nonce_field('myshop_cleanup_proofs'); ?>
+                    <p>
+                        <label>清理 
+                            <input type="number" name="cleanup_days" value="90" min="1" style="width: 80px;"> 
+                            天前已完成订单的付款凭证
+                        </label>
+                        <button type="submit" name="myshop_cleanup_proofs" class="button">
+                            开始清理
+                        </button>
+                    </p>
+                    <p style="font-size: 12px; color: #666;">
+                        ⚠️ 建议：仅清理已完成且超过90天的订单凭证。清理后无法恢复，请谨慎操作。
+                    </p>
+                </form>
+            </div>
             
             <?php if (empty($orders)): ?>
                 <div class="notice notice-info">
@@ -120,10 +227,22 @@ class MyShop_Payment_Proof_Manager {
                     </thead>
                     <tbody>
                         <?php foreach ($orders as $order): 
-                            $proof_id = get_post_meta($order->get_id(), '_myshop_payment_proof', true);
+                            // 优先使用新存储方式
+                            $proof_url = get_post_meta($order->get_id(), '_myshop_payment_proof_url', true);
+                            $proof_path = get_post_meta($order->get_id(), '_myshop_payment_proof_path', true);
+                            
+                            // 兼容旧版本媒体库存储
+                            if (!$proof_url) {
+                                $proof_id = get_post_meta($order->get_id(), '_myshop_payment_proof', true);
+                                $proof_url = $proof_id ? wp_get_attachment_url($proof_id) : '';
+                            }
+                            
                             $submitted_at = get_post_meta($order->get_id(), '_myshop_payment_proof_submitted_at', true);
-                            $proof_url = wp_get_attachment_url($proof_id);
-                            $proof_thumb = wp_get_attachment_image_url($proof_id, 'thumbnail');
+                            
+                            // 跳过没有凭证的订单
+                            if (!$proof_url) {
+                                continue;
+                            }
                             
                             // 订单状态颜色
                             $status_colors = [
@@ -164,12 +283,17 @@ class MyShop_Payment_Proof_Manager {
                             </td>
                             <td>
                                 <?php echo esc_html($submitted_at ?: '未知'); ?>
+                                <?php if ($proof_path): ?>
+                                    <br><small style="color: #666;">📁 独立目录</small>
+                                <?php else: ?>
+                                    <br><small style="color: #999;">📚 媒体库</small>
+                                <?php endif; ?>
                             </td>
                             <td>
-                                <?php if ($proof_thumb): ?>
+                                <?php if ($proof_url): ?>
                                     <a href="<?php echo esc_url($proof_url); ?>" target="_blank">
-                                        <img src="<?php echo esc_url($proof_thumb); ?>" 
-                                             style="max-width: 100px; height: auto; border: 2px solid #ddd; border-radius: 4px; cursor: pointer;"
+                                        <img src="<?php echo esc_url($proof_url); ?>" 
+                                             style="max-width: 100px; max-height: 100px; height: auto; border: 2px solid #ddd; border-radius: 4px; cursor: pointer; object-fit: cover;"
                                              alt="付款凭证" />
                                     </a>
                                 <?php else: ?>
@@ -196,7 +320,12 @@ class MyShop_Payment_Proof_Manager {
             <div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-left: 4px solid #00a0d2;">
                 <h3>💡 使用说明</h3>
                 <ul style="line-height: 1.8;">
-                    <li><strong>凭证存储位置：</strong>所有付款凭证图片保存在 WordPress 媒体库中（<code>/wp-content/uploads/</code>）</li>
+                    <li><strong>凭证存储位置：</strong>付款凭证图片保存在独立目录，不占用媒体库空间
+                        <ul style="margin-top: 5px; margin-left: 20px;">
+                            <li>📁 新版本：<code>/wp-content/uploads/payment-proofs/年/月/</code></li>
+                            <li>📚 旧数据：<code>/wp-content/uploads/</code>（媒体库）</li>
+                        </ul>
+                    </li>
                     <li><strong>订单状态流程：</strong>
                         <ol style="margin-top: 10px;">
                             <li>用户下单后为"待支付"（pending）</li>
@@ -206,7 +335,16 @@ class MyShop_Payment_Proof_Manager {
                     </li>
                     <li><strong>查看凭证：</strong>点击缩略图或"查看原图"按钮可以查看完整凭证</li>
                     <li><strong>订单管理：</strong>点击"编辑订单"可以进入订单详情页面，在右侧侧边栏可以看到付款凭证</li>
-                    <li><strong>媒体管理：</strong>在 WordPress 后台 → 媒体库中可以找到所有上传的凭证图片</li>
+                    <li><strong>存储优势：</strong>
+                        <ul style="margin-top: 5px; margin-left: 20px;">
+                            <li>✅ 独立目录管理，不与产品图片混淆</li>
+                            <li>✅ 按年月自动分类，便于归档和清理</li>
+                            <li>✅ 不占用媒体库空间，提升后台性能</li>
+                            <li>✅ 可添加 .htaccess 防止目录遍历</li>
+                            <li>✅ 兼容旧版本数据（媒体库存储）</li>
+                        </ul>
+                    </li>
+                    <li><strong>文件命名规则：</strong><code>order-{订单ID}-{随机ID}.jpg</code>，便于识别和追溯</li>
                 </ul>
             </div>
         </div>

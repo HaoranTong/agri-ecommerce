@@ -328,10 +328,14 @@ class Order_Controller {
             'postcode'       => $order->get_shipping_postcode()
         ];
 
-        // 获取支付凭证状态
-        $payment_proof_id = get_post_meta($order->get_id(), '_myshop_payment_proof', true);
+        // 获取支付凭证状态（兼容新旧两种存储方式）
+        $payment_proof_url = get_post_meta($order->get_id(), '_myshop_payment_proof_url', true);
+        if (!$payment_proof_url) {
+            // 兼容旧版本：从媒体库读取
+            $payment_proof_id = get_post_meta($order->get_id(), '_myshop_payment_proof', true);
+            $payment_proof_url = $payment_proof_id ? wp_get_attachment_url($payment_proof_id) : '';
+        }
         $payment_proof_submitted_at = get_post_meta($order->get_id(), '_myshop_payment_proof_submitted_at', true);
-        $payment_proof_url = $payment_proof_id ? wp_get_attachment_url($payment_proof_id) : '';
         
         // 获取物流信息
         $tracking_number = $order->get_meta('_tracking_number', true) ?: '';
@@ -390,18 +394,35 @@ class Order_Controller {
             return new WP_Error('upload_failed', '图片大小超出 5MB 限制', ['status' => 422]);
         }
 
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        require_once ABSPATH . 'wp-admin/includes/media.php';
-        require_once ABSPATH . 'wp-admin/includes/image.php';
-        add_filter('upload_mimes', [self::class, 'filter_payment_proof_mimes']);
-        $attachment_id = media_handle_upload('proof_image', $order_id);
-        remove_filter('upload_mimes', [self::class, 'filter_payment_proof_mimes']);
-
-        if (is_wp_error($attachment_id)) {
-            return new WP_Error('upload_failed', '附件保存失败', ['status' => 422]);
+        // ✅ 保存到独立目录，不使用媒体库
+        $upload_dir = wp_upload_dir();
+        $proof_dir = $upload_dir['basedir'] . '/payment-proofs/' . date('Y/m');
+        $proof_url_base = $upload_dir['baseurl'] . '/payment-proofs/' . date('Y/m');
+        
+        // 创建目录（如果不存在）
+        if (!file_exists($proof_dir)) {
+            wp_mkdir_p($proof_dir);
+            // 添加 .htaccess 保护（可选，防止直接访问目录列表）
+            file_put_contents($proof_dir . '/.htaccess', 'Options -Indexes');
         }
+        
+        // 生成唯一文件名
+        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = sprintf('order-%d-%s.%s', $order_id, uniqid(), $ext);
+        $filepath = $proof_dir . '/' . $filename;
+        $file_url = $proof_url_base . '/' . $filename;
+        
+        // 移动上传的文件
+        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+            return new WP_Error('upload_failed', '文件保存失败', ['status' => 500]);
+        }
+        
+        // 设置文件权限
+        chmod($filepath, 0644);
 
-        update_post_meta($order_id, '_myshop_payment_proof', $attachment_id);
+        // 保存文件路径和URL到订单元数据
+        update_post_meta($order_id, '_myshop_payment_proof_path', $filepath);
+        update_post_meta($order_id, '_myshop_payment_proof_url', $file_url);
         update_post_meta($order_id, '_myshop_payment_proof_submitted_at', current_time('mysql'));
         
         // 更新订单状态为"处理中"（凭证已提交，等待确认）
@@ -412,15 +433,8 @@ class Order_Controller {
         return rest_ensure_response([
             'order_id'             => $order_id,
             'payment_proof_status' => 'submitted',
-            'preview_url'          => wp_get_attachment_url($attachment_id),
+            'preview_url'          => $file_url,
             'message'              => '付款凭证已提交，请勿重复支付'
         ]);
-    }
-
-    public static function filter_payment_proof_mimes($mimes) {
-        $mimes['jpg'] = 'image/jpeg';
-        $mimes['jpeg'] = 'image/jpeg';
-        $mimes['png'] = 'image/png';
-        return $mimes;
     }
 }
