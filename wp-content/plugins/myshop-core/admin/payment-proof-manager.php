@@ -73,10 +73,10 @@ class MyShop_Payment_Proof_Manager {
      * 在订单列表添加付款凭证列
      */
     public static function add_order_column($columns) {
-        // 在"操作"列之前插入
+        // 在"操作"列之前插入（传统：order_actions，HPOS：wc_actions）
         $new_columns = [];
         foreach ($columns as $key => $label) {
-            if ($key === 'order_actions') {
+            if ($key === 'order_actions' || $key === 'wc_actions') {
                 $new_columns['payment_proof'] = '💳 付款凭证';
             }
             $new_columns[$key] = $label;
