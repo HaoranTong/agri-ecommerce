@@ -9,6 +9,13 @@ class MyShop_Payment_Proof_Manager {
         add_action('admin_menu', [self::class, 'add_menu_page']);
         add_action('add_meta_boxes', [self::class, 'add_order_meta_box']);
         
+        // 在订单列表添加付款凭证列
+        add_filter('manage_edit-shop_order_columns', [self::class, 'add_order_column']);
+        add_action('manage_shop_order_posts_custom_column', [self::class, 'render_order_column'], 10, 2);
+        
+        // 添加快速查看凭证的弹窗样式和脚本
+        add_action('admin_footer', [self::class, 'add_lightbox_script']);
+        
         // 处理清理操作
         if (isset($_POST['myshop_cleanup_proofs']) && check_admin_referer('myshop_cleanup_proofs')) {
             add_action('admin_notices', [self::class, 'handle_cleanup_action']);
@@ -57,6 +64,227 @@ class MyShop_Payment_Proof_Manager {
         echo '<div class="notice notice-success"><p>';
         echo sprintf('已清理 %d 个已完成订单的付款凭证，释放空间 %s', $deleted_count, size_format($total_size));
         echo '</p></div>';
+    }
+    
+    /**
+     * 在订单列表添加付款凭证列
+     */
+    public static function add_order_column($columns) {
+        // 在"操作"列之前插入
+        $new_columns = [];
+        foreach ($columns as $key => $label) {
+            if ($key === 'order_actions') {
+                $new_columns['payment_proof'] = '💳 付款凭证';
+            }
+            $new_columns[$key] = $label;
+        }
+        return $new_columns;
+    }
+    
+    /**
+     * 渲染订单列表的付款凭证列
+     */
+    public static function render_order_column($column, $post_id) {
+        if ($column !== 'payment_proof') {
+            return;
+        }
+        
+        // 优先使用新存储方式
+        $proof_url = get_post_meta($post_id, '_myshop_payment_proof_url', true);
+        $proof_path = get_post_meta($post_id, '_myshop_payment_proof_path', true);
+        
+        // 兼容旧版本媒体库存储
+        if (!$proof_url) {
+            $proof_id = get_post_meta($post_id, '_myshop_payment_proof', true);
+            $proof_url = $proof_id ? wp_get_attachment_url($proof_id) : '';
+        }
+        
+        $submitted_at = get_post_meta($post_id, '_myshop_payment_proof_submitted_at', true);
+        
+        if (!$proof_url) {
+            echo '<span style="color: #999; font-size: 12px;">未上传</span>';
+            return;
+        }
+        
+        // 检查文件是否存在
+        $file_exists = !$proof_path || file_exists($proof_path);
+        
+        ?>
+        <div style="text-align: center;">
+            <a href="<?php echo esc_url($proof_url); ?>" 
+               class="myshop-proof-preview" 
+               data-image="<?php echo esc_attr($proof_url); ?>"
+               data-order="<?php echo esc_attr($post_id); ?>"
+               title="点击查看付款凭证">
+                <span style="font-size: 32px; cursor: pointer; display: block; line-height: 1;">
+                    <?php echo $file_exists ? '🖼️' : '⚠️'; ?>
+                </span>
+            </a>
+            <?php if ($submitted_at): ?>
+                <small style="display: block; color: #666; font-size: 11px; margin-top: 4px;">
+                    <?php echo date('m-d H:i', strtotime($submitted_at)); ?>
+                </small>
+            <?php endif; ?>
+            <?php if (!$file_exists): ?>
+                <small style="display: block; color: #d63638; font-size: 11px;">
+                    文件缺失
+                </small>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+    
+    /**
+     * 添加图片预览弹窗脚本
+     */
+    public static function add_lightbox_script() {
+        $screen = get_current_screen();
+        if (!$screen || $screen->id !== 'edit-shop_order') {
+            return;
+        }
+        ?>
+        <style>
+            .myshop-lightbox {
+                display: none;
+                position: fixed;
+                z-index: 999999;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.9);
+                animation: fadeIn 0.3s;
+            }
+            .myshop-lightbox.active {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .myshop-lightbox-content {
+                max-width: 90%;
+                max-height: 90%;
+                position: relative;
+                animation: zoomIn 0.3s;
+            }
+            .myshop-lightbox img {
+                max-width: 100%;
+                max-height: 90vh;
+                border-radius: 8px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            }
+            .myshop-lightbox-close {
+                position: absolute;
+                top: -40px;
+                right: 0;
+                color: white;
+                font-size: 40px;
+                font-weight: bold;
+                cursor: pointer;
+                background: none;
+                border: none;
+                padding: 0;
+                line-height: 1;
+            }
+            .myshop-lightbox-close:hover {
+                color: #ff6b6b;
+            }
+            .myshop-lightbox-info {
+                position: absolute;
+                bottom: -60px;
+                left: 0;
+                right: 0;
+                text-align: center;
+                color: white;
+                font-size: 14px;
+            }
+            .myshop-lightbox-actions {
+                position: absolute;
+                bottom: -100px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 10px;
+            }
+            .myshop-lightbox-btn {
+                padding: 10px 20px;
+                background: white;
+                color: #333;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                text-decoration: none;
+                display: inline-block;
+            }
+            .myshop-lightbox-btn:hover {
+                background: #f0f0f0;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes zoomIn {
+                from { transform: scale(0.8); }
+                to { transform: scale(1); }
+            }
+        </style>
+        
+        <div id="myshop-proof-lightbox" class="myshop-lightbox">
+            <div class="myshop-lightbox-content">
+                <button class="myshop-lightbox-close">&times;</button>
+                <img src="" alt="付款凭证">
+                <div class="myshop-lightbox-info">
+                    <span id="myshop-lightbox-order">订单 #<span></span></span>
+                </div>
+                <div class="myshop-lightbox-actions">
+                    <a href="#" class="myshop-lightbox-btn" target="_blank">🔍 新窗口打开</a>
+                    <a href="#" class="myshop-lightbox-btn myshop-edit-order">📝 编辑订单</a>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            const lightbox = $('#myshop-proof-lightbox');
+            const lightboxImg = lightbox.find('img');
+            const lightboxOrder = lightbox.find('#myshop-lightbox-order span');
+            const openNewTab = lightbox.find('.myshop-lightbox-btn[target="_blank"]');
+            const editOrder = lightbox.find('.myshop-edit-order');
+            
+            // 点击预览图标
+            $(document).on('click', '.myshop-proof-preview', function(e) {
+                e.preventDefault();
+                const imageUrl = $(this).data('image');
+                const orderId = $(this).data('order');
+                
+                lightboxImg.attr('src', imageUrl);
+                lightboxOrder.text(orderId);
+                openNewTab.attr('href', imageUrl);
+                editOrder.attr('href', 'post.php?post=' + orderId + '&action=edit');
+                lightbox.addClass('active');
+            });
+            
+            // 点击关闭按钮
+            lightbox.find('.myshop-lightbox-close').on('click', function() {
+                lightbox.removeClass('active');
+            });
+            
+            // 点击背景关闭
+            lightbox.on('click', function(e) {
+                if (e.target === this) {
+                    lightbox.removeClass('active');
+                }
+            });
+            
+            // ESC键关闭
+            $(document).on('keydown', function(e) {
+                if (e.key === 'Escape' && lightbox.hasClass('active')) {
+                    lightbox.removeClass('active');
+                }
+            });
+        });
+        </script>
+        <?php
     }
 
     /**
