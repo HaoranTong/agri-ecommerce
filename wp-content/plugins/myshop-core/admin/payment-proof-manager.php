@@ -152,17 +152,17 @@ class MyShop_Payment_Proof_Manager {
         
         $post_id = $order->get_id();
         
-        // 优先使用新存储方式
-        $proof_url = $order->get_meta('_myshop_payment_proof_url', true);
-        $proof_path = $order->get_meta('_myshop_payment_proof_path', true);
+        // 优先使用新存储方式（使用 get_post_meta 保持与 API 的兼容性）
+        $proof_url = get_post_meta($post_id, '_myshop_payment_proof_url', true);
+        $proof_path = get_post_meta($post_id, '_myshop_payment_proof_path', true);
         
         // 兼容旧版本媒体库存储
         if (!$proof_url) {
-            $proof_id = $order->get_meta('_myshop_payment_proof', true);
+            $proof_id = get_post_meta($post_id, '_myshop_payment_proof', true);
             $proof_url = $proof_id ? wp_get_attachment_url($proof_id) : '';
         }
         
-        $submitted_at = $order->get_meta('_myshop_payment_proof_submitted_at', true);
+        $submitted_at = get_post_meta($post_id, '_myshop_payment_proof_submitted_at', true);
         
         if (!$proof_url) {
             echo '<span style="color: #999; font-size: 12px;">未上传</span>';

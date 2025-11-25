@@ -420,8 +420,8 @@ class Order_Controller {
         // 设置文件权限
         chmod($filepath, 0644);
 
-        // 保存文件路径和URL到订单元数据
-        update_post_meta($order_id, '_myshop_payment_proof_path', $filepath);
+        // 保存文件路径和URL到订单元数据（使用 wp_normalize_path 规范化路径）
+        update_post_meta($order_id, '_myshop_payment_proof_path', wp_normalize_path($filepath));
         update_post_meta($order_id, '_myshop_payment_proof_url', $file_url);
         update_post_meta($order_id, '_myshop_payment_proof_submitted_at', current_time('mysql'));
         
