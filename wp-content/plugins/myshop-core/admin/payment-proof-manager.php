@@ -9,9 +9,12 @@ class MyShop_Payment_Proof_Manager {
         add_action('admin_menu', [self::class, 'add_menu_page']);
         add_action('add_meta_boxes', [self::class, 'add_order_meta_box']);
         
-        // 在订单列表添加付款凭证列
+        // 在订单列表添加付款凭证列（兼容传统和HPOS）
         add_filter('manage_edit-shop_order_columns', [self::class, 'add_order_column']);
+        add_filter('manage_woocommerce_page_wc-orders_columns', [self::class, 'add_order_column']); // HPOS
+        
         add_action('manage_shop_order_posts_custom_column', [self::class, 'render_order_column'], 10, 2);
+        add_action('manage_woocommerce_page_wc-orders_custom_column', [self::class, 'render_order_column_hpos'], 10, 2); // HPOS
         
         // 添加快速查看凭证的弹窗样式和脚本
         add_action('admin_footer', [self::class, 'add_lightbox_script']);
@@ -135,11 +138,71 @@ class MyShop_Payment_Proof_Manager {
     }
     
     /**
+     * 渲染订单列表的付款凭证列（HPOS版本）
+     */
+    public static function render_order_column_hpos($column, $order) {
+        if ($column !== 'payment_proof') {
+            return;
+        }
+        
+        // HPOS 中 $order 是 WC_Order 对象
+        if (!is_a($order, 'WC_Order')) {
+            return;
+        }
+        
+        $post_id = $order->get_id();
+        
+        // 优先使用新存储方式
+        $proof_url = $order->get_meta('_myshop_payment_proof_url', true);
+        $proof_path = $order->get_meta('_myshop_payment_proof_path', true);
+        
+        // 兼容旧版本媒体库存储
+        if (!$proof_url) {
+            $proof_id = $order->get_meta('_myshop_payment_proof', true);
+            $proof_url = $proof_id ? wp_get_attachment_url($proof_id) : '';
+        }
+        
+        $submitted_at = $order->get_meta('_myshop_payment_proof_submitted_at', true);
+        
+        if (!$proof_url) {
+            echo '<span style="color: #999; font-size: 12px;">未上传</span>';
+            return;
+        }
+        
+        // 检查文件是否存在
+        $file_exists = !$proof_path || file_exists($proof_path);
+        
+        ?>
+        <div style="text-align: center;">
+            <a href="<?php echo esc_url($proof_url); ?>" 
+               class="myshop-proof-preview" 
+               data-image="<?php echo esc_attr($proof_url); ?>"
+               data-order="<?php echo esc_attr($post_id); ?>"
+               title="点击查看付款凭证">
+                <span style="font-size: 32px; cursor: pointer; display: block; line-height: 1;">
+                    <?php echo $file_exists ? '🖼️' : '⚠️'; ?>
+                </span>
+            </a>
+            <?php if ($submitted_at): ?>
+                <small style="display: block; color: #666; font-size: 11px; margin-top: 4px;">
+                    <?php echo date('m-d H:i', strtotime($submitted_at)); ?>
+                </small>
+            <?php endif; ?>
+            <?php if (!$file_exists): ?>
+                <small style="display: block; color: #d63638; font-size: 11px;">
+                    文件缺失
+                </small>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+    
+    /**
      * 添加图片预览弹窗脚本
      */
     public static function add_lightbox_script() {
         $screen = get_current_screen();
-        if (!$screen || $screen->id !== 'edit-shop_order') {
+        if (!$screen || !in_array($screen->id, ['edit-shop_order', 'woocommerce_page_wc-orders'])) {
             return;
         }
         ?>
@@ -305,6 +368,7 @@ class MyShop_Payment_Proof_Manager {
      * 在订单编辑页面添加付款凭证元框
      */
     public static function add_order_meta_box() {
+        // 传统订单编辑页面
         add_meta_box(
             'myshop_payment_proof',
             '💳 付款凭证',
@@ -313,13 +377,37 @@ class MyShop_Payment_Proof_Manager {
             'side',
             'high'
         );
+        
+        // HPOS 订单编辑页面
+        add_meta_box(
+            'myshop_payment_proof',
+            '💳 付款凭证',
+            [self::class, 'render_order_meta_box'],
+            'woocommerce_page_wc-orders',
+            'side',
+            'high'
+        );
     }
 
     /**
      * 渲染订单编辑页面的付款凭证元框
      */
-    public static function render_order_meta_box($post) {
-        $order_id = $post->ID;
+    public static function render_order_meta_box($post_or_order) {
+        // 兼容传统模式（$post）和 HPOS 模式（$order）
+        if (is_a($post_or_order, 'WC_Order')) {
+            // HPOS 模式
+            $order = $post_or_order;
+            $order_id = $order->get_id();
+        } else {
+            // 传统模式
+            $order_id = $post_or_order->ID;
+            $order = wc_get_order($order_id);
+        }
+        
+        if (!$order) {
+            echo '<p style="color: #999;">无法获取订单信息</p>';
+            return;
+        }
         
         // 优先使用新存储方式
         $proof_url = get_post_meta($order_id, '_myshop_payment_proof_url', true);
