@@ -6,6 +6,13 @@ class User_Controller {
             'callback' => [self::class, 'get_profile'],
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
+        
+        // 添加 /me 路由（与 /user/profile 功能相同）
+        register_rest_route('myshop/v1', '/me', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_profile'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
     }
 
     public static function get_profile($request) {

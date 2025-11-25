@@ -51,13 +51,48 @@ class Cart_Controller {
                 continue;
             }
 
+            // 获取父产品和变体信息
+            $parent_product = null;
+            $variation_name = '';
+            $attributes = [];
+            
+            if ($product->is_type('variation')) {
+                $parent_product = wc_get_product($product->get_parent_id());
+                $product_name = $parent_product ? $parent_product->get_name() : $product->get_name();
+                
+                // 获取变体属性（格式化为中文标签）
+                $variation_attributes = $product->get_attributes();
+                $attr_labels = [];
+                
+                foreach ($variation_attributes as $taxonomy => $term_slug) {
+                    // 获取属性的中文名称
+                    $taxonomy_label = wc_attribute_label($taxonomy);
+                    
+                    // 获取属性值的中文标签
+                    if (taxonomy_exists($taxonomy)) {
+                        $term = get_term_by('slug', $term_slug, $taxonomy);
+                        $term_name = $term ? $term->name : $term_slug;
+                    } else {
+                        $term_name = $term_slug;
+                    }
+                    
+                    $attr_labels[] = $taxonomy_label . ': ' . $term_name;
+                }
+                
+                $variation_name = implode(' | ', $attr_labels);
+            } else {
+                $product_name = $product->get_name();
+                $variation_name = '';
+            }
+
             $result[] = [
-                'product_id'   => $product->get_id(),
-                'variation_id' => $product->is_type('variation') ? $product->get_id() : null,
-                'name'         => $product->get_name(),
-                'quantity'     => $data['quantity'],
-                'price'        => $product->get_price(),
-                'image_url'    => $product->get_image_id() ? wp_get_attachment_image_src($product->get_image_id(), 'thumbnail')[0] : ''
+                'product_id'    => $product->is_type('variation') ? $product->get_parent_id() : $product->get_id(),
+                'variation_id'  => $product->is_type('variation') ? $product->get_id() : 0,
+                'product_name'  => $product_name,
+                'variation_name' => $variation_name,
+                'quantity'      => $data['quantity'],
+                'price'         => $product->get_price(),
+                'image_url'     => $product->get_image_id() ? wp_get_attachment_image_src($product->get_image_id(), 'thumbnail')[0] : ''
             ];
         }
 

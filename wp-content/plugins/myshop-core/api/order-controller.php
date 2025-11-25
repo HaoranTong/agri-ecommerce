@@ -19,10 +19,22 @@ class Order_Controller {
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
 
-        register_rest_route('myshop/v1', '/orders/upload-payment-proof', [
+        register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_order_detail'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'order_id' => ['required' => true, 'type' => 'integer']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)/upload-payment-proof', [
             'methods' => \WP_REST_Server::CREATABLE,
             'callback' => [self::class, 'upload_payment_proof'],
-            'permission_callback' => ['MyShop_Auth', 'check_permission']
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'order_id' => ['required' => true, 'type' => 'integer']
+            ]
         ]);
     }
 
@@ -88,6 +100,46 @@ class Order_Controller {
         }
 
         $order->calculate_totals();
+
+        // ✅ 自动保存收货地址到用户地址列表
+        $user_addresses = get_user_meta($user_id, '_myshop_addresses', true);
+        if (!is_array($user_addresses)) {
+            $user_addresses = [];
+        }
+
+        // 检查是否已存在相同地址
+        $address_exists = false;
+        foreach ($user_addresses as $addr) {
+            if (
+                $addr['name'] === $address['name'] &&
+                $addr['phone'] === $address['phone'] &&
+                $addr['province'] === $address['province'] &&
+                $addr['city'] === $address['city'] &&
+                $addr['district'] === $address['district'] &&
+                $addr['detail'] === $address['detail']
+            ) {
+                $address_exists = true;
+                break;
+            }
+        }
+
+        // 如果地址不存在，添加到列表
+        if (!$address_exists) {
+            $new_address = [
+                'id' => uniqid('addr_'),
+                'name' => $address['name'],
+                'phone' => $address['phone'],
+                'province' => $address['province'],
+                'city' => $address['city'],
+                'district' => $address['district'],
+                'detail' => $address['detail'],
+                'postal_code' => $address['postal_code'] ?? '',
+                'is_default' => empty($user_addresses) ? true : false, // 第一个地址设为默认
+                'created_at' => current_time('mysql')
+            ];
+            $user_addresses[] = $new_address;
+            update_user_meta($user_id, '_myshop_addresses', $user_addresses);
+        }
 
         // ✅ 从 WooCommerce 货到付款描述中提取二维码 URL
         $payment_qr_url = '';
@@ -164,16 +216,143 @@ class Order_Controller {
             }
 
             $data[] = [
-                'id'         => $order->get_id(),
-                'number'     => $order->get_order_number(),
-                'status'     => $order->get_status(),
-                'total'      => $order->get_total(),
-                'created_at' => $order->get_date_created() ? $order->get_date_created()->format('Y-m-d H:i:s') : null,
-                'items'      => $items
+                'order_id'    => $order->get_id(),
+                'order_number' => $order->get_order_number(),
+                'status'      => $order->get_status(),
+                'total'       => $order->get_total(),
+                'created_at'  => $order->get_date_created() ? $order->get_date_created()->format('Y-m-d H:i:s') : null,
+                'items'       => $items
             ];
         }
 
         return rest_ensure_response($data);
+    }
+
+    // 获取单个订单详情
+    public static function get_order_detail($request) {
+        $auth = MyShop_Auth::check_permission($request);
+        if (is_wp_error($auth)) {
+            return $auth;
+        }
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+        $user_id = $user->ID;
+
+        $order_id = absint($request->get_param('order_id'));
+        if (!$order_id) {
+            return new WP_Error('invalid_order_id', '无效的订单ID', ['status' => 400]);
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return new WP_Error('order_not_found', '订单不存在', ['status' => 404]);
+        }
+
+        // 验证订单所有权
+        if ($order->get_customer_id() !== $user_id) {
+            return new WP_Error('unauthorized', '无权访问此订单', ['status' => 403]);
+        }
+
+        // 获取订单商品
+        $items = [];
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            
+            // 获取变体属性（格式化为中文）
+            $variation_name = '';
+            if ($product && $product->is_type('variation')) {
+                $variation_attributes = $product->get_attributes();
+                $attr_labels = [];
+                
+                foreach ($variation_attributes as $taxonomy => $term_slug) {
+                    $taxonomy_label = wc_attribute_label($taxonomy);
+                    
+                    if (taxonomy_exists($taxonomy)) {
+                        $term = get_term_by('slug', $term_slug, $taxonomy);
+                        $term_name = $term ? $term->name : $term_slug;
+                    } else {
+                        $term_name = $term_slug;
+                    }
+                    
+                    $attr_labels[] = $taxonomy_label . ': ' . $term_name;
+                }
+                
+                $variation_name = implode(' | ', $attr_labels);
+            }
+            
+            $items[] = [
+                'product_id'     => $product ? ($product->is_type('variation') ? $product->get_parent_id() : $product->get_id()) : null,
+                'variation_id'   => $product && $product->is_type('variation') ? $product->get_id() : 0,
+                'product_name'   => $item->get_name(),
+                'variation_name' => $variation_name,
+                'quantity'       => $item->get_quantity(),
+                'price'          => $item->get_total() / $item->get_quantity(),
+                'subtotal'       => $item->get_total()
+            ];
+        }
+
+        // ✅ 从 WooCommerce 货到付款描述中提取二维码（与创建订单时保持一致）
+        $payment_qr_url = '';
+        $customer_service_qr = '';
+
+        $gateways = WC()->payment_gateways->payment_gateways();
+        if (isset($gateways['cod']) && $gateways['cod']->enabled === 'yes') {
+            $description = $gateways['cod']->description;
+            preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $description, $matches);
+            $image_urls = $matches[1] ?? [];
+
+            if (!empty($image_urls)) {
+                $payment_qr_url = esc_url_raw($image_urls[0]); // 第一张：收款码
+                $customer_service_qr = count($image_urls) > 1 ? esc_url_raw($image_urls[1]) : $payment_qr_url; // 第二张：客服码
+            }
+        }
+
+        // 如果没提取到，尝试从 myshop_public_config 读取（向后兼容）
+        if (!$payment_qr_url) {
+            $config = get_option('myshop_public_config', []);
+            $payment_qr_url = $config['payment_qr_url'] ?? '';
+            $customer_service_qr = $config['customer_service_qr'] ?? '';
+        }
+
+        // 获取收货地址信息
+        $shipping_address = [
+            'name'           => $order->get_shipping_first_name() ?: $order->get_billing_first_name(),
+            'phone'          => $order->get_billing_phone(),
+            'province'       => $order->get_shipping_state(),
+            'city'           => $order->get_shipping_city(),
+            'district'       => $order->get_meta('_shipping_district', true) ?: '',
+            'detail_address' => $order->get_shipping_address_1(),
+            'postcode'       => $order->get_shipping_postcode()
+        ];
+
+        // 获取支付凭证状态
+        $payment_proof_id = get_post_meta($order->get_id(), '_myshop_payment_proof', true);
+        $payment_proof_submitted_at = get_post_meta($order->get_id(), '_myshop_payment_proof_submitted_at', true);
+        $payment_proof_url = $payment_proof_id ? wp_get_attachment_url($payment_proof_id) : '';
+        
+        // 获取物流信息
+        $tracking_number = $order->get_meta('_tracking_number', true) ?: '';
+        $tracking_company = $order->get_meta('_tracking_company', true) ?: '';
+
+        return rest_ensure_response([
+            'order_id'            => $order->get_id(),
+            'order_number'        => $order->get_order_number(),
+            'status'              => $order->get_status(),
+            'total'               => $order->get_total(),
+            'created_at'          => $order->get_date_created() ? $order->get_date_created()->format('Y-m-d H:i:s') : null,
+            'items'               => $items,
+            'payment_qr_url'      => $payment_qr_url,
+            'customer_service_qr' => $customer_service_qr,
+            'shipping_address'    => $shipping_address,
+            'payment_proof_url'   => $payment_proof_url,
+            'payment_proof_submitted_at' => $payment_proof_submitted_at,
+            'has_payment_proof'   => !empty($payment_proof_url),
+            'tracking_number'     => $tracking_number,
+            'tracking_company'    => $tracking_company
+        ]);
     }
 
     public static function upload_payment_proof($request) {
@@ -223,12 +402,18 @@ class Order_Controller {
         }
 
         update_post_meta($order_id, '_myshop_payment_proof', $attachment_id);
-        $order->add_order_note(__('用户上传付款凭证，待人工审核。', 'myshop-core'));
+        update_post_meta($order_id, '_myshop_payment_proof_submitted_at', current_time('mysql'));
+        
+        // 更新订单状态为"处理中"（凭证已提交，等待确认）
+        $order->update_status('processing', __('用户上传付款凭证，待人工审核。', 'myshop-core'));
+        
+        $order->save();
 
         return rest_ensure_response([
             'order_id'             => $order_id,
             'payment_proof_status' => 'submitted',
-            'preview_url'          => wp_get_attachment_url($attachment_id)
+            'preview_url'          => wp_get_attachment_url($attachment_id),
+            'message'              => '付款凭证已提交，请勿重复支付'
         ]);
     }
 
