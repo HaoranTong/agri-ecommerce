@@ -11,10 +11,10 @@ class MyShop_Payment_Proof_Manager {
         
         // 在订单列表添加付款凭证列（兼容传统和HPOS）
         add_filter('manage_edit-shop_order_columns', [self::class, 'add_order_column']);
-        add_filter('manage_woocommerce_page_wc-orders_columns', [self::class, 'add_order_column']); // HPOS
+        add_filter('woocommerce_shop_order_list_table_columns', [self::class, 'add_order_column']); // HPOS
         
         add_action('manage_shop_order_posts_custom_column', [self::class, 'render_order_column'], 10, 2);
-        add_action('manage_woocommerce_page_wc-orders_custom_column', [self::class, 'render_order_column_hpos'], 10, 2); // HPOS
+        add_action('woocommerce_shop_order_list_table_custom_column', [self::class, 'render_order_column_hpos'], 10, 2); // HPOS
         
         // 添加快速查看凭证的弹窗样式和脚本
         add_action('admin_footer', [self::class, 'add_lightbox_script']);
