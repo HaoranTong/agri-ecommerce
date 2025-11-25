@@ -23,6 +23,7 @@ require_once MYSHOP_PLUGIN_DIR . 'includes/class-myshop-loader.php';
 // 引入后台管理页面
 if (is_admin()) {
     require_once MYSHOP_PLUGIN_DIR . 'admin/config-page.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/payment-proof-manager.php';
 }
 
 // 引入轮播图短代码（PC端使用）
