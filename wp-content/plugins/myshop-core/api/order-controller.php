@@ -63,7 +63,30 @@ class Order_Controller {
             return $user;
         }
         $order->set_customer_id($user->ID);
+        $user_id = $user->ID;
         $order->set_payment_method('cod'); // 设置为货到付款
+
+        // ✅ 处理积分抵扣
+        $points_to_use = isset($params['points_to_use']) ? absint($params['points_to_use']) : 0;
+        if ($points_to_use > 0) {
+            $points_discount = self::calculate_points_discount($user_id, $points_to_use, $order);
+            if (is_wp_error($points_discount)) {
+                return $points_discount;
+            }
+            
+            if ($points_discount['discount_amount'] > 0) {
+                // 添加积分抵扣费用项（负数）
+                $fee = new WC_Order_Item_Fee();
+                $fee->set_name('积分抵扣');
+                $fee->set_amount(-$points_discount['discount_amount']);
+                $fee->set_total(-$points_discount['discount_amount']);
+                $order->add_item($fee);
+                
+                // 保存使用的积分数
+                $order->update_meta_data('_points_used', $points_to_use);
+                $order->update_meta_data('_points_discount_amount', $points_discount['discount_amount']);
+            }
+        }
 
         // ✅ 处理中国标准收货地址
         if (isset($params['shipping_address'])) {
@@ -215,13 +238,21 @@ class Order_Controller {
                 ];
             }
 
+            // 获取快递信息
+            $tracking_number = get_post_meta($order->get_id(), '_myshop_tracking_number', true) ?: '';
+            $tracking_company = get_post_meta($order->get_id(), '_myshop_tracking_company', true) ?: '';
+            $shipped_at = get_post_meta($order->get_id(), '_myshop_shipped_at', true) ?: '';
+            
             $data[] = [
-                'order_id'    => $order->get_id(),
-                'order_number' => $order->get_order_number(),
-                'status'      => $order->get_status(),
-                'total'       => $order->get_total(),
-                'created_at'  => $order->get_date_created() ? $order->get_date_created()->format('Y-m-d H:i:s') : null,
-                'items'       => $items
+                'order_id'         => $order->get_id(),
+                'order_number'     => $order->get_order_number(),
+                'status'           => $order->get_status(),
+                'total'            => $order->get_total(),
+                'created_at'       => $order->get_date_created() ? $order->get_date_created()->format('Y-m-d H:i:s') : null,
+                'items'            => $items,
+                'tracking_number'  => $tracking_number,
+                'tracking_company' => $tracking_company,
+                'shipped_at'       => $shipped_at
             ];
         }
 
@@ -338,8 +369,9 @@ class Order_Controller {
         $payment_proof_submitted_at = get_post_meta($order->get_id(), '_myshop_payment_proof_submitted_at', true);
         
         // 获取物流信息
-        $tracking_number = $order->get_meta('_tracking_number', true) ?: '';
-        $tracking_company = $order->get_meta('_tracking_company', true) ?: '';
+        $tracking_number = get_post_meta($order->get_id(), '_myshop_tracking_number', true) ?: '';
+        $tracking_company = get_post_meta($order->get_id(), '_myshop_tracking_company', true) ?: '';
+        $shipped_at = get_post_meta($order->get_id(), '_myshop_shipped_at', true) ?: '';
 
         return rest_ensure_response([
             'order_id'            => $order->get_id(),
@@ -355,7 +387,8 @@ class Order_Controller {
             'payment_proof_submitted_at' => $payment_proof_submitted_at,
             'has_payment_proof'   => !empty($payment_proof_url),
             'tracking_number'     => $tracking_number,
-            'tracking_company'    => $tracking_company
+            'tracking_company'    => $tracking_company,
+            'shipped_at'          => $shipped_at
         ]);
     }
 
@@ -436,5 +469,150 @@ class Order_Controller {
             'preview_url'          => $file_url,
             'message'              => '付款凭证已提交，请勿重复支付'
         ]);
+    }
+    
+    /**
+     * 计算积分抵扣金额
+     */
+    private static function calculate_points_discount($user_id, $points_to_use, $order) {
+        global $wpdb;
+        
+        // 获取积分设置
+        $settings = self::get_points_settings();
+        
+        // 检查是否启用积分抵扣
+        if (!$settings['enable_points_discount']) {
+            return new WP_Error('points_discount_disabled', '积分抵扣功能未启用', ['status' => 400]);
+        }
+        
+        // 获取用户当前积分
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $available_points = intval($wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+            $user_id
+        )));
+        
+        // 检查积分是否足够
+        if ($available_points < $points_to_use) {
+            return new WP_Error('insufficient_points', '积分不足', ['status' => 400]);
+        }
+        
+        // 检查最低使用积分
+        if ($points_to_use < $settings['min_points_to_use']) {
+            return new WP_Error('points_too_low', sprintf('最少需要使用 %d 积分', $settings['min_points_to_use']), ['status' => 400]);
+        }
+        
+        // 计算订单金额
+        $order->calculate_totals();
+        $order_total = $order->get_total();
+        
+        // 检查订单最低金额
+        if ($settings['min_order_amount_to_use'] > 0 && $order_total < $settings['min_order_amount_to_use']) {
+            return new WP_Error('order_amount_too_low', sprintf('订单金额需满 ¥%.2f 才能使用积分', $settings['min_order_amount_to_use']), ['status' => 400]);
+        }
+        
+        // 计算可抵扣金额
+        $discount_amount = $points_to_use / $settings['redeem_rate'];
+        
+        // 检查最大抵扣比例
+        $max_discount = $order_total * ($settings['max_discount_percent'] / 100);
+        if ($discount_amount > $max_discount) {
+            $discount_amount = $max_discount;
+            $points_to_use = floor($max_discount * $settings['redeem_rate']);
+        }
+        
+        // 不能超过订单金额
+        if ($discount_amount > $order_total) {
+            $discount_amount = $order_total;
+            $points_to_use = floor($order_total * $settings['redeem_rate']);
+        }
+        
+        return [
+            'discount_amount' => $discount_amount,
+            'points_used' => $points_to_use
+        ];
+    }
+    
+    /**
+     * 扣除用户积分（订单确认后调用）
+     */
+    public static function deduct_points_for_order($order_id) {
+        global $wpdb;
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+        
+        $points_used = $order->get_meta('_points_used', true);
+        if (!$points_used || $points_used <= 0) {
+            return;
+        }
+        
+        // 检查是否已经扣除过
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND reference_order_id = %d AND channel = 'order_discount'",
+            $order->get_customer_id(),
+            $order_id
+        ));
+        
+        if ($existing > 0) {
+            return; // 已经扣除过了
+        }
+        
+        $user_id = $order->get_customer_id();
+        
+        // 计算当前余额
+        $current_balance = intval($wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+            $user_id
+        )));
+        
+        $balance_after = $current_balance - $points_used;
+        
+        // 插入扣除记录
+        $wpdb->insert(
+            $table,
+            [
+                'user_id' => $user_id,
+                'type' => 'spend',
+                'delta' => -$points_used,
+                'balance_after' => $balance_after,
+                'status' => 'confirmed',
+                'channel' => 'order_discount',
+                'reference_order_id' => $order_id,
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
+            ],
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s']
+        );
+        
+        // 添加订单备注
+        $discount_amount = $order->get_meta('_points_discount_amount', true);
+        $order->add_order_note(sprintf('已使用 %d 积分抵扣 ¥%.2f', $points_used, $discount_amount));
+    }
+    
+    /**
+     * 获取积分系统设置
+     */
+    private static function get_points_settings() {
+        $defaults = [
+            'enable_points' => 1,
+            'earn_rate' => 10,
+            'min_order_amount' => 0,
+            'register_bonus' => 100,
+            'daily_signin_points' => 10,
+            'enable_points_discount' => 1,
+            'redeem_rate' => 100,
+            'min_points_to_use' => 100,
+            'max_discount_percent' => 50,
+            'min_order_amount_to_use' => 0,
+            'enable_expiry' => 0,
+            'expiry_days' => 365
+        ];
+        
+        $settings = get_option('myshop_points_settings', []);
+        return wp_parse_args($settings, $defaults);
     }
 }

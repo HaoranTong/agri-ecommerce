@@ -26,10 +26,18 @@ class MyShop_Auth {
             return false;
         }
 
+        // 🔥 支持预定义的测试用户（用于开发测试）
+        $test_users = self::get_test_users();
+        if (isset($test_users[$code])) {
+            return $test_users[$code]['openid'];
+        }
+
+        // 兼容旧的 test 代码
         if ($code === 'test') {
             return 'oMockUser1234567890ab';
         }
 
+        // 其他code生成随机openid
         $normalized = preg_replace('/[^a-zA-Z0-9_-]/', '', $code);
         if ($normalized === '') {
             return false;
@@ -37,6 +45,76 @@ class MyShop_Auth {
 
         $hash = substr(hash('sha256', $normalized), 0, 18);
         return 'oMockUser' . $hash;
+    }
+    
+    /**
+     * 获取测试用户列表
+     */
+    public static function get_test_users() {
+        $default_users = [
+            'test001' => [
+                'openid' => 'oTest_User_001_FixedOpenID',
+                'nickname' => '测试用户001',
+                'phone' => '13800138001',
+                'description' => '主测试账号 - 用于日常功能测试'
+            ],
+            'test002' => [
+                'openid' => 'oTest_User_002_FixedOpenID',
+                'nickname' => '测试用户002',
+                'phone' => '13800138002',
+                'description' => '副测试账号 - 用于多用户场景测试'
+            ],
+            'test003' => [
+                'openid' => 'oTest_User_003_FixedOpenID',
+                'nickname' => '测试用户003',
+                'phone' => '13800138003',
+                'description' => '测试账号003 - 用于代理商功能测试'
+            ],
+            'admin' => [
+                'openid' => 'oTest_Admin_999_FixedOpenID',
+                'nickname' => '管理员测试账号',
+                'phone' => '13900139000',
+                'description' => '管理员账号 - 用于权限测试'
+            ]
+        ];
+        
+        // 允许通过配置文件或数据库自定义测试用户
+        $custom_users = get_option('myshop_test_users', []);
+        
+        return array_merge($default_users, $custom_users);
+    }
+    
+    /**
+     * 添加自定义测试用户
+     */
+    public static function add_test_user($code, $openid, $nickname = '', $phone = '', $description = '') {
+        $custom_users = get_option('myshop_test_users', []);
+        
+        $custom_users[$code] = [
+            'openid' => $openid,
+            'nickname' => $nickname ?: "测试用户_{$code}",
+            'phone' => $phone,
+            'description' => $description
+        ];
+        
+        update_option('myshop_test_users', $custom_users);
+        
+        return true;
+    }
+    
+    /**
+     * 删除自定义测试用户
+     */
+    public static function delete_test_user($code) {
+        $custom_users = get_option('myshop_test_users', []);
+        
+        if (isset($custom_users[$code])) {
+            unset($custom_users[$code]);
+            update_option('myshop_test_users', $custom_users);
+            return true;
+        }
+        
+        return false;
     }
 
     public static function get_or_create_user_by_openid($openid) {
@@ -47,11 +125,56 @@ class MyShop_Auth {
         ));
         if ($user_id) return $user_id;
 
-        $username = 'agri_user_' . uniqid();
-        $email = 'user_' . time() . '@example.com';
-        $user_id = wp_create_user($username, wp_generate_password(), $email);
+        // 检查是否为测试用户
+        $test_users = self::get_test_users();
+        $is_test_user = false;
+        $test_code = '';
+        $test_data = null;
+        
+        foreach ($test_users as $code => $user) {
+            if ($user['openid'] === $openid) {
+                $is_test_user = true;
+                $test_code = $code;
+                $test_data = $user;
+                break;
+            }
+        }
+        
+        // 根据是否为测试用户设置不同的用户名格式
+        if ($is_test_user) {
+            $username = 'test_' . $test_code;  // 例如: test_test001, test_admin
+            $email = $test_code . '@test.myshop.local';
+            $display_name = $test_data['nickname'];
+        } else {
+            $username = 'wx_user_' . substr(md5($openid), 0, 8);  // 真实用户用 wx_ 前缀
+            $email = 'wx_' . substr(md5($openid), 0, 12) . '@wechat.myshop.local';
+            $display_name = '微信用户';
+        }
+        
+        $user_id = wp_create_user($username, wp_generate_password(16, true, true), $email);
         if (is_wp_error($user_id)) return false;
+        
+        // 保存 openid
         update_user_meta($user_id, '_wechat_openid', $openid);
+        
+        // 更新用户信息
+        wp_update_user([
+            'ID' => $user_id,
+            'display_name' => $display_name,
+            'nickname' => $display_name,
+            'first_name' => $display_name,
+        ]);
+        
+        // 如果是测试用户，保存额外信息
+        if ($is_test_user) {
+            if (!empty($test_data['phone'])) {
+                update_user_meta($user_id, 'billing_phone', $test_data['phone']);
+                update_user_meta($user_id, 'phone', $test_data['phone']);
+            }
+            update_user_meta($user_id, '_test_user_code', $test_code);
+            update_user_meta($user_id, '_is_test_user', '1');
+        }
+        
         return $user_id;
     }
     public static function check_permission($request) {

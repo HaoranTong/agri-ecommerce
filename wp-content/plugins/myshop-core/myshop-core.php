@@ -24,6 +24,23 @@ require_once MYSHOP_PLUGIN_DIR . 'includes/class-myshop-loader.php';
 if (is_admin()) {
     require_once MYSHOP_PLUGIN_DIR . 'admin/config-page.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/payment-proof-manager.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/order-manager.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/points-manager.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/test-users-manager.php';
+    
+    // 测试用户清理工具（仅开发环境）
+    add_action('admin_menu', function() {
+        add_submenu_page(
+            null, // 不显示在菜单中，只能通过直接访问
+            '清理测试用户',
+            '清理测试用户',
+            'manage_options',
+            'myshop-cleanup-test-users',
+            function() {
+                require_once MYSHOP_PLUGIN_DIR . 'admin/cleanup-test-users.php';
+            }
+        );
+    }, 100);
 }
 
 // 引入轮播图短代码（PC端使用）
