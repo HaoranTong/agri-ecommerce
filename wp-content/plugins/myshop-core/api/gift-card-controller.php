@@ -1,6 +1,7 @@
 <?php
 
 class Gift_Card_Controller {
+    private const DEFAULT_DELIVERY_MODES = ['digital_share', 'printable'];
     public static function register_routes() {
         register_rest_route('myshop/v1', '/gift-cards/templates', [
             'methods'  => \WP_REST_Server::READABLE,
@@ -82,16 +83,23 @@ class Gift_Card_Controller {
             return $user;
         }
 
-        $table = $wpdb->prefix . 'myshop_gift_cards';
+        $cards_table = $wpdb->prefix . 'myshop_gift_cards';
+        $templates_table = $wpdb->prefix . 'myshop_gift_card_templates';
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$table} WHERE purchaser_id = %d OR redeemer_id = %d ORDER BY created_at DESC",
+            "SELECT c.*, t.name AS template_name, t.delivery_modes AS template_delivery_modes, t.print_template_url AS template_print_template_url
+             FROM {$cards_table} c
+             LEFT JOIN {$templates_table} t ON c.template_id = t.id
+             WHERE c.purchaser_id = %d OR c.redeemer_id = %d
+             ORDER BY c.created_at DESC",
             $user->ID,
             $user->ID
         ));
 
         $cards = [];
         foreach ($rows as $row) {
+            $template_modes = self::normalize_delivery_modes($row->template_delivery_modes ?? '');
             $cards[] = [
+                'template_id'   => (int) $row->template_id,
                 'card_number'   => $row->card_number,
                 'status'        => $row->status,
                 'bind_status'   => $row->bind_status,
@@ -102,7 +110,10 @@ class Gift_Card_Controller {
                 'redeemer_id'   => $row->redeemer_id ? (int) $row->redeemer_id : null,
                 'purchaser_id'  => (int) $row->purchaser_id,
                 'created_at'    => $row->created_at,
-                'updated_at'    => $row->updated_at
+                'updated_at'    => $row->updated_at,
+                'template_name' => $row->template_name ?: null,
+                'delivery_modes'=> $template_modes,
+                'print_template_url' => self::resolve_print_template_url($row->template_print_template_url ?? '')
             ];
         }
 
@@ -318,7 +329,7 @@ class Gift_Card_Controller {
             'share_token'         => null,
             'share_channel'       => null,
             'share_token_expires_at' => null,
-            'print_package_url'   => $template->print_template_url,
+            'print_package_url'   => self::resolve_print_template_url($template->print_template_url ?? ''),
             'pin_code_hash'       => $pin_hash,
             'pin_reveal_limit'    => 3,
             'pin_reveal_count'    => 0,
@@ -395,6 +406,9 @@ class Gift_Card_Controller {
         $params = $request->get_json_params();
         $card_number = isset($params['card_number']) ? sanitize_text_field($params['card_number']) : '';
         $delivery_mode = isset($params['delivery_mode']) ? sanitize_text_field($params['delivery_mode']) : 'digital_share';
+        if (!in_array($delivery_mode, self::DEFAULT_DELIVERY_MODES, true)) {
+            $delivery_mode = 'digital_share';
+        }
         $channel = isset($params['channel']) ? sanitize_text_field($params['channel']) : 'miniprogram';
 
         $card = self::get_card_by_number($card_number);
@@ -402,12 +416,19 @@ class Gift_Card_Controller {
             return new WP_Error('card_not_found', '礼品卡不存在', ['status' => 404]);
         }
 
+        $template = self::get_template_row((int) $card->template_id);
+        $allowed_modes = $template ? self::normalize_delivery_modes($template->delivery_modes ?? '') : self::DEFAULT_DELIVERY_MODES;
+
         if ((int) $card->purchaser_id !== (int) $user->ID) {
             return new WP_Error('card_forbidden', '无权分享该礼品卡', ['status' => 403]);
         }
 
         if ($card->status !== 'active') {
             return new WP_Error('card_invalid', '仅可分享状态为可用的礼品卡', ['status' => 400]);
+        }
+
+        if (!in_array($delivery_mode, $allowed_modes, true)) {
+            return new WP_Error('delivery_mode_not_allowed', '该礼品卡模板未启用此交付方式', ['status' => 400]);
         }
 
         $token  = self::generate_share_token();
@@ -433,13 +454,20 @@ class Gift_Card_Controller {
 
         self::log_share_event((int) $card->id, (int) $user->ID, $delivery_mode, $channel, $token);
 
+        $print_template_source = ($template && !empty($template->print_template_url)) ? $template->print_template_url : '';
+        $print_template_url = self::resolve_print_template_url($print_template_source);
+
         return rest_ensure_response([
             'success' => true,
             'data' => [
+                'card_number'   => $card->card_number,
+                'template_name' => $template ? $template->name : null,
                 'share_token'   => $token,
                 'delivery_mode' => $delivery_mode,
                 'channel'       => $channel,
-                'expires_at'    => $expiry
+                'expires_at'    => $expiry,
+                'print_template_url' => $print_template_url,
+                'allowed_delivery_modes' => $allowed_modes
             ]
         ]);
     }
@@ -544,7 +572,7 @@ class Gift_Card_Controller {
             'created_at'         => $row->created_at,
             'updated_at'         => $row->updated_at,
             'share_template_config' => $include_config && !empty($row->share_template_config) ? json_decode($row->share_template_config, true) : null,
-            'print_template_url' => $include_config ? ($row->print_template_url ?: null) : null
+            'print_template_url' => $include_config ? self::resolve_print_template_url($row->print_template_url ?? '') : null
         ];
     }
 
@@ -614,5 +642,37 @@ class Gift_Card_Controller {
             ],
             ['%d','%d','%s','%s','%s','%s','%s','%s']
         );
+    }
+
+    private static function normalize_delivery_modes($encoded) {
+        $decoded = [];
+        if (is_array($encoded)) {
+            $decoded = $encoded;
+        } elseif (is_string($encoded) && $encoded !== '') {
+            $decoded = json_decode($encoded, true);
+        }
+
+        if (!is_array($decoded)) {
+            $decoded = [];
+        }
+
+        $modes = array_values(array_intersect(self::DEFAULT_DELIVERY_MODES, $decoded));
+        return !empty($modes) ? $modes : self::DEFAULT_DELIVERY_MODES;
+    }
+
+    private static function resolve_print_template_url($custom_url) {
+        if (!empty($custom_url)) {
+            return esc_url_raw($custom_url);
+        }
+
+        return plugins_url('assets/giftcard/print-default.html', self::get_plugin_main_file());
+    }
+
+    private static function get_plugin_main_file() {
+        static $plugin_file = null;
+        if (!$plugin_file) {
+            $plugin_file = trailingslashit(MYSHOP_PLUGIN_DIR) . 'myshop-core.php';
+        }
+        return $plugin_file;
     }
 }

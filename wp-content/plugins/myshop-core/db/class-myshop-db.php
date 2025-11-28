@@ -1,6 +1,6 @@
 <?php
 class MyShop_DB {
-    const VERSION = '1.4.0';
+    const VERSION = '1.5.0';
     const OPTION_KEY = 'myshop_db_version';
 
     public static function install() {
@@ -31,7 +31,7 @@ class MyShop_DB {
             "CREATE TABLE {$prefix}myshop_gift_card_templates (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 name VARCHAR(100) NOT NULL,
-                type ENUM('fixed_amount','product_bundle') NOT NULL,
+                type ENUM('fixed_amount','product_bundle','custom_bundle') NOT NULL,
                 fixed_amount DECIMAL(10,2) NULL,
                 currency CHAR(3) NOT NULL DEFAULT 'CNY',
                 product_id BIGINT UNSIGNED NULL,
@@ -50,7 +50,7 @@ class MyShop_DB {
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 card_number VARCHAR(32) NOT NULL,
                 template_id BIGINT UNSIGNED NOT NULL,
-                template_type ENUM('fixed_amount','product_bundle') NOT NULL,
+                template_type ENUM('fixed_amount','product_bundle','custom_bundle') NOT NULL,
                 initial_amount DECIMAL(10,2) NULL,
                 balance DECIMAL(10,2) NULL,
                 currency CHAR(3) NOT NULL DEFAULT 'CNY',

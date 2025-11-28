@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>礼品卡打印模板</title>
+<style>
+  body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f8fafc;
+    color: #0f172a;
+  }
+  .card-wrapper {
+    width: 210mm; /* A4 宽度 */
+    height: 297mm;
+    padding: 30mm;
+    box-sizing: border-box;
+    background: linear-gradient(135deg, #0ea5e9, #1d4ed8);
+    color: #fff;
+  }
+  .brand {
+    font-size: 28px;
+    letter-spacing: 4px;
+  }
+  .title {
+    margin-top: 20mm;
+    font-size: 42px;
+    font-weight: 600;
+  }
+  .subtitle {
+    font-size: 22px;
+    margin-bottom: 10mm;
+  }
+  .info-box {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 10mm;
+    margin-bottom: 10mm;
+  }
+  .info-label {
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 2px;
+    opacity: 0.8;
+  }
+  .info-value {
+    font-size: 26px;
+    font-weight: 600;
+    margin-top: 4mm;
+    letter-spacing: 2px;
+  }
+  .pin-mask {
+    margin-top: 8mm;
+    padding: 6mm;
+    background: rgba(15, 23, 42, 0.45);
+    border-radius: 6px;
+  }
+  .pin-mask span {
+    display: inline-block;
+    width: 12mm;
+    height: 12mm;
+    margin-right: 4mm;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+  }
+  .qr-block {
+    display: flex;
+    align-items: center;
+    gap: 10mm;
+    margin-top: 12mm;
+  }
+  .qr-placeholder {
+    width: 60mm;
+    height: 60mm;
+    background: #fff;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0f172a;
+    font-weight: 600;
+  }
+  .terms {
+    margin-top: 16mm;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+  <div class="card-wrapper">
+    <div class="brand">MyShop Farm</div>
+    <div class="title">礼品卡</div>
+    <div class="subtitle">凭卡可兑换两箱有机稻花香</div>
+
+    <div class="info-box">
+      <div class="info-label">Card Number</div>
+      <div class="info-value">{{CARD_NUMBER}}</div>
+    </div>
+
+    <div class="info-box">
+      <div class="info-label">PIN (刮开涂层)</div>
+      <div class="pin-mask">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div class="qr-block">
+      <div class="qr-placeholder">{{QR_CODE}}</div>
+      <div>
+        <strong>扫码领取 / 输入 PIN</strong>
+        <p>登录微信小程序后，输入卡号与 PIN 即可填写收货地址并安排配送。</p>
+      </div>
+    </div>
+
+    <div class="terms">
+      <p>• 礼品卡有效期：{{EXPIRES_AT}}</p>
+      <p>• 领取成功后不可再次转赠；如需协助请联系企业微信客服。</p>
+      <p>• 线下打印建议使用 300dpi 彩色输出，并覆盖 PIN 区域的刮刮膜。</p>
+    </div>
+  </div>
+</body>
+</html>
