@@ -24,6 +24,22 @@ class Cart_Controller {
             'callback' => [self::class, 'clear_cart'],
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
+
+        register_rest_route('myshop/v1', '/cart/(?P<variation_id>\d+)', [
+            'methods' => \WP_REST_Server::EDITABLE,
+            'callback' => [self::class, 'update_item'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'variation_id' => ['required' => true, 'type' => 'integer'],
+                'quantity'     => ['required' => true, 'type' => 'integer']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/cart/(?P<variation_id>\d+)', [
+            'methods' => \WP_REST_Server::DELETABLE,
+            'callback' => [self::class, 'remove_item'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
     }
 
     public static function get_cart($request) {
@@ -160,6 +176,88 @@ class Cart_Controller {
         return rest_ensure_response([
             'success' => true,
             'message' => '购物车已清空'
+        ]);
+    }
+
+    public static function update_item($request) {
+        $auth = MyShop_Auth::check_permission($request);
+        if (is_wp_error($auth)) {
+            return $auth;
+        }
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $variation_id = absint($request['variation_id']);
+        if (!$variation_id) {
+            return new WP_Error('invalid_variation', '无效的 SKU', ['status' => 400]);
+        }
+
+        $params = $request->get_json_params();
+        $quantity = isset($params['quantity']) ? intval($params['quantity']) : 0;
+
+        $cart = get_user_meta($user->ID, '_myshop_cart', true);
+        if (!is_array($cart)) {
+            $cart = [];
+        }
+
+        if ($quantity <= 0) {
+            if (isset($cart[$variation_id])) {
+                unset($cart[$variation_id]);
+                update_user_meta($user->ID, '_myshop_cart', $cart);
+            }
+            return rest_ensure_response([
+                'success' => true,
+                'message' => '已从购物车移除'
+            ]);
+        }
+
+        $variation = wc_get_product($variation_id);
+        if (!$variation || !$variation->is_type('variation')) {
+            return new WP_Error('invalid_variation', '无效的 SKU', ['status' => 400]);
+        }
+
+        $cart[$variation_id] = ['quantity' => $quantity];
+        update_user_meta($user->ID, '_myshop_cart', $cart);
+
+        return rest_ensure_response([
+            'success' => true,
+            'message' => '购物车数量已更新',
+            'quantity' => $quantity
+        ]);
+    }
+
+    public static function remove_item($request) {
+        $auth = MyShop_Auth::check_permission($request);
+        if (is_wp_error($auth)) {
+            return $auth;
+        }
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $variation_id = absint($request['variation_id']);
+        if (!$variation_id) {
+            return new WP_Error('invalid_variation', '无效的 SKU', ['status' => 400]);
+        }
+
+        $cart = get_user_meta($user->ID, '_myshop_cart', true);
+        if (!is_array($cart)) {
+            $cart = [];
+        }
+
+        if (isset($cart[$variation_id])) {
+            unset($cart[$variation_id]);
+            update_user_meta($user->ID, '_myshop_cart', $cart);
+        }
+
+        return rest_ensure_response([
+            'success' => true,
+            'message' => '已从购物车移除'
         ]);
     }
 }
