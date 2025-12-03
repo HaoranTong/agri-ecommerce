@@ -40,6 +40,18 @@ class Points_Controller {
                 'target_openid'  => ['required' => false, 'type' => 'string']
             ]
         ]);
+
+        register_rest_route('myshop/v1', '/points/settings', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_settings'],
+            'permission_callback' => '__return_true'
+        ]);
+        
+        register_rest_route('myshop/v1', '/points/rules', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_rules'],
+            'permission_callback' => '__return_true'
+        ]);
     }
 
     public static function get_balance($request) {
@@ -318,5 +330,57 @@ class Points_Controller {
             "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = '_wechat_openid' AND meta_value = %s LIMIT 1",
             $openid
         ));
+    }
+
+    /**
+     * 获取积分设置（用于前端计算积分抵扣）
+     */
+    public static function get_settings($request) {
+        $defaults = [
+            'enable_points' => 1,
+            'earn_rate' => 10,
+            'min_order_amount' => 0,
+            'register_bonus' => 100,
+            'daily_signin_points' => 10,
+            'enable_points_discount' => 1,
+            'redeem_rate' => 100,
+            'min_points_to_use' => 100,
+            'max_discount_percent' => 50,
+            'min_order_amount_to_use' => 0,
+            'enable_expiry' => 0,
+            'expiry_days' => 365
+        ];
+        
+        $settings = get_option('myshop_points_settings', []);
+        $merged = wp_parse_args($settings, $defaults);
+        
+        // 只返回前端需要的关键设置
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'enable_points_discount' => (bool) $merged['enable_points_discount'],
+                'redeem_rate' => (float) $merged['redeem_rate'], // 积分抵扣比例（每X积分=1元）
+                'min_points_to_use' => (int) $merged['min_points_to_use'], // 最低使用积分
+                'max_discount_percent' => (float) $merged['max_discount_percent'], // 最大抵扣比例（百分比）
+                'min_order_amount_to_use' => (float) $merged['min_order_amount_to_use'] // 最低订单金额
+            ]
+        ]);
+    }
+    
+    /**
+     * 获取积分规则列表
+     */
+    public static function get_rules($request) {
+        // 从积分设置中获取规则信息，或者从其他地方获取
+        // 这里先返回空数组，后续可以从后台设置中获取
+        $rules = [];
+        
+        // 可以后续扩展：从数据库或设置中读取规则
+        // 目前先返回空数组，避免前端报错
+        
+        return rest_ensure_response([
+            'success' => true,
+            'data' => $rules
+        ]);
     }
 }

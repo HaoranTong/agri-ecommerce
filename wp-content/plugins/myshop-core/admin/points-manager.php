@@ -25,6 +25,9 @@ class MyShop_Points_Manager {
         
         // 保存积分设置
         add_action('admin_init', [self::class, 'handle_save_settings']);
+        
+        // 保存积分兑换商品设置
+        add_action('admin_post_myshop_save_points_redeem_products', [self::class, 'handle_save_redeem_products']);
     }
     
     /**
@@ -57,6 +60,15 @@ class MyShop_Points_Manager {
             'manage_options',
             'myshop-points-ledger',
             [self::class, 'render_ledger_page']
+        );
+        
+        add_submenu_page(
+            'myshop-points',
+            '积分兑换商品设置',
+            '积分兑换商品设置',
+            'manage_options',
+            'myshop-points-redeem-products',
+            [self::class, 'render_redeem_products_page']
         );
     }
     
@@ -407,7 +419,9 @@ class MyShop_Points_Manager {
             'max_discount_percent' => 50,
             'min_order_amount_to_use' => 0,
             'enable_expiry' => 0,
-            'expiry_days' => 365
+            'expiry_days' => 365,
+            'redeem_allowed_product_ids' => [],
+            'redeem_allowed_variation_ids' => []
         ];
         
         $settings = get_option('myshop_points_settings', []);
@@ -654,6 +668,353 @@ class MyShop_Points_Manager {
         
         // 更新用户 meta
         update_user_meta($user_id, '_myshop_total_points', $points);
+    }
+    
+    /**
+     * 渲染积分兑换商品设置页面
+     */
+    public static function render_redeem_products_page() {
+        $settings = self::get_settings();
+        $allowed_product_ids = isset($settings['redeem_allowed_product_ids']) ? (array) $settings['redeem_allowed_product_ids'] : [];
+        $allowed_variation_ids = isset($settings['redeem_allowed_variation_ids']) ? (array) $settings['redeem_allowed_variation_ids'] : [];
+        
+        // 自动清理已下架或已删除的商品和变体ID
+        $cleaned_settings = self::clean_invalid_redeem_products($allowed_product_ids, $allowed_variation_ids);
+        if ($cleaned_settings['has_changes']) {
+            $settings['redeem_allowed_product_ids'] = $cleaned_settings['product_ids'];
+            $settings['redeem_allowed_variation_ids'] = $cleaned_settings['variation_ids'];
+            update_option('myshop_points_settings', $settings);
+            $allowed_product_ids = $cleaned_settings['product_ids'];
+            $allowed_variation_ids = $cleaned_settings['variation_ids'];
+        }
+        
+        // 获取所有已发布的商品（实际商品，实时同步）
+        $products = get_posts([
+            'post_type' => 'product',
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+            'orderby' => 'title',
+            'order' => 'ASC'
+        ]);
+        
+        // 获取已下架但之前被选中的商品（用于提示管理员）
+        $unpublished_products = [];
+        if (!empty($allowed_product_ids)) {
+            $unpublished_posts = get_posts([
+                'post_type' => 'product',
+                'posts_per_page' => -1,
+                'post_status' => ['draft', 'private', 'pending'],
+                'post__in' => $allowed_product_ids,
+                'orderby' => 'title',
+                'order' => 'ASC'
+            ]);
+            foreach ($unpublished_posts as $post) {
+                $unpublished_products[$post->ID] = $post;
+            }
+        }
+        
+        // 显示保存成功消息
+        if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
+            echo '<div class="notice notice-success is-dismissible"><p>✓ 积分兑换商品设置已保存</p></div>';
+        }
+        
+        ?>
+        <div class="wrap">
+            <h1>🛒 积分兑换商品设置</h1>
+            <p class="description">设置哪些商品和变体可以用积分兑换。只有被选中的商品/变体才会在积分兑换页面显示。</p>
+            
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('myshop_save_points_redeem_products'); ?>
+                <input type="hidden" name="action" value="myshop_save_points_redeem_products" />
+                
+                <div style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #ccc; border-radius: 8px;">
+                    <h2>选择可用积分兑换的商品和变体</h2>
+                    
+                    <p>
+                        <strong>说明：</strong>
+                        <br>• 本页面显示的所有商品都是从WooCommerce商品库实时同步的，已发布的商品会自动显示
+                        <br>• 商品下架后会自动从积分兑换列表中移除，无需手动操作
+                        <br>• 选择商品：表示该商品的所有变体都可以用积分兑换
+                        <br>• 选择变体：只允许指定的变体使用积分兑换，优先级高于商品选择
+                        <br>• 未选中的商品/变体不会在积分兑换页面显示
+                    </p>
+                    
+                    <?php if (!empty($unpublished_products)): ?>
+                        <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin: 15px 0; border-radius: 4px;">
+                            <strong>⚠️ 提示：以下商品已下架或未发布，但仍在积分兑换列表中：</strong>
+                            <ul style="margin: 10px 0 0 20px;">
+                                <?php foreach ($unpublished_products as $post): ?>
+                                    <li><?php echo esc_html($post->post_title); ?> (ID: <?php echo $post->ID; ?>) - 状态: <?php echo esc_html($post->post_status); ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <p style="margin: 10px 0 0; font-size: 13px; color: #666;">
+                                这些商品将在下次保存时自动清理，或现在保存即可清理。
+                            </p>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <div style="margin: 20px 0;">
+                        <div style="margin-bottom: 15px;">
+                            <input 
+                                type="text" 
+                                id="product-search" 
+                                placeholder="搜索商品名称..." 
+                                style="width: 300px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
+                            />
+                            <span style="margin-left: 10px; color: #666; font-size: 13px;">输入商品名称进行搜索</span>
+                        </div>
+                        <label style="font-weight: bold; display: block; margin-bottom: 10px;">
+                            <input type="checkbox" id="select-all-products" />
+                            全选/取消全选所有商品
+                        </label>
+                    </div>
+                    
+                    <div id="products-container" style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; background: #f9f9f9;">
+                        <?php foreach ($products as $product_post): 
+                            $product = wc_get_product($product_post->ID);
+                            if (!$product || !in_array($product->get_type(), ['simple', 'variable'])) {
+                                continue;
+                            }
+                            
+                            $is_product_selected = in_array($product_post->ID, $allowed_product_ids);
+                            $has_variations = $product->is_type('variable');
+                            
+                            // 获取变体列表
+                            $variations = [];
+                            if ($has_variations) {
+                                $variations = $product->get_available_variations();
+                            }
+                        ?>
+                            <div class="product-item" style="margin-bottom: 20px; padding: 15px; background: #fff; border: 1px solid #e0e0e0; border-radius: 4px;" data-product-name="<?php echo esc_attr(strtolower($product_post->post_title)); ?>">
+                                <label style="font-weight: bold; display: flex; align-items: center; cursor: pointer;">
+                                    <input 
+                                        type="checkbox" 
+                                        name="allowed_product_ids[]" 
+                                        value="<?php echo esc_attr($product_post->ID); ?>"
+                                        class="product-checkbox"
+                                        <?php checked($is_product_selected); ?>
+                                        style="margin-right: 8px;"
+                                    />
+                                    <span class="product-name"><?php echo esc_html($product_post->post_title); ?> (ID: <?php echo $product_post->ID; ?>)</span>
+                                    <span style="color: #666; margin-left: 10px; font-size: 12px;">
+                                        <?php echo $has_variations ? '[变体商品]' : '[单品]'; ?>
+                                    </span>
+                                </label>
+                                
+                                <?php if ($has_variations && !empty($variations)): ?>
+                                    <div style="margin-left: 30px; margin-top: 10px; padding-left: 15px; border-left: 2px solid #ddd;">
+                                        <p style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                                            <strong>变体选择（可选）：</strong>如果不选择任何变体，则所有变体都可用积分兑换
+                                        </p>
+                                        <?php foreach ($variations as $variation_data): 
+                                            $variation_id = $variation_data['variation_id'];
+                                            $variation_obj = wc_get_product($variation_id);
+                                            if (!$variation_obj) continue;
+                                            
+                                            $is_variation_selected = in_array($variation_id, $allowed_variation_ids);
+                                            $variation_attrs = [];
+                                            foreach ($variation_data['attributes'] as $attr_key => $attr_value) {
+                                                $taxonomy = str_replace('attribute_', '', $attr_key);
+                                                $term = get_term_by('slug', $attr_value, $taxonomy);
+                                                if ($term) {
+                                                    $variation_attrs[] = $term->name;
+                                                }
+                                            }
+                                            $variation_name = !empty($variation_attrs) ? implode(' | ', $variation_attrs) : '默认规格';
+                                        ?>
+                                            <label style="display: block; margin-bottom: 5px; cursor: pointer; font-size: 13px;">
+                                                <input 
+                                                    type="checkbox" 
+                                                    name="allowed_variation_ids[]" 
+                                                    value="<?php echo esc_attr($variation_id); ?>"
+                                                    class="variation-checkbox"
+                                                    <?php checked($is_variation_selected); ?>
+                                                    style="margin-right: 5px;"
+                                                />
+                                                <span><?php echo esc_html($variation_name); ?></span>
+                                                <span style="color: #999;">(ID: <?php echo $variation_id; ?>)</span>
+                                                <span style="color: #0a9;"> - ¥<?php echo number_format($variation_obj->get_price(), 2); ?></span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                        
+                        <?php if (empty($products)): ?>
+                            <p style="text-align: center; padding: 40px; color: #999;">暂无商品，请先在WooCommerce中添加商品</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <p>
+                    <button type="submit" name="myshop_save_redeem_products" class="button button-primary button-large">
+                        💾 保存设置
+                    </button>
+                </p>
+            </form>
+            
+            <script>
+            jQuery(document).ready(function($) {
+                // 全选/取消全选商品
+                $('#select-all-products').on('change', function() {
+                    $('.product-item:visible .product-checkbox').prop('checked', this.checked);
+                });
+                
+                // 如果所有商品都已选中，自动勾选全选
+                $('.product-checkbox').on('change', function() {
+                    var visibleCheckboxes = $('.product-item:visible .product-checkbox');
+                    var allChecked = visibleCheckboxes.length > 0 && 
+                        visibleCheckboxes.filter(':checked').length === visibleCheckboxes.length;
+                    $('#select-all-products').prop('checked', allChecked);
+                });
+                
+                // 搜索功能
+                $('#product-search').on('input', function() {
+                    var searchTerm = $(this).val().toLowerCase().trim();
+                    $('.product-item').each(function() {
+                        var productName = $(this).data('product-name') || '';
+                        if (searchTerm === '' || productName.indexOf(searchTerm) !== -1) {
+                            $(this).show();
+                        } else {
+                            $(this).hide();
+                        }
+                    });
+                });
+            });
+            </script>
+        </div>
+        <?php
+    }
+    
+    /**
+     * 处理保存积分兑换商品设置请求
+     */
+    public static function handle_save_redeem_products() {
+        // 验证 nonce
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'myshop_save_points_redeem_products')) {
+            wp_die('安全验证失败');
+        }
+        
+        // 检查权限
+        if (!current_user_can('manage_options')) {
+            wp_die('权限不足');
+        }
+        
+        // 获取当前设置
+        $settings = self::get_settings();
+        
+        // 处理商品ID列表
+        $allowed_product_ids = [];
+        if (isset($_POST['allowed_product_ids']) && is_array($_POST['allowed_product_ids'])) {
+            $allowed_product_ids = array_map('intval', $_POST['allowed_product_ids']);
+            $allowed_product_ids = array_filter($allowed_product_ids); // 移除0值
+            $allowed_product_ids = array_unique($allowed_product_ids); // 去重
+        }
+        
+        // 处理变体ID列表
+        $allowed_variation_ids = [];
+        if (isset($_POST['allowed_variation_ids']) && is_array($_POST['allowed_variation_ids'])) {
+            $allowed_variation_ids = array_map('intval', $_POST['allowed_variation_ids']);
+            $allowed_variation_ids = array_filter($allowed_variation_ids); // 移除0值
+            $allowed_variation_ids = array_unique($allowed_variation_ids); // 去重
+        }
+        
+        // 自动清理已下架或已删除的商品和变体ID
+        $cleaned = self::clean_invalid_redeem_products($allowed_product_ids, $allowed_variation_ids);
+        $allowed_product_ids = $cleaned['product_ids'];
+        $allowed_variation_ids = $cleaned['variation_ids'];
+        
+        // 更新设置
+        $settings['redeem_allowed_product_ids'] = $allowed_product_ids;
+        $settings['redeem_allowed_variation_ids'] = $allowed_variation_ids;
+        
+        update_option('myshop_points_settings', $settings);
+        
+        // 重定向回设置页面并显示成功消息
+        wp_redirect(add_query_arg([
+            'page' => 'myshop-points-redeem-products',
+            'settings-updated' => 'true'
+        ], admin_url('admin.php')));
+        exit;
+    }
+    
+    /**
+     * 清理无效的积分兑换商品和变体ID
+     * 移除已下架、已删除或不存在的商品/变体
+     * 
+     * @param array $product_ids 商品ID数组
+     * @param array $variation_ids 变体ID数组
+     * @return array 清理后的商品ID和变体ID，以及是否有变更
+     */
+    public static function clean_invalid_redeem_products($product_ids, $variation_ids) {
+        $has_changes = false;
+        
+        // 清理商品ID：只保留已发布且存在的商品
+        $cleaned_product_ids = [];
+        if (!empty($product_ids)) {
+            $valid_products = get_posts([
+                'post_type' => 'product',
+                'posts_per_page' => -1,
+                'post_status' => 'publish',
+                'post__in' => $product_ids,
+                'fields' => 'ids'
+            ]);
+            
+            $cleaned_product_ids = array_map('intval', $valid_products);
+            
+            if (count($cleaned_product_ids) !== count($product_ids)) {
+                $has_changes = true;
+            }
+        }
+        
+        // 清理变体ID：只保留存在且所属商品已发布的变体
+        $cleaned_variation_ids = [];
+        if (!empty($variation_ids)) {
+            foreach ($variation_ids as $variation_id) {
+                $variation = wc_get_product($variation_id);
+                
+                // 检查变体是否存在
+                if (!$variation || !$variation->is_type('variation')) {
+                    $has_changes = true;
+                    continue;
+                }
+                
+                // 获取父商品ID
+                $parent_id = $variation->get_parent_id();
+                if (!$parent_id) {
+                    $has_changes = true;
+                    continue;
+                }
+                
+                // 检查父商品是否已发布
+                $parent_post = get_post($parent_id);
+                if (!$parent_post || $parent_post->post_status !== 'publish') {
+                    $has_changes = true;
+                    continue;
+                }
+                
+                // 检查变体是否在库存中（可选）
+                if (!$variation->is_in_stock() && !$variation->backorders_allowed()) {
+                    // 如果缺货且不允许缺货销售，可以考虑移除，但这里先保留
+                    // 实际使用时，API接口会再次过滤库存状态
+                }
+                
+                $cleaned_variation_ids[] = (int) $variation_id;
+            }
+            
+            $cleaned_variation_ids = array_unique($cleaned_variation_ids);
+            
+            if (count($cleaned_variation_ids) !== count($variation_ids)) {
+                $has_changes = true;
+            }
+        }
+        
+        return [
+            'product_ids' => $cleaned_product_ids,
+            'variation_ids' => $cleaned_variation_ids,
+            'has_changes' => $has_changes
+        ];
     }
 }
 

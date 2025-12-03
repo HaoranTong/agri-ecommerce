@@ -1,0 +1,16 @@
+{
+  "id": "style-1",
+  "name": "经典风格",
+  "preview_image": "https://dummyimage.com/300x400/1e3a8a/ffffff&text=%E7%BB%8F%E5%85%B8%E9%A3%8E%E6%A0%BC",
+  "title": "赠送稻花香双礼盒",
+  "subtitle": "好友领取礼卡后即可填写地址并预约配送",
+  "background_image": "https://dummyimage.com/750x1334/1e3a8a/ffffff&text=%E7%BB%8F%E5%85%B8%E9%A3%8E%E6%A0%BC",
+  "qr_caption": "长按识别二维码领取购物卡",
+  "button_text": "立即领取",
+  "brand_logo": "https://dummyimage.com/200x80/ffffff/1e3a8a&text=常香米坊",
+  "terms": [
+    "购物卡仅限兑换指定商品",
+    "有效期内未兑换将自动过期",
+    "如需帮助请联系企业微信客服"
+  ]
+}

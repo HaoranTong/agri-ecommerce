@@ -1,6 +1,6 @@
 <?php
 class MyShop_DB {
-    const VERSION = '1.5.0';
+    const VERSION = '1.6.0';
     const OPTION_KEY = 'myshop_db_version';
 
     public static function install() {
@@ -65,6 +65,9 @@ class MyShop_DB {
                 share_token VARCHAR(64) NULL,
                 share_channel VARCHAR(32) NULL,
                 share_token_expires_at DATETIME NULL,
+                share_meta LONGTEXT NULL,
+                shared_at DATETIME NULL,
+                shared_count INT UNSIGNED NOT NULL DEFAULT 0,
                 print_package_url VARCHAR(255) NULL,
                 pin_code_hash VARCHAR(255) NULL,
                 pin_revealed_at DATETIME NULL,

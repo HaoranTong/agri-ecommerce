@@ -20,6 +20,13 @@ class User_Controller {
             'callback' => [self::class, 'update_profile'],
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
+        
+        // 获取用户地址列表（包含默认地址）
+        register_rest_route('myshop/v1', '/user/addresses', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_addresses'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
     }
 
     public static function get_profile($request) {
@@ -100,5 +107,60 @@ class User_Controller {
         
         // 返回更新后的资料
         return self::get_profile($request);
+    }
+    
+    /**
+     * 获取用户地址列表（包含默认地址）
+     */
+    public static function get_addresses($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+        
+        $user_id = $user->ID;
+        $user_addresses = get_user_meta($user_id, '_myshop_addresses', true);
+        
+        if (!is_array($user_addresses)) {
+            $user_addresses = [];
+        }
+        
+        // 格式化地址数据，与前端格式保持一致
+        $formatted_addresses = [];
+        foreach ($user_addresses as $addr) {
+            $formatted_addresses[] = [
+                'id' => $addr['id'] ?? uniqid('addr_'),
+                'name' => $addr['name'] ?? '',
+                'phone' => $addr['phone'] ?? '',
+                'province' => $addr['province'] ?? '',
+                'city' => $addr['city'] ?? '',
+                'district' => $addr['district'] ?? '',
+                'detail_address' => $addr['detail'] ?? $addr['detail_address'] ?? '',
+                'postcode' => $addr['postal_code'] ?? $addr['postcode'] ?? '',
+                'isDefault' => !empty($addr['is_default']),
+                'created_at' => $addr['created_at'] ?? ''
+            ];
+        }
+        
+        // 找到默认地址
+        $default_address = null;
+        foreach ($formatted_addresses as $addr) {
+            if ($addr['isDefault']) {
+                $default_address = $addr;
+                break;
+            }
+        }
+        // 如果没有默认地址，返回第一个地址作为默认
+        if (!$default_address && !empty($formatted_addresses)) {
+            $default_address = $formatted_addresses[0];
+        }
+        
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'addresses' => $formatted_addresses,
+                'default_address' => $default_address
+            ]
+        ]);
     }
 }

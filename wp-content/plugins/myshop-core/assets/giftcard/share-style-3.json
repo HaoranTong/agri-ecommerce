@@ -1,0 +1,16 @@
+{
+  "id": "style-3",
+  "name": "节日风格",
+  "preview_image": "https://dummyimage.com/300x400/dc2626/ffffff&text=%E8%8A%82%E6%97%A5%E9%A3%8E%E6%A0%BC",
+  "title": "节日好礼",
+  "subtitle": "送上最真挚的祝福与心意",
+  "background_image": "https://dummyimage.com/750x1334/dc2626/ffffff&text=%E8%8A%82%E6%97%A5%E9%A3%8E%E6%A0%BC",
+  "qr_caption": "长按识别领取节日好礼",
+  "button_text": "立即领取",
+  "brand_logo": "https://dummyimage.com/200x80/ffffff/dc2626&text=常香米坊",
+  "terms": [
+    "购物卡限时有效，请及时使用",
+    "可兑换精选商品组合",
+    "节日特惠，不容错过"
+  ]
+}

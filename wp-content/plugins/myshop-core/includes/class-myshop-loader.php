@@ -15,7 +15,8 @@ class MyShop_Loader {
             'api/points-controller.php',
             'api/referral-controller.php',
             'api/commission-controller.php',
-            'api/agent-controller.php'
+            'api/agent-controller.php',
+            'api/coupon-controller.php'
         ];
 
         foreach ($includes as $relative_path) {
@@ -29,6 +30,10 @@ class MyShop_Loader {
 
         add_action('plugins_loaded', ['MyShop_DB', 'upgrade']);
         add_action('rest_api_init', ['MyShop_Loader', 'register_routes']);
+
+        if (class_exists('Gift_Card_Controller') && method_exists('Gift_Card_Controller', 'boot')) {
+            Gift_Card_Controller::boot();
+        }
     }
 
     public static function register_routes() {
@@ -45,7 +50,8 @@ class MyShop_Loader {
             'Points_Controller',
             'Referral_Controller',
             'Commission_Controller',
-            'Agent_Controller'
+            'Agent_Controller',
+            'Coupon_Controller'
         ];
 
         foreach ($controllers as $controller) {

@@ -15,8 +15,8 @@ class MyShop_Gift_Card_Template_Manager {
 
     public static function register_menu() {
         add_menu_page(
-            __('礼品卡模板', 'myshop'),
-            __('礼品卡模板', 'myshop'),
+            __('购物卡模板', 'myshop'),
+            __('购物卡模板', 'myshop'),
             'manage_woocommerce',
             self::PAGE_SLUG,
             [self::class, 'render_page'],
@@ -43,7 +43,7 @@ class MyShop_Gift_Card_Template_Manager {
 
     private static function render_list($templates) {
         echo '<div class="wrap">';
-        echo '<h1>' . esc_html__('礼品卡模板管理', 'myshop') . '</h1>';
+        echo '<h1>' . esc_html__('购物卡模板管理', 'myshop') . '</h1>';
         echo '<a href="' . esc_url(add_query_arg(['page' => self::PAGE_SLUG, 'action' => 'edit'], admin_url('admin.php'))) . '" class="page-title-action">' . esc_html__('新增模板', 'myshop') . '</a>';
 
         echo '<table class="wp-list-table widefat fixed striped">';
@@ -108,14 +108,14 @@ class MyShop_Gift_Card_Template_Manager {
                 <th><label for="type">' . esc_html__('模板类型', 'myshop') . '</label></th>
                 <td>
                     <select name="type" id="type">
-                        <option value="fixed_amount" ' . selected($template->type ?? '', 'fixed_amount', false) . '>' . esc_html__('储值卡', 'myshop') . '</option>
-                        <option value="product_bundle" ' . selected($template->type ?? '', 'product_bundle', false) . '>' . esc_html__('商品兑换卡', 'myshop') . '</option>
-                        <option value="custom_bundle" ' . selected($template->type ?? '', 'custom_bundle', false) . '>' . esc_html__('任意组合', 'myshop') . '</option>
+                        <option value="fixed_amount" ' . selected($template->type ?? '', 'fixed_amount', false) . '>' . esc_html__('储值卡购物卡', 'myshop') . '</option>
+                        <option value="product_bundle" ' . selected($template->type ?? '', 'product_bundle', false) . '>' . esc_html__('固定组合购物卡', 'myshop') . '</option>
+                        <option value="custom_bundle" ' . selected($template->type ?? '', 'custom_bundle', false) . '>' . esc_html__('任意组合购物卡', 'myshop') . '</option>
                     </select>
                 </td>
             </tr>';
 
-        self::render_input_row('fixed_amount', '储值卡面额', $template->fixed_amount ?? '', 'number', false, ['step' => '0.01']);
+        self::render_input_row('fixed_amount', '储值购物卡面额', $template->fixed_amount ?? '', 'number', false, ['step' => '0.01']);
         self::render_input_row('currency', '币种', $template->currency ?? 'CNY');
         self::render_input_row(
             'product_id',
@@ -124,7 +124,7 @@ class MyShop_Gift_Card_Template_Manager {
             'number',
             false,
             [],
-            __('仅商品兑换卡需要；任意组合卡会在下单时根据订单快照自动记录。', 'myshop')
+            __('仅固定组合购物卡需要；任意组合购物卡会在下单时根据订单快照自动记录。', 'myshop')
         );
         self::render_input_row(
             'variation_ids',
@@ -139,7 +139,7 @@ class MyShop_Gift_Card_Template_Manager {
             'bundle_items',
             '礼包明细(JSON)',
             $bundle_items ? wp_json_encode($bundle_items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : '',
-            __('仅商品兑换卡需要预设礼包；任意组合卡会写入下单商品快照。示例：[{"product_id":101,"variation_id":202,"quantity":2}]', 'myshop')
+            __('仅固定组合购物卡需要预设礼包；任意组合购物卡会写入下单商品快照。示例：[{"product_id":101,"variation_id":202,"quantity":2}]', 'myshop')
         );
         self::render_input_row('valid_days', '有效期(天)', $template->valid_days ?? 365, 'number');
 
@@ -167,11 +167,11 @@ class MyShop_Gift_Card_Template_Manager {
         echo '<div class="notice notice-info" style="margin-top:15px;">';
         echo '<p><strong>' . esc_html__('使用说明', 'myshop') . '</strong></p>';
         echo '<ul style="margin-left:20px;list-style:disc;">';
-        echo '<li>' . esc_html__('储值卡适用于多次抵扣，商品兑换卡/任意组合卡将根据模板或订单快照兑换指定商品。', 'myshop') . '</li>';
-        echo '<li>' . esc_html__('任意组合卡建议命名为“订单自选礼卡”等描述性名称，兑换内容来自下单时的商品快照。', 'myshop') . '</li>';
+        echo '<li>' . esc_html__('储值购物卡适用于多次抵扣，固定组合购物卡/任意组合购物卡将根据模板或订单快照兑换指定商品。', 'myshop') . '</li>';
+        echo '<li>' . esc_html__('任意组合购物卡建议命名为“订单自选购物卡”等描述性名称，兑换内容来自下单时的商品快照。', 'myshop') . '</li>';
         echo '<li>' . sprintf(__('默认分享模板：%s；默认打印模板：%s。可在下方自定义。', 'myshop'), self::get_asset_link('assets/giftcard/share-default.json'), self::get_asset_link('assets/giftcard/print-default.html')) . '</li>';
         echo '<li>' . esc_html__('交付方式在用户分享时选择，模板只需声明允许的模式；未勾选则默认同时开启数字分享与打印。', 'myshop') . '</li>';
-        echo '<li>' . esc_html__('任意组合卡无需填写商品/变体/礼包字段，系统将以订单中的 SKU 快照作为兑换依据。', 'myshop') . '</li>';
+        echo '<li>' . esc_html__('任意组合购物卡无需填写商品/变体/礼包字段，系统将以订单中的 SKU 快照作为兑换依据。', 'myshop') . '</li>';
         echo '</ul>';
         echo '</div>';
     }
@@ -238,10 +238,16 @@ class MyShop_Gift_Card_Template_Manager {
             $bundle_json_for_save = $bundle_items_json;
         }
 
+        $fixed_amount_input = isset($input['fixed_amount']) ? trim((string) $input['fixed_amount']) : '';
+        $fixed_amount = $fixed_amount_input === '' ? null : (float) $fixed_amount_input;
+        if ($type !== 'fixed_amount') {
+            $fixed_amount = null;
+        }
+
         return [
             'name'                 => sanitize_text_field($input['name'] ?? ''),
             'type'                 => $type,
-            'fixed_amount'         => isset($input['fixed_amount']) ? (float) $input['fixed_amount'] : null,
+            'fixed_amount'         => $fixed_amount,
             'currency'             => sanitize_text_field($input['currency'] ?? 'CNY'),
             'product_id'           => $product_id,
             'variation_ids'        => $variation_ids,
@@ -302,9 +308,9 @@ class MyShop_Gift_Card_Template_Manager {
 
     private static function get_type_label($type) {
         $map = [
-            'fixed_amount'   => __('储值卡', 'myshop'),
-            'product_bundle' => __('商品兑换卡', 'myshop'),
-            'custom_bundle'  => __('任意组合卡', 'myshop')
+            'fixed_amount'   => __('储值卡购物卡', 'myshop'),
+            'product_bundle' => __('固定组合购物卡', 'myshop'),
+            'custom_bundle'  => __('任意组合购物卡', 'myshop')
         ];
         return $map[$type] ?? $type;
     }

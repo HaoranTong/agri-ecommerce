@@ -1,0 +1,16 @@
+{
+  "id": "style-2",
+  "name": "简约风格",
+  "preview_image": "https://dummyimage.com/300x400/059669/ffffff&text=%E7%AE%80%E7%BA%A6%E9%A3%8E%E6%A0%BC",
+  "title": "购物卡礼赠",
+  "subtitle": "让好友自由选择心仪商品",
+  "background_image": "https://dummyimage.com/750x1334/059669/ffffff&text=%E7%AE%80%E7%BA%A6%E9%A3%8E%E6%A0%BC",
+  "qr_caption": "扫描二维码领取购物卡",
+  "button_text": "马上领取",
+  "brand_logo": "https://dummyimage.com/200x80/ffffff/059669&text=常香米坊",
+  "terms": [
+    "购物卡可用于购买指定商品",
+    "请在有效期内使用",
+    "如有疑问请联系客服"
+  ]
+}
