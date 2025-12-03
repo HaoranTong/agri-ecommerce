@@ -1,11 +1,4 @@
 # WordPress core
-wp-admin/
-wp-includes/
-index.php
-license.txt
-readme.html
-xmlrpc.php
-wp-*.php
 .htaccess
 
 # Config & secrets
@@ -20,16 +13,8 @@ wp-content/upgrade/
 wp-content/debug.log
 
 # Third-party plugins (keep only your own)
-wp-content/plugins/!myshop-core/
-wp-content/languages
-wp-content/plugins/*
-!wp-content/plugins/myshop-core/
 
 # Themes (unless you built one)
-wp-content/themes/!your-custom-theme-name/
-wp-content/themes/twenty*/
-wp-content/themes/storefront/
-wp-content/themes/astra/
 
 # Logs & temp
 error_log

@@ -1,0 +1,1130 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Advanced Woo Labels\n"
+"Report-Msgid-Bugs-To: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: grunt-wp-i18n 0.5.0\n"
+"X-Poedit-KeywordsList: "
+"__;_e;_x:1,2c;_ex:1,2c;_n:1,2;_nx:1,2,4c;_n_noop:1,2;_nx_noop:1,2,3c;esc_"
+"attr__;esc_html__;esc_attr_e;esc_html_e;esc_attr_x:1,2c;esc_html_x:1,2c;\n"
+"Language: en_US\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Poedit-Country: United States\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Poedit-Basepath: ../\n"
+"X-Poedit-SearchPath-0: .\n"
+"X-Poedit-Bookmarks: \n"
+"X-Textdomain-Support: yes\n"
+
+
+msgid "Settings"
+msgstr ""
+
+msgid "Advanced Woo Labels plugin can't be activated because you already activate PRO plugin version."
+msgstr ""
+
+msgid "Advanced Woo Labels plugin is enabled but not effective. It requires WooCommerce in order to work."
+msgstr ""
+
+msgid "All Labels"
+msgstr ""
+
+msgid "Add New"
+msgstr ""
+
+msgid "Label conditions"
+msgstr ""
+
+msgid "Label settings"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Priority"
+msgstr ""
+
+msgid "No label to duplicate has been supplied!"
+msgstr ""
+
+msgid "Label creation failed, could not find original label: %s"
+msgstr ""
+
+msgid "(copy)"
+msgstr ""
+
+msgid "Label creation failed, could not create label duplicate: %s"
+msgstr ""
+
+msgid "Duplicate"
+msgstr ""
+
+msgid "Duplicate label"
+msgstr ""
+
+msgid "No shipping class"
+msgstr ""
+
+msgid "percents"
+msgstr ""
+
+msgid "amount"
+msgstr ""
+
+msgid "(no title)"
+msgstr ""
+
+msgid "Super Admin"
+msgstr ""
+
+msgid "Visitor ( not logged-in )"
+msgstr ""
+
+msgid "Current"
+msgstr ""
+
+msgid "Sale"
+msgstr ""
+
+msgid "Regular"
+msgstr ""
+
+msgid "all time"
+msgstr ""
+
+msgid "last 24 hours"
+msgstr ""
+
+msgid "last 7 days"
+msgstr ""
+
+msgid "last month"
+msgstr ""
+
+msgid "last year"
+msgstr ""
+
+msgid "Monday"
+msgstr ""
+
+msgid "Tuesday"
+msgstr ""
+
+msgid "Wednesday"
+msgstr ""
+
+msgid "Thursday"
+msgstr ""
+
+msgid "Friday"
+msgstr ""
+
+msgid "Saturday"
+msgstr ""
+
+msgid "Sunday"
+msgstr ""
+
+msgid "Label position"
+msgstr ""
+
+msgid "Hook"
+msgstr ""
+
+msgid "Add hook"
+msgstr ""
+
+msgid "Show current hooks"
+msgstr ""
+
+msgid "Remove hook"
+msgstr ""
+
+msgid "Hook name"
+msgstr ""
+
+msgid "JS selector ( optional )"
+msgstr ""
+
+msgid "JS placement ( optional )"
+msgstr ""
+
+msgid "Callback ( optional )"
+msgstr ""
+
+msgid "Callback args ( optional )"
+msgstr ""
+
+msgid "Add new rule"
+msgstr ""
+
+msgid "and"
+msgstr ""
+
+msgid "Remove rule"
+msgstr ""
+
+msgid "Any"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "Inactive"
+msgstr ""
+
+msgid "Warning: you set some label conditions incorrectly. You can\'t have several Product, Page or User conditions inside one AND condition group."
+msgstr ""
+
+msgid "Incorrect rules:"
+msgstr ""
+
+msgid "Divide them into several OR condition groups or just delete some."
+msgstr ""
+
+msgid "To display the label product must match all of the following conditions."
+msgstr ""
+
+msgid "Add 'or' group"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "Product name"
+msgstr ""
+
+msgid "Product brand"
+msgstr ""
+
+msgid "Main Settings"
+msgstr ""
+
+msgid "Show default 'sale' label"
+msgstr ""
+
+msgid "Show or not default WooCommerce 'sale' label."
+msgstr ""
+
+msgid "Show"
+msgstr ""
+
+msgid "Hide"
+msgstr ""
+
+msgid "Show default 'out-of-stock' label"
+msgstr ""
+
+msgid "Show or not default WooCommerce 'out-of-stock' label."
+msgstr ""
+
+msgid "Show for single product"
+msgstr ""
+
+msgid "Show for loops"
+msgstr ""
+
+msgid "Show labels inside blocks with product loops ( shop, search results, archives, etc )."
+msgstr ""
+
+msgid "Show the product labels for product detail pages. This overwrites settings inside single label display rules."
+msgstr ""
+
+msgid "Labels alignment"
+msgstr ""
+
+msgid "Alignment of several labels inside one product."
+msgstr ""
+
+msgid "Vertical"
+msgstr ""
+
+msgid "Horizontal"
+msgstr ""
+
+msgid "Labels distance (px)"
+msgstr ""
+
+msgid "Distance between several labels inside one product position."
+msgstr ""
+
+msgid "Max. number of labels per product"
+msgstr ""
+
+msgid "Maximal number of labels over one product."
+msgstr ""
+
+msgid "Max. number of labels per position"
+msgstr ""
+
+msgid "Hooks"
+msgstr ""
+
+msgid "Change display hooks"
+msgstr ""
+
+msgid "Change hooks that used to display labels on different product positions."
+msgstr ""
+
+msgid "Hooks relation"
+msgstr ""
+
+msgid "Set relations between new specified hook and default built-in plugin hooks."
+msgstr ""
+
+msgid "Use only built-in default hooks"
+msgstr ""
+
+msgid "Add additional hooks. Default hooks will be unchanged"
+msgstr ""
+
+msgid "Rewrite hooks. Use only specified hooks and disable default"
+msgstr ""
+
+msgid "Rewrite specified hooks and leave default as is"
+msgstr ""
+
+msgid "Disable all hooks"
+msgstr ""
+
+msgid "Enable hooks"
+msgstr ""
+
+msgid "Disable hooks"
+msgstr ""
+
+msgid "Turn off all display hooks. Use this option if you want to manually place product labels via shortcodes or php functions."
+msgstr ""
+
+msgid "Enable"
+msgstr ""
+
+msgid "Disable"
+msgstr ""
+
+msgid "equal to"
+msgstr ""
+
+msgid "not equal to"
+msgstr ""
+
+msgid "greater or equal to"
+msgstr ""
+
+msgid "less or equal to"
+msgstr ""
+
+msgid "contains"
+msgstr ""
+
+msgid "not contains"
+msgstr ""
+
+msgid "Label text"
+msgstr ""
+
+msgid "supports variables"
+msgstr ""
+
+msgid "Product regular price ( without sale price )."
+msgstr ""
+
+msgid "Current product name."
+msgstr ""
+
+msgid "Current product price."
+msgstr ""
+
+msgid "Product discount percentage."
+msgstr ""
+
+msgid "Product discount amount."
+msgstr ""
+
+msgid "Days left for product sale."
+msgstr ""
+
+msgid "Currency symbol for product price."
+msgstr ""
+
+msgid "Product SKU number."
+msgstr ""
+
+msgid "Product quantity value."
+msgstr ""
+
+msgid "Product stock status."
+msgstr ""
+
+msgid "New line symbol."
+msgstr ""
+
+msgid "for more info visit"
+msgstr ""
+
+msgid "guide page"
+msgstr ""
+
+msgid "Template"
+msgstr ""
+
+msgid "Position type"
+msgstr ""
+
+msgid "On image"
+msgstr ""
+
+msgid "Before title"
+msgstr ""
+
+msgid "Position"
+msgstr ""
+
+msgid "Left top"
+msgstr ""
+
+msgid "Center Top"
+msgstr ""
+
+msgid "Right Top"
+msgstr ""
+
+msgid "Left center"
+msgstr ""
+
+msgid "Center center"
+msgstr ""
+
+msgid "Right center"
+msgstr ""
+
+msgid "Left bottom"
+msgstr ""
+
+msgid "Center bottom"
+msgstr ""
+
+msgid "Right bottom"
+msgstr ""
+
+msgid "Left"
+msgstr ""
+
+msgid "Center"
+msgstr ""
+
+msgid "Right"
+msgstr ""
+
+msgid "Set custom styles"
+msgstr ""
+
+msgid "Label color"
+msgstr ""
+
+msgid "Text color"
+msgstr ""
+
+msgid "Font size (px)"
+msgstr ""
+
+msgid "Font style"
+msgstr ""
+
+msgid "Normal"
+msgstr ""
+
+msgid "Bold"
+msgstr ""
+
+msgid "Italic"
+msgstr ""
+
+msgid "Bold italic"
+msgstr ""
+
+msgid "Oblique"
+msgstr ""
+
+msgid "Font weight"
+msgstr ""
+
+msgid "Thin"
+msgstr ""
+
+msgid "Extra Light"
+msgstr ""
+
+msgid "Light"
+msgstr ""
+
+msgid "Medium"
+msgstr ""
+
+msgid "Semi Bold"
+msgstr ""
+
+msgid "Extra Bold"
+msgstr ""
+
+msgid "Black"
+msgstr ""
+
+msgid "Extra Black"
+msgstr ""
+
+msgid "Letter spacing (px)"
+msgstr ""
+
+msgid "Opacity"
+msgstr ""
+
+msgid "Padding (em)"
+msgstr ""
+
+msgid "Margin (px)"
+msgstr ""
+
+msgid "Top, right, bottom, left."
+msgstr ""
+
+msgid "Set custom styles for your label."
+msgstr ""
+
+msgid "Learn more."
+msgstr ""
+
+msgid "Custom css"
+msgstr ""
+
+msgid "Product stock status"
+msgstr ""
+
+msgid "Product visibility"
+msgstr ""
+
+msgid "Product price"
+msgstr ""
+
+msgid "Product sale discount"
+msgstr ""
+
+msgid "Product quantity"
+msgstr ""
+
+msgid "Product shipping class"
+msgstr ""
+
+msgid "Product rating"
+msgstr ""
+
+msgid "Product reviews count"
+msgstr ""
+
+msgid "Product is on sale"
+msgstr ""
+
+msgid "Product is featured"
+msgstr ""
+
+msgid "Product has image"
+msgstr ""
+
+msgid "Product has gallery"
+msgstr ""
+
+msgid "Product"
+msgstr ""
+
+msgid "Search for a product..."
+msgstr ""
+
+msgid "Product category"
+msgstr ""
+
+msgid "Product tag"
+msgstr ""
+
+msgid "User"
+msgstr ""
+
+msgid "User role"
+msgstr ""
+
+msgid "Page"
+msgstr ""
+
+msgid "Page language"
+msgstr ""
+
+msgid "Attributes"
+msgstr ""
+
+msgid "Date"
+msgstr ""
+
+msgid "General"
+msgstr ""
+
+msgid "Styles"
+msgstr ""
+
+msgid "Active sources"
+msgstr ""
+
+msgid "Change order by drag&drop"
+msgstr ""
+
+msgid "Deactivated sources"
+msgstr ""
+
+msgid "Excluded from search results"
+msgstr ""
+
+msgid "Save Changes"
+msgstr ""
+
+msgid "Labels"
+msgstr ""
+
+msgid "Label"
+msgstr ""
+
+msgid "Add Label"
+msgstr ""
+
+msgid "Add New Label"
+msgstr ""
+
+msgid "Edit Label"
+msgstr ""
+
+msgid "New Label"
+msgstr ""
+
+msgid "View Label"
+msgstr ""
+
+msgid "Search Label"
+msgstr ""
+
+msgid "No Label found"
+msgstr ""
+
+msgid "No Labels found in Trash"
+msgstr ""
+
+msgid "Premium"
+msgstr ""
+
+msgid "Welcome to %s"
+msgstr ""
+
+msgid "Product labels plugin for WooCommerce."
+msgstr ""
+
+msgid "Get Started"
+msgstr ""
+
+msgid "If you've just set up the plugin, the first thing you need to do is create a new Label."
+msgstr ""
+
+msgid "Documentation"
+msgstr ""
+
+msgid "Creating New Label"
+msgstr ""
+
+msgid "Label Styling Settings"
+msgstr ""
+
+msgid "Help"
+msgstr ""
+
+msgid "Support Forums"
+msgstr ""
+
+msgid "Contact Form"
+msgstr ""
+
+msgid "View Labels"
+msgstr ""
+
+msgid "WCFM PLugin Support"
+msgstr ""
+
+msgid "WCFM / Dokan / WC Vendors Plugins Support"
+msgstr ""
+
+msgid "Build-in integration with WCFM Multivendor Marketplace, WC Vendors and Dokan Multivendor Marketplace plugins. Show vendor related data inside product labels and create special labels display conditions based on these data."
+msgstr ""
+
+msgid "Show vendor data via text variables"
+msgstr ""
+
+msgid "Label display conditions based on vendor data"
+msgstr ""
+
+msgid "Hi! Looks like you are using some plugins that have the advanced integration with %s. Please find more details below."
+msgstr ""
+
+msgid "Learn more"
+msgstr ""
+
+msgid "Integrations for your plugins"
+msgstr ""
+
+msgid "All PRO Features"
+msgstr ""
+
+msgid "View Pricing"
+msgstr ""
+
+msgid "Dismiss"
+msgstr ""
+
+msgid "Copied"
+msgstr ""
+
+msgid "This action will generate the currently used display hooks. Please only confirm the action if you are sure of what you are doing. In most cases, this action is not required as these hooks are already in use."
+msgstr ""
+
+msgid "Breakdance: Is Breakdance block"
+msgstr ""
+
+msgid "Pro version only!"
+msgstr ""
+
+msgid "Label type"
+msgstr ""
+
+msgid "Shape with text"
+msgstr ""
+
+msgid "Image"
+msgstr ""
+
+msgid "(Pro)"
+msgstr ""
+
+msgid "Border"
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Shadow"
+msgstr ""
+
+msgid "Rotation (deg)"
+msgstr ""
+
+msgid "X, Y, Z axis. Max 360 deg."
+msgstr ""
+
+msgid "ACF field value, e.g {ACF:my_field}"
+msgstr ""
+
+msgid "ACF fields"
+msgstr ""
+
+msgid "Attribute values list, e.g {ATTR:color}."
+msgstr ""
+
+msgid "Average product rating."
+msgstr ""
+
+msgid "Current user can purchase"
+msgstr ""
+
+msgid "Current user can view"
+msgstr ""
+
+msgid "Current user has discount"
+msgstr ""
+
+msgid "Current user membership"
+msgstr ""
+
+msgid "Custom field value, e.g {META:sales}."
+msgstr ""
+
+msgid "Day of week"
+msgstr ""
+
+msgid "Dokan product views number"
+msgstr ""
+
+msgid "Dokan shop 'Sold by' badge"
+msgstr ""
+
+msgid "Dokan shop avarage rating"
+msgstr ""
+
+msgid "Dokan shop link for current product"
+msgstr ""
+
+msgid "Dokan shop logo for current product"
+msgstr ""
+
+msgid "Dokan shop name for current product"
+msgstr ""
+
+msgid "Dokan shop reviews number"
+msgstr ""
+
+msgid "EAN for WooCommerce: Has EAN"
+msgstr ""
+
+msgid "EAN product number ( EAN for WooCommerce )"
+msgstr ""
+
+msgid "Format numbers from text variables, e.g {FORMAT:10000} or {FORMAT:{CALC:{PRICE}*2}}."
+msgstr ""
+
+msgid "Is product sold by"
+msgstr ""
+
+msgid "Is product sold by any vendor"
+msgstr ""
+
+msgid "Is sold by trusted vendor"
+msgstr ""
+
+msgid "Is sold by verified vendor"
+msgstr ""
+
+msgid "Is store featured"
+msgstr ""
+
+msgid "Is store page"
+msgstr ""
+
+msgid "Math calculations, e.g {CALC:{PRICE}*2}."
+msgstr ""
+
+msgid "MultiVendorX shop 'Sold by' badge"
+msgstr ""
+
+msgid "MultiVendorX shop avarage rating"
+msgstr ""
+
+msgid "MultiVendorX shop items sold"
+msgstr ""
+
+msgid "MultiVendorX shop link for current product"
+msgstr ""
+
+msgid "MultiVendorX shop logo for current product"
+msgstr ""
+
+msgid "MultiVendorX shop name for current product"
+msgstr ""
+
+msgid "MultiVendorX shop net sales"
+msgstr ""
+
+msgid "MultiVendorX shop products number"
+msgstr ""
+
+msgid "MultiVendorX shop reviews number"
+msgstr ""
+
+msgid "Number of product reviews for the last X days ( or all time )."
+msgstr ""
+
+msgid "Page URL"
+msgstr ""
+
+msgid "Page archives"
+msgstr ""
+
+msgid "Page template"
+msgstr ""
+
+msgid "Page type"
+msgstr ""
+
+msgid "Perfect Brands brand banner image"
+msgstr ""
+
+msgid "Perfect Brands brand banner link"
+msgstr ""
+
+msgid "Perfect Brands brand link to archive page"
+msgstr ""
+
+msgid "Perfect Brands brand logo image"
+msgstr ""
+
+msgid "Perfect Brands brand name"
+msgstr ""
+
+msgid "Product GTIN, UPC, EAN, or ISBN"
+msgstr ""
+
+msgid "Product Table: Is inside specific table"
+msgstr ""
+
+msgid "Product Table: Is inside table"
+msgstr ""
+
+msgid "Product add to cart link."
+msgstr ""
+
+msgid "Product age"
+msgstr ""
+
+msgid "Product attributes"
+msgstr ""
+
+msgid "Product custom attributes"
+msgstr ""
+
+msgid "Product custom fields"
+msgstr ""
+
+msgid "Product grant access to"
+msgstr ""
+
+msgid "Product has discount for"
+msgstr ""
+
+msgid "Product brands list. Use with parameter to set max number of brands to display, e.g {BRAND | 1}."
+msgstr ""
+
+msgid "Product categories list. Use with parameter to set max number of categories to display, e.g {CATEGORY | 1}."
+msgstr ""
+
+msgid "Product tags list. Use with parameter to set max number of tags to display, e.g {TAG | 1}."
+msgstr ""
+
+msgid "Product height."
+msgstr ""
+
+msgid "Product is in cart"
+msgstr ""
+
+msgid "Product length."
+msgstr ""
+
+msgid "Product permalink."
+msgstr ""
+
+msgid "Product sale date"
+msgstr ""
+
+msgid "Product sales number"
+msgstr ""
+
+msgid "Product sales number for the last X days ( or all time )."
+msgstr ""
+
+msgid "Product shipping class."
+msgstr ""
+
+msgid "Product shipping parameters"
+msgstr ""
+
+msgid "Product sku"
+msgstr ""
+
+msgid "Product sold by"
+msgstr ""
+
+msgid "Product taxonomies list, e.g {TAX:product_cat}."
+msgstr ""
+
+msgid "Link to product taxonomy page, e.g {TAX_LINK:product_cat}. Will display a link only to the first found product taxonomy."
+msgstr ""
+
+msgid "Link to product attribute page, e.g {ATTR_LINK:color}. Will display a link only to the first found product attribute."
+msgstr ""
+
+msgid "Show product taxonomy image, e.g {TAX_IMAGE:product_cat}. Will display an image of the first found product taxonomy. Use with parameter to set max image size, e.g {TAX_IMAGE:product_cat | 50}."
+msgstr ""
+
+msgid "Product taxonomy"
+msgstr ""
+
+msgid "Product type"
+msgstr ""
+
+msgid "Product views"
+msgstr ""
+
+msgid "Product weight."
+msgstr ""
+
+msgid "Product width."
+msgstr ""
+
+msgid "Store items sold"
+msgstr ""
+
+msgid "Store net sales"
+msgstr ""
+
+msgid "Store products count"
+msgstr ""
+
+msgid "Store rating"
+msgstr ""
+
+msgid "Store reviews count"
+msgstr ""
+
+msgid "Store total sales count"
+msgstr ""
+
+msgid "Time"
+msgstr ""
+
+msgid "Total number of wishlists that contain current product"
+msgstr ""
+
+msgid "User cart"
+msgstr ""
+
+msgid "User country"
+msgstr ""
+
+msgid "User device"
+msgstr ""
+
+msgid "User language"
+msgstr ""
+
+msgid "User shop stats"
+msgstr ""
+
+msgid "Vendor store products number"
+msgstr ""
+
+msgid "Vendor store rating"
+msgstr ""
+
+msgid "Vendor store reviews count"
+msgstr ""
+
+msgid "Vendor store total sales count"
+msgstr ""
+
+msgid "WC Vendors shop 'Sold by' badge"
+msgstr ""
+
+msgid "WC Vendors shop avarage rating"
+msgstr ""
+
+msgid "WC Vendors shop link for current product"
+msgstr ""
+
+msgid "WC Vendors shop logo for current product"
+msgstr ""
+
+msgid "WC Vendors shop name for current product"
+msgstr ""
+
+msgid "WC Vendors shop products number"
+msgstr ""
+
+msgid "WC Vendors shop reviews number"
+msgstr ""
+
+msgid "WC Vendors shop sales number"
+msgstr ""
+
+msgid "WCFM shop 'Sold by' badge"
+msgstr ""
+
+msgid "WCFM shop avarage rating"
+msgstr ""
+
+msgid "WCFM shop link for current product"
+msgstr ""
+
+msgid "WCFM shop logo for current product"
+msgstr ""
+
+msgid "WCFM shop name for current product"
+msgstr ""
+
+msgid "WCFM shop reviews number"
+msgstr ""
+
+msgid "Who can purchase product"
+msgstr ""
+
+msgid "Who can view product"
+msgstr ""
+
+msgid "WooCommerce Memberships: Current member product discount amount"
+msgstr ""
+
+msgid "WooCommerce Memberships: Current member product discount percentage"
+msgstr ""
+
+msgid "WooCommerce Memberships: Current user membership plan"
+msgstr ""
+
+msgid "WooCommerce Memberships: List of memberships that current product purchase grant access to"
+msgstr ""
+
+msgid "WooCommerce Memberships: List of memberships to which the current product is restricted"
+msgstr ""
+
+msgid "WooCommerce Memberships: List of memberships with access to purchase current product"
+msgstr ""
+
+msgid "YITH Wishlist: Is product in current user wishlist"
+msgstr ""
+
+msgid "YITH Wishlist: Is wishlist page"
+msgstr ""
+
+msgid "YITH Wishlist: Product number of wishlists"
+msgstr ""
+
+msgid "Animation"
+msgstr ""
+
+msgid "Link"
+msgstr ""
+
+msgid "Apply to"
+msgstr ""
+
+msgid "Label block"
+msgstr ""
+
+msgid "Duration (ms)"
+msgstr ""
+
+msgid "Repeats number"
+msgstr ""
+
+msgid "Infinite"
+msgstr ""
+
+msgid "Delay (ms)"
+msgstr ""
+
+msgid "Label link"
+msgstr ""
+
+msgid "Open in new window"
+msgstr ""
+
+msgid "User name"
+msgstr ""
+
+msgid "Page name"
+msgstr ""

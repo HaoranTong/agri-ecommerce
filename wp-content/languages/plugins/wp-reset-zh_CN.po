@@ -1,0 +1,465 @@
+# Translation of Plugins - WP Reset - Stable (latest release) in Chinese (China)
+# This file is distributed under the same license as the Plugins - WP Reset - Stable (latest release) package.
+msgid ""
+msgstr ""
+"PO-Revision-Date: 2021-03-31 13:38:07+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: GlotPress/4.0.1\n"
+"Language: zh_CN\n"
+"Project-Id-Version: Plugins - WP Reset - Stable (latest release)\n"
+
+#. translators: %s is replaced with "reset"
+#: wp-reset.php:1713
+msgid "Type in: %s"
+msgstr "输入： %s"
+
+#: wp-reset.php:1544
+msgid "Thank you for purchasing WP Reset PRO!"
+msgstr "感谢您购买WP Reset PRO！"
+
+#: wp-reset.php:2172
+msgid "Activate PRO License"
+msgstr "激活专业版许可证"
+
+#: wp-reset.php:2161
+msgid "WP Reset PRO"
+msgstr "WP Reset PRO"
+
+#: wp-reset.php:2134
+msgid "Premium Email Support"
+msgstr "高级电子邮件支持"
+
+#: wp-reset.php:1993
+msgid "Switch WP Version"
+msgstr "切换WP版本"
+
+#: wp-reset.php:1950
+msgid "Clean wp-content Folder"
+msgstr "清理wp-content文件夹"
+
+#: wp-reset.php:1886
+msgid "Delete Widgets"
+msgstr "删除小工具"
+
+#: wp-reset.php:1853
+msgid "Delete Content"
+msgstr "删除内容"
+
+#: wp-reset.php:1843
+msgid "Delete Local Data"
+msgstr "删除本地数据"
+
+#: wp-reset.php:1834
+msgid "Purge Cache"
+msgstr "清除缓存"
+
+#: wp-reset.php:1814
+msgid "Reset User Roles"
+msgstr "重置用户角色"
+
+#: wp-reset.php:1736
+msgid "Reset WordPress &amp; Delete All Custom Files &amp; Data"
+msgstr "重置WordPress并删除所有自定义文件和数据"
+
+#: wp-reset.php:1722
+msgid "Nuclear Site Reset"
+msgstr "核电站重置"
+
+#: wp-reset.php:1666
+msgid "see the table above to find out what exactly will be reset or deleted"
+msgstr "请参阅上表，找出将要重设或删除的具体内容"
+
+#: wp-reset.php:1662
+msgid "What happens when I run any Reset tool?"
+msgstr "当我运行重置工具时会发生什么？"
+
+#: wp-reset.php:1455
+msgid "PRO"
+msgstr "专业版"
+
+#: wp-reset.php:1360
+msgid "Open documentation for this tool"
+msgstr "打开此工具的文档"
+
+#: wp-reset.php:406
+msgid "is already installed"
+msgstr "已安装"
+
+#: wp-reset.php:405
+msgid "Could not install"
+msgstr "无法安装"
+
+#: wp-reset.php:404
+msgid "Could not delete"
+msgstr "无法删除"
+
+#: wp-reset.php:403
+msgid "Could not deactivate"
+msgstr "无法禁用"
+
+#: wp-reset.php:402
+msgid "Could not activate"
+msgstr "无法激活"
+
+#: wp-reset.php:401
+msgid "Installing"
+msgstr "正在安装"
+
+#: wp-reset.php:400
+msgid "Deleting"
+msgstr "删除"
+
+#: wp-reset.php:399
+msgid "Deactivating"
+msgstr "停用"
+
+#: wp-reset.php:398
+msgid "Activating"
+msgstr "正在激活"
+
+#: wp-reset.php:395
+msgid "Enter snapshot name or brief description"
+msgstr "输入快照名称或简短描述"
+
+#: wp-reset.php:394
+msgid "Snapshot name or brief description, ie: before plugin install"
+msgstr "快照名称或简短描述，如：安装插件之前"
+
+#: wp-reset.php:393
+msgid "Create snapshot"
+msgstr "创建快照"
+
+#: wp-reset.php:392
+msgid "Creating snapshot. Please wait."
+msgstr "正在创建快照，请稍候…"
+
+#: wp-reset.php:391
+msgid "Snapshot created"
+msgstr "快照已创建"
+
+#: wp-reset.php:1733
+msgid "Type <b>reset</b> in the confirmation field to confirm the reset and then click the \"Reset WordPress &amp; Delete All Custom Files &amp; Data\" button. <b>There is NO UNDO."
+msgstr "在确认字段中输入<b>reset</b>以确认重置，然后单击\"重置WordPress并删除所有自定义文件和数据\"按钮。<b>此操作无法取消。"
+
+#: wp-reset.php:1664
+msgid "remember, always <b>make a backup first</b> or use <a href=\"#\" class=\"change-tab\" data-tab=\"2\">snapshots</a>"
+msgstr "记住，请务必提前<b>备份</b>或使用<a href=\"#\" class=\"change-tab\" data-tab=\"2\">快照功能</a>"
+
+#: wp-reset.php:1669
+msgid "WP Reset plugin will be reactivated if that option is chosen"
+msgstr "如果选择对应选项，WP Reset插件将被重新激活"
+
+#: wp-reset.php:1689
+msgid "Options Reset"
+msgstr "可选重置"
+
+#: wp-reset.php:1918
+msgid "Delete MU Plugins & Drop-ins"
+msgstr "删除强制使用的插件和强化扩展"
+
+#: wp-reset.php:1366
+msgid "Create Snapshot"
+msgstr "创建快照"
+
+#: wp-reset.php:1806
+msgid "All options (mods) for all themes will be reset; not just for the active theme. The tool works only for themes that use the <a href=\"https://codex.wordpress.org/Theme_Modification_API\" target=\"_blank\">WordPress theme modification API</a>. If options are saved in some other, custom way they won't be reset.<br> Always <a href=\"#\" class=\"create-new-snapshot\" data-description=\"Before resetting theme options\">create a snapshot</a> before using this tool if you want to be able to undo its actions."
+msgstr "所有主题的全部选项(mods) 都将被重置，而不仅仅是活动主题。该工具仅适用于使用 <a href=\"https://codex.wordpress.org/Theme_Modification_API\" target=\"_blank\">WordPress theme modification API</a>的主题。如果某主题以其他方式保存选项，则不会被重置。<br>如果您希望能够撤消此操作，请务必在使用此工具之前<a href=\"#\" class=\"create-new-snapshot\" data-description=\"Before resetting theme options\">创建快照</a>。"
+
+#: wp-reset.php:1772
+msgid "Index of Tools"
+msgstr "工具索引"
+
+#: wp-reset.php:1714
+msgid "Reset Site"
+msgstr "重置站点"
+
+#: wp-reset.php:1709
+msgid "Type <b>reset</b> in the confirmation field to confirm the reset and then click the \"Reset WordPress\" button.<br>Always <a href=\"#\" class=\"create-new-snapshot\" data-description=\"Before resetting the site\">create a snapshot</a> before resetting if you want to be able to undo."
+msgstr "在确认字段中输入<b>reset</b>以确认重置，然后单击“重置站点”按钮。<br>如果需要撤消操作，请务必在重置之前<a href=\"#\" class=\"create-new-snapshot\" data-description=\"Before resetting the site\">创建快照</a>。"
+
+#: wp-reset.php:1703
+msgid "Site Reset"
+msgstr "网站重置"
+
+#: wp-reset.php:1665
+msgid "you will have to confirm the action one more time"
+msgstr "您必须再确认一次此操作"
+
+#: wp-reset.php:1591
+msgid "Please read carefully before proceeding"
+msgstr "请仔细阅读，然后再继续"
+
+#: wp-reset.php:1452 wp-reset.php:2341
+msgid "Snapshots"
+msgstr "快照"
+
+#: wp-reset.php:388
+msgid "Clicking \"Reset WordPress\" will reset your site to default values. All content will be lost. Always <a href=\"#\" class=\"create-new-snapshot\" data-description=\"Before resetting the site\">create a snapshot</a> if you want to be able to undo.</b>"
+msgstr "点击\"重置WordPress\"会将你的网站重置为默认值。所有内容都将丢失。如果您想撤消快照，请始终<a href=\"#\"class=\"create new snapshot\"data description=\"Before Reset the site\">创建快照</a></b>"
+
+#. Description of the plugin
+#: wp-reset.php
+msgid "Reset the entire site or just selected parts while reserving the option to undo by using snapshots."
+msgstr "重置整个网站或某个部分，同时可以选择使用快照撤销某个重置操作。"
+
+#: wp-reset.php:396
+msgid "Create a new snapshot"
+msgstr "创建一个新快照"
+
+#: wp-reset.php:2048
+msgid "Have a set of plugins (and themes) that you install and activate after every reset? Or on every fresh WordPress installation? Well, no more clicking install &amp; active for ten minutes! Build the collection once and install it with one click as many times as needed.</p><p>WP Reset stores collections in the cloud so they're accessible on every site you build. You can use free plugins and themes from the official repo, and PRO ones by uploading a ZIP file. We'll safely store your license keys too, so you have everything in one place."
+msgstr "您是否在每次重置或安装新的WordPress后都需要安装和激活一些插件(和主题)？现在好了，不需要再花费十多分钟在点击“安装&amp;激活”上了！只需构建一次集合，然后根据需要单击一次即可安装。</p><p>WP Reset将集合存储在云中，以便您构建的每个站点都可以访问它们。你可以从官方网站上使用免费的插件和主题，也可以通过上传ZIP文件来使用专业的插件和主题。我们还会安全地存储您的许可证密钥，这样您就可以将所有东西放在一个地方。"
+
+#: wp-reset.php:1572
+msgid "Please help us spread the word &amp; keep the plugin up-to-date"
+msgstr "请帮我们宣传一下 &amp; 使插件保持最新"
+
+#: wp-reset.php:387
+msgid "Are you sure you want to reset the site?"
+msgstr "你确定要重置该站点吗？"
+
+#: wp-reset.php:2143
+msgid "No need for donations :) If you can give us a <a href=\"https://wordpress.org/support/plugin/wp-reset/reviews/#new-post\" target=\"_blank\">five star rating</a> you'll help out more than you can imagine. A public mention <a href=\"https://twitter.com/webfactoryltd\" target=\"_blank\">@webfactoryltd</a> also does wonders. Thank you!"
+msgstr "不需要捐赠 :)，如果你能给我们一个<a href=\"https://wordpress.org/support/plugin/wp-reset/reviews/#new-post\" target=\"_blank\">五星好评</a>，就可以给我们很多帮助。一个公开提及 <a href=\"https://twitter.com/webfactoryltd\" target=\"_blank\">@webfactoryltd</a> 也能创造奇迹，谢谢！"
+
+#: wp-reset.php:2102
+msgid "Documentation"
+msgstr "说明文档"
+
+#: wp-reset.php:1804
+msgid "Reset Theme Options"
+msgstr "重置主题选项"
+
+#: wp-reset.php:1453
+msgid "Collections"
+msgstr "集合"
+
+#: wp-reset.php:2024
+msgid "Delete .htaccess File"
+msgstr "删除.htaccess文件"
+
+#: wp-reset.php:271
+msgid "Notice is already dismissed."
+msgstr "通知已被关闭。"
+
+#: wp-reset.php:262 wp-reset.php:848
+msgid "You are not allowed to run this action."
+msgstr "您不能运行此操作。"
+
+#: wp-reset.php:1981
+msgid "There are no custom tables. There's nothing for this tool to empty or delete."
+msgstr "没有自定义表，没有任何内容可以被清空或删除。"
+
+#: wp-reset.php:1965
+msgid "Empty or Delete Custom Tables"
+msgstr "清空或删除自定义表"
+
+#: wp-reset.php:1909
+msgid "Delete Plugins"
+msgstr "删除插件"
+
+#: wp-reset.php:1899
+msgid "Delete Themes"
+msgstr "删除主题"
+
+#: wp-reset.php:1936
+msgid "Clean uploads Folder"
+msgstr "清理上传文件夹"
+
+#: wp-reset.php:1824
+msgid "Delete Transients"
+msgstr "删除瞬态缓存"
+
+#: wp-reset.php:1204
+msgid "Open WP Reset Tools"
+msgstr "打开WP Reset工具"
+
+#: wp-reset.php:1911
+msgid "All plugins will be deleted except for WP Reset which will remain active.<br><b>There is NO UNDO. WP Reset does not make any file backups.</b>"
+msgstr "除WP Reset保持激活外，其他插件将被删除。<br><b>次操作无法撤销，WP Reset不会进行任何文件备份。</b>"
+
+#: wp-reset.php:2141
+msgid "Care to Help Out?"
+msgstr "想要帮忙吗？"
+
+#: wp-reset.php:1560
+msgid "WP Reset is not compatible with multisite!"
+msgstr "WP Reset与多网站不兼容！"
+
+#: wp-reset.php:1228 wp-reset.php:1574
+msgid "Rate the plugin ★★★★★"
+msgstr "评价插件★★★★★"
+
+#: wp-reset.php:1228
+msgid "Rate the plugin"
+msgstr "为插件评分"
+
+#: wp-reset.php:376
+msgid "An error has occurred."
+msgstr "出现了一个错误。"
+
+#: wp-reset.php:2127
+msgid "Public Support Forum"
+msgstr "公众支持论坛"
+
+#: wp-reset.php:1451
+msgid "Tools"
+msgstr "工具"
+
+#: wp-reset.php:852 wp-reset.php:1011
+msgid "Unknown tool."
+msgstr "未知工具。"
+
+#: wp-reset.php:2129
+msgid "We are very active on the <a href=\"https://wordpress.org/support/plugin/wp-reset\" target=\"_blank\">official WP Reset support forum</a>. If you found a bug, have a feature idea or just want to say hi - please drop by. We love to hear back from our users."
+msgstr "我们在<a href=\"https://wordpress.org/support/plugin/wp-reset\" target=\"_blank\">官方WP Reset支持论坛</a>上非常活跃。如果你发现了一个bug，有一个功能想法，或者只是想打个招呼，请随时过来。我们喜欢听到用户的反馈。"
+
+#: wp-reset.php:1695 wp-reset.php:1705
+msgid "Reactivate current theme"
+msgstr "重新激活当前主题"
+
+#: wp-reset.php:1369 wp-reset.php:2342
+msgid "Collapse / expand box"
+msgstr "折叠/展开框"
+
+#: wp-reset.php:1561
+msgid "Please be careful when using WP Reset with multisite enabled. It's not recommended to reset the main site. Sub-sites should be OK. We're working on making it fully compatible with WP-MU. <b>Till then please be careful.</b> Thank you for understanding."
+msgstr "在启用多站点的情况下使用WP Reset时请小心。不建议重置主站点。子站点应该没问题。我们正在努力使其与WP-MU完全兼容。<b>在此之前，请小心使用。</b>感谢您的理解。"
+
+#: wp-reset.php:1706 wp-reset.php:1731
+msgid "Reactivate WP Reset plugin"
+msgstr "重新激活WP Reset插件"
+
+#: wp-reset.php:1708
+msgid "Reactivate all currently active plugins"
+msgstr "重新激活当前已激活的所有插件"
+
+#. Plugin URI of the plugin
+#: wp-reset.php
+msgid "https://wpreset.com/"
+msgstr "https://wpreset.com/"
+
+#. translators: %s is replaced with the literal html "<code>--yes</code>"
+#: wp-reset.php:1676
+msgid "All actions have to be confirmed. If you want to skip confirmation use the standard %s option. Please be careful and backup first."
+msgstr "必须确认所有操作， 如果要跳过确认，请使用标准%s选项。 请谨慎操作并提前做好备份。"
+
+#: wp-reset.php:1672
+msgid "WP-CLI Support"
+msgstr "WP-CLI支持"
+
+#: wp-reset.php:1574
+msgid "I've already rated it"
+msgstr "我已评论"
+
+#: wp-reset.php:1574
+msgid "Rate WP Reset"
+msgstr "评价 WP Reset"
+
+#: wp-reset.php:1573
+msgid "If you use &amp; enjoy WP Reset, <b>please rate it on WordPress.org</b>. It only takes a second and helps us keep the plugin maintained. Thank you!"
+msgstr "如果您觉得WP Reset 不错， <b>请花费几秒时间在 WordPress.org 上给我们一个好评</b>，这可以激励我们持续维护插件，谢谢！"
+
+#: wp-reset.php:1431
+msgid "Sorry, you are not allowed to access this page."
+msgstr "抱歉，您不能访问此页面。"
+
+#: wp-reset.php:1227
+msgid "Plugin Homepage"
+msgstr "插件主页"
+
+#: wp-reset.php:1226 wp-reset.php:1454
+msgid "Support"
+msgstr "支持"
+
+#: wp-reset.php:1226
+msgid "Get help"
+msgstr "获取帮助"
+
+#: wp-reset.php:390
+msgid "Resetting in progress. Please wait."
+msgstr "正在重置，请耐心等待…"
+
+#: wp-reset.php:386
+msgid "Are you sure you want to proceed?"
+msgstr "确定要继续吗？"
+
+#: wp-reset.php:384
+msgid "OK"
+msgstr "确定"
+
+#: wp-reset.php:383
+msgid "Cancel"
+msgstr "退出"
+
+#: wp-reset.php:382
+msgid "Invalid confirmation"
+msgstr "确认无效"
+
+#: wp-reset.php:381
+msgid "Please type \"reset\" in the confirmation field."
+msgstr "请在确认字段中输入“reset”。"
+
+#: wp-reset.php:375
+msgid "An undocumented error has occurred. Please refresh the page and try again."
+msgstr "发生未知错误，请刷新页面并重试。"
+
+#. translators: %s is replaced with the literal html "<code>wp help
+#. reset</code>"
+#: wp-reset.php:1674
+msgid "All tools available via GUI are available in WP-CLI as well. To get the list of commands run %s. Instead of the active user, the first user with admin privileges found in the database will be restored. "
+msgstr "所有通过GUI提供的工具也可在WP-CLI中使用。要获取命令列表, 请运行 %s。不同的是，在WP-CLI中使用时，该插件将还原在数据库中找到的第一个具有管理员权限的用户, 而不是当前用户。"
+
+#: wp-reset.php:385
+msgid "Reset WordPress"
+msgstr "重置WordPress"
+
+#: wp-reset.php:1450
+msgid "Reset"
+msgstr "重置"
+
+#. Author URI of the plugin
+#: wp-reset.php
+msgid "https://www.webfactoryltd.com/"
+msgstr "https://www.webfactoryltd.com/"
+
+#: wp-reset.php:1735
+msgid "Type in \"reset\""
+msgstr "输入“reset”"
+
+#: wp-reset.php:1667
+msgid "site title, WordPress URL, site URL, site language, search engine visibility and current user will always be restored"
+msgstr "网站标题，WordPress URL，网站URL，网站语言，搜索引擎可见性和当前用户将始终被恢复"
+
+#: wp-reset.php:1163
+msgid "Something went wrong. Please refresh the page and try again."
+msgstr "有些不对劲， 请刷新页面然后重试。"
+
+#: wp-reset.php:1169
+msgid "<b>Invalid confirmation code.</b> Please type \"reset\" in the confirmation field."
+msgstr "<b>确认码无效。</b>请在确认字段中输入“reset”。"
+
+#: wp-reset.php:389
+msgid "Click \"Cancel\" to abort."
+msgstr "单击“取消”以中止。"
+
+#: wp-reset.php:1268
+msgid "Visit WP Reset page for more info"
+msgstr "访问WP重置页面了解更多信息"
+
+#: wp-reset.php:1668
+msgid "you will be logged out, automatically logged back in and taken to the admin dashboard"
+msgstr "您将被注销，然后自动重新登录并进入管理控制台"
+
+#. Plugin Name of the plugin
+#: wp-reset.php wp-reset.php:248 wp-reset.php:377 wp-reset.php:1439
+msgid "WP Reset"
+msgstr "WP Reset"
+
+#. Author of the plugin
+#: wp-reset.php
+msgid "WebFactory Ltd"
+msgstr "WebFactory Ltd"
