@@ -1,0 +1,734 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-08-23 01:36+0000\n"
+"PO-Revision-Date: 2020-08-23 16:46+0000\n"
+"Last-Translator: Guilherme Frisoni\n"
+"Language-Team: Português do Brasil\n"
+"Language: pt-BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Generator: Loco https://localise.biz/\n"
+": \n"
+"X-Loco-Version: 2.4.2; wp-5.5"
+
+msgid "Settings"
+msgstr "Configurações"
+
+msgid ""
+"Advanced Woo Labels plugin is enabled but not effective. It requires "
+"WooCommerce in order to work."
+msgstr ""
+"O plugin Advanced Woo Labels está ativo mas não funcional. É necessário ter "
+"o WooCommerce instalado para funcionar."
+
+msgid "All Labels"
+msgstr "Todas etiquetas"
+
+msgid "Add New"
+msgstr "Adicionar nova"
+
+msgid "Label conditions"
+msgstr "Condições da etiqueta"
+
+msgid "Label settings"
+msgstr "Configurações da etiqueta"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Priority"
+msgstr "Prioridade"
+
+msgid "No label to duplicate has been supplied!"
+msgstr "Nenhuma etiqueta para duplicar foi informada!"
+
+msgid "Label creation failed, could not find original label: %s"
+msgstr "Falha na criação da etiqueta, etiqueta original não encontrada: %s"
+
+msgid "(copy)"
+msgstr "(copiar"
+
+msgid "Label creation failed, could not create label duplicate: %s"
+msgstr "Falha na criação da etiqueta, não foi possível duplicar: %s"
+
+msgid "Duplicate"
+msgstr "Duplicar"
+
+msgid "Duplicate label"
+msgstr "Duplicar etiqueta"
+
+msgid "Product variation"
+msgstr "Variação de produto"
+
+msgid "No shipping class"
+msgstr "Sem classe de entrega"
+
+msgid "(no title)"
+msgstr "(sem título)"
+
+msgid "Default template"
+msgstr "Modelo padrão"
+
+msgid "Product single page"
+msgstr "Página do produto"
+
+msgid "Front page"
+msgstr "Site"
+
+msgid "Shop page"
+msgstr "Página da loja"
+
+msgid "Cart page"
+msgstr "Página do carrinho"
+
+msgid "Checkout page"
+msgstr "Página da finalização de compra"
+
+msgid "Account page"
+msgstr "Página minha conta"
+
+msgid "Search results page"
+msgstr "Página de resultados"
+
+msgid "Archive page"
+msgstr "Página de arquivo"
+
+msgid "Category archive page"
+msgstr "Página de categoria de arquivo"
+
+msgid "Tag archive page"
+msgstr "Página de arquivo de tags"
+
+msgid "Attributes archive page"
+msgstr "Página de arquivo de atributos"
+
+msgid "Custom taxonomy archive page"
+msgstr "Página de arquivo taxonomias personalizadas"
+
+msgid "Simple page"
+msgstr "Página simples"
+
+msgid "Category"
+msgstr "Categoria"
+
+msgid "Tag"
+msgstr "Tag"
+
+msgid "Attributes"
+msgstr "Atributos"
+
+msgid "Super Admin"
+msgstr "Super administrador"
+
+msgid "Visitor ( not logged-in )"
+msgstr "Visitante (não logado)"
+
+msgid "Desktop"
+msgstr "Desktop"
+
+msgid "Mobile"
+msgstr "Dispositivo móvel"
+
+msgid "Number of items"
+msgstr "Número de itens"
+
+msgid "Average items cost"
+msgstr "Custo médio dos itens"
+
+msgid "Total sum of items"
+msgstr "Soma total dos itens"
+
+msgid "Orders number"
+msgstr "Número de pedidos"
+
+msgid "Average order value"
+msgstr "Valor médio do pedido"
+
+msgid "Total spend"
+msgstr "Total gasto"
+
+msgid "Current"
+msgstr "Atual"
+
+msgid "Sale"
+msgstr "Promocional"
+
+msgid "Regular"
+msgstr "Normal"
+
+msgid "percents"
+msgstr "percentuais"
+
+msgid "amount"
+msgstr "total"
+
+msgid "in days"
+msgstr "em dias"
+
+msgid "in weeks"
+msgstr "em semanas"
+
+msgid "in months"
+msgstr "em meses"
+
+msgid "in hours"
+msgstr "em horas"
+
+msgid "was started x hours ago"
+msgstr "foi iniciado há x horas"
+
+msgid "was started x days ago"
+msgstr "foi iniciado há x dias"
+
+msgid "will ends in x hours"
+msgstr "terminará em x horas"
+
+msgid "will ends in x days"
+msgstr "terminará em x dias"
+
+msgid "all time"
+msgstr "qualquer tempo"
+
+msgid "last 24 hours"
+msgstr "últimas 24 horas"
+
+msgid "last 7 days"
+msgstr "últimos 7 dias"
+
+msgid "last month"
+msgstr "último mês"
+
+msgid "last year"
+msgstr "último ano"
+
+msgid "Monday"
+msgstr "Segunda-feira"
+
+msgid "Tuesday"
+msgstr "Terça-feira"
+
+msgid "Wednesday"
+msgstr "Quarta-feira"
+
+msgid "Thursday"
+msgstr "Quinta-feira"
+
+msgid "Friday"
+msgstr "Sexta-feira"
+
+msgid "Saturday"
+msgstr "Sábado"
+
+msgid "Sunday"
+msgstr "Domingo"
+
+msgid "Label position"
+msgstr "Posição da etiqueta"
+
+msgid "Hook"
+msgstr "hook"
+
+msgid "Hook priority"
+msgstr "Prioridade do hook"
+
+msgid "Add hook"
+msgstr "Adicionar hook"
+
+msgid "Remove hook"
+msgstr "Remover hook"
+
+msgid "Hook name"
+msgstr "Nome do hook"
+
+msgid "Add new rule"
+msgstr "Adicionar nova regra"
+
+msgid "and"
+msgstr "e"
+
+msgid "Remove rule"
+msgstr "Remover regra"
+
+msgid "Any"
+msgstr "Qualquer"
+
+msgid "Yes"
+msgstr "Sim"
+
+msgid "No"
+msgstr "Não"
+
+msgid "Active"
+msgstr "Ativo"
+
+msgid "Inactive"
+msgstr "Inativo"
+
+msgid ""
+"To display the label product must match all of the following conditions."
+msgstr ""
+"Para mostrar a etiqueta o produto precisa atender todas as seguintes "
+"condições."
+
+msgid "Add 'or' group"
+msgstr "Adicionar grupo 'OU'"
+
+msgid "Preview"
+msgstr "Pré-visualizar"
+
+msgid "Product name"
+msgstr "Nome do produto"
+
+msgid "Main Settings"
+msgstr "Configurações principais"
+
+msgid "Show default 'sale' label"
+msgstr "Mostrar a etiqueta de 'promoção' padrão "
+
+msgid "Show or not default WooCommerce 'sale' label."
+msgstr "Mostrar ou não a etiqueta padrão do Woocommerce para 'promoção'."
+
+msgid "Show"
+msgstr "Mostrar"
+
+msgid "Hide"
+msgstr "Ocultar"
+
+msgid "Show default 'out-of-stock' label"
+msgstr "Mostrar etiqueta padrão 'fora de estoque'"
+
+msgid "Show or not default WooCommerce 'out-of-stock' label."
+msgstr ""
+"Mostrar ou não a etiqueta padrão do Woocommerce para 'fora de estoque'."
+
+msgid "Show for single product"
+msgstr "Mostrar na página de produto"
+
+msgid ""
+"Show the product labels for product detail pages. This overwrites settings "
+"inside single label display rules."
+msgstr ""
+"Mostrar etiquetas de produto na página de produto. Isso substitui as "
+"configurações nas regras de exibição de etiqueta única."
+
+msgid "Label Groups"
+msgstr "Grupos de etiquetas"
+
+msgid "Labels alignment"
+msgstr "Alinhamento das etiquetas"
+
+msgid "Alignment of several labels inside one product."
+msgstr "Alinhamento de várias etiquetas em um produto."
+
+msgid "Vertical"
+msgstr "Vertical"
+
+msgid "Horizontal"
+msgstr "Horizontal"
+
+msgid "Labels distance (px)"
+msgstr "Distância da etiqueta (px)"
+
+msgid "Distance between several labels inside one product position."
+msgstr "Distância entre várias etiquetas em uma mesma posição."
+
+msgid "Max. number of labels per product"
+msgstr "Limite de etiquetas por produto"
+
+msgid "Maximal number of labels over one product."
+msgstr "Número máximo de etiquetas em cada produto."
+
+msgid "Max. number of labels per position"
+msgstr "Limite de etiquetas por posição"
+
+msgid "Maximal number of labels over one product position."
+msgstr "Número máximo de etiquetas em cada posição do produto."
+
+msgid "Hooks"
+msgstr "Hooks"
+
+msgid "Change display hooks"
+msgstr "Modificar hooks de visualização"
+
+msgid ""
+"Change hooks that used to display labels on different product positions."
+msgstr ""
+"Altera hooks usados para mostrar as etiquetas em diferentes posições do "
+"produto."
+
+msgid "equal to"
+msgstr "igual a"
+
+msgid "not equal to"
+msgstr "diferente de"
+
+msgid "greater or equal to"
+msgstr "maior ou igual a"
+
+msgid "less or equal to"
+msgstr "menor ou igual a"
+
+msgid "Label type"
+msgstr "Tipo de etiqueta"
+
+msgid "Shape with text"
+msgstr "Forma com texto"
+
+msgid "Image"
+msgstr "Imagem"
+
+msgid "Label text"
+msgstr "Texto da etiqueta"
+
+msgid "supports variables"
+msgstr "variáveis de apoio"
+
+msgid "regular price"
+msgstr "preço normal"
+
+msgid "sale price"
+msgstr "preço promocional"
+
+msgid "discount percentage"
+msgstr "percentual do desconto"
+
+msgid "discount amount"
+msgstr "valor do desconto"
+
+msgid "days left for sale"
+msgstr "dias restantes de promoção"
+
+msgid "currency symbol"
+msgstr "símbolo da moeda"
+
+msgid "product SKU"
+msgstr "REF do produto"
+
+msgid "product quantity"
+msgstr "quantidade do produto"
+
+msgid "product sales for the last 7 days"
+msgstr "vendas de produtos nos últimos 7 dias"
+
+msgid "number of product reviews for the last 30 days"
+msgstr "número de avaliações de produtos nos últimos 30 dias"
+
+msgid "average product rating"
+msgstr "avaliação média do produto"
+
+msgid "attribute values list, e.g {ATTR:color}"
+msgstr "lista de valores de atributos, por exemplo {ATTR: cor}"
+
+msgid "product taxonomies list, e.g {TAX:product_cat}"
+msgstr "lista de taxonomias de produtos, por exemplo {TAX: product_cat}"
+
+msgid "custom field value, e.g {META:sales}"
+msgstr "valor do campo personalizado, por exemplo {META: vendas}"
+
+msgid "new line"
+msgstr "nova linha"
+
+msgid "for more info visit"
+msgstr "para mais informações visite"
+
+msgid "guide page"
+msgstr "página de guia"
+
+msgid "Custom image"
+msgstr "Imagem personalizada"
+
+msgid "Upload image"
+msgstr "Enviar Imagem"
+
+msgid "Template"
+msgstr "Modelo"
+
+msgid "Position type"
+msgstr "Tipo de posição"
+
+msgid "On image"
+msgstr "Na imagem"
+
+msgid "Before title"
+msgstr "Antes do título"
+
+msgid "Position"
+msgstr "Posição"
+
+msgid "Left Top"
+msgstr "Esquerda superior"
+
+msgid "Center Top"
+msgstr "Centro superior"
+
+msgid "Right Top"
+msgstr "Direita superior"
+
+msgid "Left Center"
+msgstr "Esquerda no meio"
+
+msgid "Center Center"
+msgstr "Centro no meio"
+
+msgid "Right Center"
+msgstr "Direita no meio"
+
+msgid "Left Bottom"
+msgstr "Esquerda inferior"
+
+msgid "Center Bottom"
+msgstr "Centro inferior"
+
+msgid "Right Bottom"
+msgstr "Direita inferior"
+
+msgid "Left"
+msgstr "Esquerda"
+
+msgid "Center"
+msgstr "Centro"
+
+msgid "Right"
+msgstr "Direita"
+
+msgid "Set custom styles"
+msgstr "Definir estilos personalizados"
+
+msgid "Label color"
+msgstr "Cor da etiqueta"
+
+msgid "Text color"
+msgstr "Cor do texto"
+
+msgid "Font size (px)"
+msgstr "Tamanho da fonte (px)"
+
+msgid "Font style"
+msgstr "Estilo da fonte"
+
+msgid "Normal"
+msgstr "Normal"
+
+msgid "Bold"
+msgstr "Negrito"
+
+msgid "Italic"
+msgstr "Itálico"
+
+msgid "Bold italic"
+msgstr "Negrito itálico"
+
+msgid "Label size ( px )"
+msgstr "Tamanho da etiqueta (px)"
+
+msgid "Border"
+msgstr "Borda"
+
+msgid "None"
+msgstr "Nenhum"
+
+msgid "Small"
+msgstr "Pequeno"
+
+msgid "Medium"
+msgstr "Médio"
+
+msgid "Large"
+msgstr "Grande"
+
+msgid "Border color"
+msgstr "Cor da borda"
+
+msgid "Shadow"
+msgstr "Sombra"
+
+msgid "Opacity"
+msgstr "Opacidade"
+
+msgid "Padding (em)"
+msgstr "Padding (em)"
+
+msgid "Margin (px)"
+msgstr "Margem (px)"
+
+msgid "Custom css"
+msgstr "CSS adicional"
+
+msgid "Stock status"
+msgstr "Status do estoque"
+
+msgid "Visibility"
+msgstr "Visibilidade"
+
+msgid "Price"
+msgstr "Preço"
+
+msgid "Sale discount"
+msgstr "Desconto"
+
+msgid "Quantity"
+msgstr "Quantidade"
+
+msgid "Shipping class"
+msgstr "Classe de entrega"
+
+msgid "Product type"
+msgstr "Tipo de Produto"
+
+msgid "Product age"
+msgstr "Criação do produto"
+
+msgid "Sale date"
+msgstr "Data da promoção"
+
+msgid "Rating"
+msgstr "Classificação"
+
+msgid "Reviews count"
+msgstr "Contagem de avaliações"
+
+msgid "Sales number"
+msgstr "Número de vendas"
+
+msgid "Is on sale"
+msgstr "Está em promoção"
+
+msgid "Is featured"
+msgstr "É destaque"
+
+msgid "Is in cart"
+msgstr "Está no carrinho"
+
+msgid "Has product image"
+msgstr "Possui imagem no produto"
+
+msgid "Has gallery"
+msgstr "Possui galeria"
+
+msgid "Product"
+msgstr "Produto"
+
+msgid "Product category"
+msgstr "Categoria do produto"
+
+msgid "Product tag"
+msgstr "Tag do produto"
+
+msgid "Product taxonomy"
+msgstr "Taxonomia do produto"
+
+msgid "Product attributes"
+msgstr "Atributos do produto"
+
+msgid "Product custom attributes"
+msgstr "Atributos personalizados do produto"
+
+msgid "Product custom fields"
+msgstr "Campos personalizados do produto"
+
+msgid "User"
+msgstr "Usuário"
+
+msgid "User role"
+msgstr "Função do usuário"
+
+msgid "User country"
+msgstr "País do usuário"
+
+msgid "User language"
+msgstr "Idioma do usuário"
+
+msgid "User device"
+msgstr "Dispositivo do usuário"
+
+msgid "User cart"
+msgstr "Carrinho do usuário"
+
+msgid "User shop stats"
+msgstr "Estatísticas do usuário na loja"
+
+msgid "Page"
+msgstr "Página"
+
+msgid "Page template"
+msgstr "Modelo de página"
+
+msgid "Page type"
+msgstr "Tipo de página"
+
+msgid "Page archives"
+msgstr "Arquivo de página"
+
+msgid "Page language"
+msgstr "Idioma da página"
+
+msgid "Date"
+msgstr "Data"
+
+msgid "Date or date range"
+msgstr "Data ou intervalo de datas"
+
+msgid "Time"
+msgstr "Tempo"
+
+msgid "Time or time range"
+msgstr "Tempo ou intervalo de tempo"
+
+msgid "Day of week"
+msgstr "Dia da semana"
+
+msgid "General"
+msgstr "Geral"
+
+msgid "Active sources"
+msgstr "Origens ativadas"
+
+msgid "Change order by drag&drop"
+msgstr "Altere a ordem arrastando"
+
+msgid "Deactivated sources"
+msgstr "Origens desativadas"
+
+msgid "Excluded from search results"
+msgstr "Excluído dos resultados de pesquisa"
+
+msgid "Save Changes"
+msgstr "Salvar alterações"
+
+msgid "Labels"
+msgstr "Etiquetas"
+
+msgid "Label"
+msgstr "Etiqueta"
+
+msgid "Add New Label"
+msgstr "Adicionar nova etiqueta"
+
+msgid "Edit Label"
+msgstr "Editar etiqueta"
+
+msgid "New Label"
+msgstr "Nova etiqueta"
+
+msgid "View Label"
+msgstr "Visualizar etiqueta"
+
+msgid "Search Label"
+msgstr "Procurar etiqueta"
+
+msgid "No Label found"
+msgstr "Nenhuma etiqueta encontrada"
+
+msgid "No Labels found in Trash"
+msgstr "Nenhuma etiqueta encontrada no lixo"
+
+msgid "Adv. Woo Labels"
+msgstr "Etiquetas"
