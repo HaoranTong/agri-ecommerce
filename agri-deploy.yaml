@@ -1,0 +1,33 @@
+version: '1.0'
+name: agri-deploy
+displayName: '自动部署到生产服务器'
+stages:
+  - stage:
+      name: deploy_stage
+      displayName: '生产环境部署'
+      steps:
+        - step: ssh@1
+          name: remote_deploy
+          displayName: '通过SSH连接服务器执行部署'
+          input:
+            host: '82.157.3.130'
+            user: 'root'
+            port: '22'
+            command: |
+              set -e
+              echo "🚀 开始自动化部署..."
+              cd /www/wwwroot/agri-ecommerce
+              echo "步骤1: 从Gitee拉取最新代码..."
+              git fetch --all
+              git reset --hard origin/master
+              echo "步骤2: 使用Composer安装依赖..."
+              /usr/local/bin/composer install --no-dev --optimize-autoloader
+              echo "步骤3: 确保WordPress核心文件一致..."
+              git checkout -- wp/
+              echo "步骤4: 设置正确的文件权限..."
+              chown -R www:www /www/wwwroot/agri-ecommerce
+              find /www/wwwroot/agri-ecommerce -type d -exec chmod 755 {} \;
+              find /www/wwwroot/agri-ecommerce -type f -exec chmod 644 {} \;
+              echo "步骤5: 重启PHP-FPM服务..."
+              systemctl restart php-fpm
+              echo "✅ 生产环境部署成功完成！"
