@@ -19,16 +19,17 @@
 # 忽略所有通过 Composer 安装的第三方插件和主题
 # -------------------------------------------------------------------
 /wp-content/plugins/*
+!/wp-content/plugins/myshop-core/
 /wp-content/themes/*
+!/wp-content/themes/astra-child/
+
 
 # >>> 排除我们自主开发的插件和自定义主题 <<<
 # 规则：忽略所有插件/主题，除了下面明确列出的这几个
 
 # 1. 自主开发插件 (唯一)
-!/wp-content/plugins/myshop-core/
 
 # 2. 自主开发主题 (子主题)
-!/wp-content/themes/astra-child/
 
 # -------------------------------------------------------------------
 # 忽略运行时产生的文件与缓存（非源代码）
