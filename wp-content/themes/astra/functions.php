@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Define Constants
  */
-define( 'ASTRA_THEME_VERSION', '4.11.15' );
+define( 'ASTRA_THEME_VERSION', '4.11.16' );
 define( 'ASTRA_THEME_SETTINGS', 'astra-settings' );
 define( 'ASTRA_THEME_DIR', trailingslashit( get_template_directory() ) );
 define( 'ASTRA_THEME_URI', trailingslashit( esc_url( get_template_directory_uri() ) ) );
@@ -205,69 +205,3 @@ require_once ASTRA_THEME_DIR . 'inc/core/markup/class-astra-markup.php';
 require_once ASTRA_THEME_DIR . 'inc/core/deprecated/deprecated-filters.php';
 require_once ASTRA_THEME_DIR . 'inc/core/deprecated/deprecated-hooks.php';
 require_once ASTRA_THEME_DIR . 'inc/core/deprecated/deprecated-functions.php';
-
-// 全局翻译：同时处理模板和插件文本
-add_filter('gettext', 'translate_checkout_all_texts', 20, 3);
-function translate_checkout_all_texts($translated_text, $text, $domain) {
-    // 通用翻译表（覆盖所有来源）
-    $translations = array(
-        'Contact'         => '联系人信息',
-        'Welcome Back'    => '欢迎回来',
-        'Coupon Code'     => '优惠券代码',
-        'Apply'           => '应用',
-        'Subtotal'        => '小计',
-        'Shipping'        => '配送',
-        'Total'           => '总计',
-        'Payment'         => '支付方式',
-        'Place Order'     => '提交订单',
-    );
-
-    // 如果当前文本在映射表中，就返回中文
-    if (array_key_exists($text, $translations)) {
-        return $translations[$text];
-    }
-
-    return $translated_text;
-}
-
-add_action('wp_footer', 'translate_checkout_dynamic_texts');
-function translate_checkout_dynamic_texts() {
-    if (!is_checkout()) return;
-    ?>
-    <script>
-    (function() {
-        function translateTexts() {
-            // 1. 翻译左侧 Shipping 标题
-            const shippingEl = document.querySelector('.wcf-ic-shipping-package-name');
-            if (shippingEl && shippingEl.textContent.trim() === 'Shipping') {
-                shippingEl.textContent = '配送';
-            }
-
-            // 2. 翻译 Welcome Back（保留用户名和邮箱）
-            const welcomeEl = document.querySelector('.wcf-logged-in-customer-info');
-            if (welcomeEl && welcomeEl.textContent.includes('Welcome Back')) {
-                // 只替换 "Welcome Back"，保留后面的内容
-                welcomeEl.innerHTML = welcomeEl.innerHTML.replace(
-                    /^(\s*)Welcome Back(\s+)/,
-                    '$1欢迎回来$2'
-                );
-            }
-        }
-
-        // 页面加载完成后执行
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', translateTexts);
-        } else {
-            translateTexts();
-        }
-
-        // 监听 DOM 变化（应对 AJAX 或动态加载）
-        const observer = new MutationObserver(translateTexts);
-        observer.observe(document.body, { childList: true, subtree: true });
-
-        // 保险：1秒后再次执行
-        setTimeout(translateTexts, 1000);
-    })();
-    </script>
-    <?php
-}

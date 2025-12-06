@@ -2,7 +2,7 @@
 # This file is distributed under the same license as the Plugins - WooCommerce - Stable (latest release) package.
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2025-11-12 18:26:36+0000\n"
+"PO-Revision-Date: 2025-12-04 09:54:17+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -10,6 +10,10 @@ msgstr ""
 "X-Generator: GlotPress/4.0.3\n"
 "Language: zh_CN\n"
 "Project-Id-Version: Plugins - WooCommerce - Stable (latest release)\n"
+
+#: src/Internal/Abilities/AbilitiesCategories.php:47
+msgid "REST API operations for WooCommerce resources including products, orders, and other store data."
+msgstr "WooCommerce 资源的 REST API 操作，包括产品、订单及其他商店数据。"
 
 #: assets/client/blocks/add-to-cart-with-options-variation-description/block.json
 msgctxt "block description"
@@ -232,8 +236,8 @@ msgstr "示例下载文件.pdf"
 msgid "Dummy Downloadable Product"
 msgstr "虚拟的可下载产品"
 
-#: src/Internal/Abilities/REST/RestAbilityFactory.php:115
-#: src/Internal/Abilities/REST/RestAbilityFactory.php:138
+#: src/Internal/Abilities/REST/RestAbilityFactory.php:125
+#: src/Internal/Abilities/REST/RestAbilityFactory.php:148
 msgid "Unique identifier for the resource"
 msgstr "该资源的唯一标识符"
 
@@ -20937,7 +20941,7 @@ msgid "%1$s (update to version %2$s is available)"
 msgstr "%1$s（可更新至版本 %2$s）"
 
 #. translators: %s: URL of WooCommerce.com subscriptions tab.
-#: includes/admin/helper/class-wc-helper-updater.php:837
+#: includes/admin/helper/class-wc-helper-updater.php:864
 msgid "Please visit the <a href=\"%s\" target=\"_blank\">subscriptions page</a> and renew to continue receiving updates."
 msgstr "请访问<a href=\"%s\" target=\"_blank\">订阅页面</a>并续订以继续接收更新。"
 
@@ -44712,7 +44716,7 @@ msgstr "特色产品"
 msgid "Yes"
 msgstr "是"
 
-#: includes/abstracts/abstract-wc-order.php:2512
+#: includes/abstracts/abstract-wc-order.php:2517
 #: includes/admin/class-wc-admin-dashboard.php:496
 #: includes/admin/list-tables/class-wc-admin-list-table-orders.php:123
 #: includes/admin/meta-boxes/class-wc-meta-box-order-data.php:214

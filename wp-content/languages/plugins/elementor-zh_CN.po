@@ -2,7 +2,7 @@
 # This file is distributed under the same license as the Plugins - Elementor Website Builder &#8211; More Than Just a Page Builder - Stable (latest release) package.
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2025-11-12 04:17:22+0000\n"
+"PO-Revision-Date: 2025-11-20 12:30:25+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -10,6 +10,68 @@ msgstr ""
 "X-Generator: GlotPress/4.0.3\n"
 "Language: zh_CN\n"
 "Project-Id-Version: Plugins - Elementor Website Builder &#8211; More Than Just a Page Builder - Stable (latest release)\n"
+
+#: modules/variables/classes/rest-api.php:562
+msgid "Unexpected error"
+msgstr "意外错误"
+
+#: modules/variables/classes/rest-api.php:542
+msgid "Batch operation failed: Variables not found"
+msgstr "批量操作失败：未找到变量"
+
+#: modules/variables/classes/rest-api.php:536
+msgid "Batch operation failed: Variable labels already exist"
+msgstr "批量操作失败：变量标签已存在"
+
+#: modules/variables/classes/rest-api.php:530
+msgid "Batch operation failed: Reached the maximum number of variables"
+msgstr "批量操作失败：达到变量数量上限"
+
+#: modules/variables/classes/rest-api.php:226
+msgid "Order must be a non-negative integer"
+msgstr "序号必须是非负整数"
+
+#: modules/nested-accordion/widgets/nested-accordion.php:329
+msgid "Google no longer supports the FAQ schema; however, it may still hold secondary value for AI and LLMs."
+msgstr "Google 已不再支持 FAQ 结构化数据架构，但其对人工智能与大语言模型可能仍具辅助性价值。"
+
+#: modules/cloud-library/module.php:188
+msgid "Document not found for preview."
+msgstr "无法预览文档。"
+
+#: modules/atomic-widgets/module.php:207
+msgid "Editor MCP for atomic widgets."
+msgstr "用于原子化部件的编辑器 MCP"
+
+#: modules/atomic-widgets/module.php:206
+msgid "Editor MCP for atomic widgets"
+msgstr "用于原子化部件的编辑器 MCP"
+
+#: modules/atomic-widgets/elements/div-block/div-block.php:34
+msgid "Div block"
+msgstr "DIV 区块"
+
+#: modules/atomic-widgets/elements/atomic-tabs/atomic-tabs.php:62
+msgid "Menu items"
+msgstr "菜单项"
+
+#: modules/atomic-widgets/elements/atomic-tabs/atomic-tab.php:31
+msgid "Atomic Tab"
+msgstr "原子标签"
+
+#: modules/atomic-widgets/elements/atomic-tabs/atomic-tab-panel.php:32
+msgid "Atomic Tab Panel"
+msgstr "原子选项卡面板"
+
+#: app/modules/import-export-customization/module.php:461
+#: assets/js/import-export-customization-admin.js:326
+msgid "No import sessions available to revert."
+msgstr "无可用导入会话以供还原。"
+
+#: app/modules/import-export-customization/data/routes/traits/handles-quota-errors.php:30
+#: assets/js/app.js:8864
+msgid "This file"
+msgstr "这个文件"
 
 #: modules/promotions/pointers/black-friday.php:31
 msgid "Save big on Elementor Pro and unlock the tools to design without limits."
@@ -19,11 +81,11 @@ msgstr "Elementor Pro 超值优惠，立即解锁工具，开启无限设计可�
 msgid "Black Friday Is On!"
 msgstr "黑五盛典，现已开启！"
 
-#: core/admin/admin-notices.php:535
+#: core/admin/admin-notices.php:539
 msgid "Please note: The \"Load Google Fonts Locally\" feature has been disabled by default on all websites. To turn it back on, go to Elementor → Settings → Performance → Enable Load Google Fonts Locally."
 msgstr "请注意：“本地加载 Google 字体”功能现已在所有网站上默认禁用。如需重新开启，请前往 Elementor → 设置 → 性能 → 启用“本地加载 Google 字体”功能。"
 
-#: core/admin/admin-notices.php:534
+#: core/admin/admin-notices.php:538
 msgid "Important: Local Google Fonts Settings in Elementor"
 msgstr "重要提示：Elementor 中的本地加载 Google 字体设置"
 
@@ -321,11 +383,11 @@ msgstr "应用网站模板"
 msgid "Import/Export Customization"
 msgstr "导入/导出自定义配置"
 
-#: core/admin/admin-notices.php:496
+#: core/admin/admin-notices.php:500
 msgid "Collecting leads is just the beginning. With Send by Elementor, you can manage contacts, launch automations, and turn form submissions into sales."
 msgstr "收集潜在客户信息只是开始。使用Elementor的Send，您可以管理联系信息、启动自动化流程，并将表单提交转化为销售。"
 
-#: core/admin/admin-notices.php:492
+#: core/admin/admin-notices.php:496
 msgid "Turn leads into loyal shoppers"
 msgstr "将潜在客户转化为忠实顾客"
 
@@ -521,19 +583,19 @@ msgstr "Elementor 库应用不可用。"
 msgid "Failed to connect to Elementor Library."
 msgstr "无法连接到 Elementor 库。"
 
-#: core/admin/admin-notices.php:281
+#: core/admin/admin-notices.php:283
 msgid "Opt in"
 msgstr "同意启用"
 
-#: core/admin/admin-notices.php:278
+#: core/admin/admin-notices.php:280
 msgid "Update regarding usage data collection"
 msgstr "关于使用数据收集的更新"
 
-#: core/admin/admin-notices.php:274
+#: core/admin/admin-notices.php:276
 msgid "We're updating our Terms and Conditions to include the collection of usage and behavioral data. This information helps us understand how you use Elementor so we can make informed improvements to the product."
 msgstr "我们正在更新我们的服务条款，以包括收集使用和行为数据。这些信息帮助我们了解您如何使用Elementor，以便我们能够对产品进行有针对性的改进。"
 
-#: core/admin/admin-notices.php:236
+#: core/admin/admin-notices.php:238
 msgid "Want to shape the future of web creation?"
 msgstr "想要塑造网络创作的未来吗？"
 
@@ -576,7 +638,7 @@ msgstr "导出此网站"
 msgid "Here’s where you can export this website as a .zip file, upload it to the cloud, or start the process of applying an existing template to your site."
 msgstr "此处支持三种操作：将本站导出为ZIP压缩文件、上传至云端，或开始为您的站点应用现有模板。"
 
-#: core/admin/admin-notices.php:220 includes/settings/settings-page.php:403
+#: core/admin/admin-notices.php:222 includes/settings/settings-page.php:403
 msgid "Become a super contributor by helping us understand how you use our service to enhance your experience and improve our product."
 msgstr "成为超级贡献者：通过分享您的使用体验，助力我们优化产品服务，共同提升用户体验。"
 
@@ -591,9 +653,9 @@ msgstr "Cloud-Kits 未被实例化。"
 #: app/modules/kit-library/kit-library-menu-item.php:22
 #: app/modules/kit-library/module.php:35 app/modules/kit-library/module.php:36
 #: core/common/modules/finder/categories/general.php:78
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1693
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:4572
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5626
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1704
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:4584
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5638
 msgid "Website Templates"
 msgstr "网站模板"
 
@@ -772,11 +834,11 @@ msgstr "输入或粘贴您的网址"
 msgid "Not Authorized"
 msgstr "未经授权"
 
-#: core/admin/admin-notices.php:579
+#: core/admin/admin-notices.php:583
 msgid "Create a more inclusive site experience for all your visitors. With Ally, it's easy to add your statement page in just a few clicks."
 msgstr "为所有访客创建更具包容性的网站体验。通过Ally工具，仅需数次点击即可轻松添加无障碍声明页面。"
 
-#: core/admin/admin-notices.php:578
+#: core/admin/admin-notices.php:582
 msgid "Make sure your site has an accessibility statement page"
 msgstr "请确保您的网站已创建无障碍声明页面"
 
@@ -1027,19 +1089,19 @@ msgstr "未连接"
 msgid "Now you can process images in bulk and standardized the background and ratio - no manual editing required!"
 msgstr "现在您可以批量处理图片，并标准化背景和比例——无需手动编辑！"
 
-#: core/admin/admin-notices.php:653
+#: core/admin/admin-notices.php:657
 msgid "Use Elementor's Site Mailer to ensure your store emails like purchase confirmations, shipping updates and more are reliably delivered."
 msgstr "使用 Elementor 的 Site Mailer 确保可靠地发送您的商店电子邮件，例如购买确认、发货更新等。"
 
-#: core/admin/admin-notices.php:652
+#: core/admin/admin-notices.php:656
 msgid "Improve Transactional Email Deliverability"
 msgstr "提高交易电子邮件的送达率"
 
-#: core/admin/admin-notices.php:632
+#: core/admin/admin-notices.php:636
 msgid "Use Site Mailer for improved email deliverability, detailed email logs, and an easy setup."
 msgstr "使用 Site Mailer 可以提高电子邮件的送达率、详细的电子邮件日志和轻松的设置。"
 
-#: core/admin/admin-notices.php:631
+#: core/admin/admin-notices.php:635
 msgid "Ensure your form emails avoid the spam folder!"
 msgstr "确保您的表单电子邮件避开垃圾邮件文件夹！"
 
@@ -1098,7 +1160,7 @@ msgstr "添加页眉"
 msgid "Floating Bar CTA"
 msgstr "浮动条 CTA"
 
-#: modules/floating-buttons/module.php:47 assets/js/editor.js:51096
+#: modules/floating-buttons/module.php:47 assets/js/editor.js:51112
 msgid "Floating Bars"
 msgstr "浮动条"
 
@@ -1496,8 +1558,8 @@ msgstr "Elementor 编辑器事件"
 msgid "<p>With AI for text, code, image generation and editing, you can bring your vision to life faster than ever. Start your free trial now - <b>no credit card required!</b></p>"
 msgstr "<p>借助用于文本、代码、图像生成和编辑的人工智能，您可以比以往更快地实现您的愿景。立即开始免费试用 - <b>无需信用卡！</b></p>"
 
-#: modules/floating-buttons/module.php:46 assets/js/editor.js:51098
-#: assets/js/editor.js:51100
+#: modules/floating-buttons/module.php:46 assets/js/editor.js:51114
+#: assets/js/editor.js:51116
 msgid "Floating Buttons"
 msgstr "悬浮按钮"
 
@@ -1741,7 +1803,7 @@ msgstr "输入图标文本"
 #: modules/floating-buttons/base/widget-contact-button-base.php:2264
 #: modules/link-in-bio/base/widget-link-in-bio-base.php:559
 #: modules/link-in-bio/base/widget-link-in-bio-base.php:1384
-#: assets/js/app.js:11102
+#: assets/js/app.js:11136
 msgid "Icons"
 msgstr "图标"
 
@@ -2081,11 +2143,11 @@ msgstr "立即升级促销"
 msgid "Discounted Upgrades Now!"
 msgstr "立即升级折扣！"
 
-#: core/admin/admin-notices.php:751
+#: core/admin/admin-notices.php:755
 msgid "Automatically compress and optimize images, resize larger files, or convert to WebP. Optimize images individually, in bulk, or on upload."
 msgstr "自动压缩和优化图像、调整较大文件的大小或转换为 WebP。单独、批量或上传时优化图像。"
 
-#: core/admin/admin-notices.php:750
+#: core/admin/admin-notices.php:754
 msgid "Speed up your website with Image Optimizer by Elementor"
 msgstr "使用 Elementor 的图像优化器加快您的网站速度"
 
@@ -2207,7 +2269,7 @@ msgstr "新的！热门插件"
 
 #: modules/apps/admin-menu-apps.php:22 modules/apps/admin-menu-apps.php:26
 #: modules/apps/module.php:37 assets/js/admin-top-bar.js:182
-#: assets/js/editor.js:38744
+#: assets/js/editor.js:38760
 msgid "Add-ons"
 msgstr "扩展"
 
@@ -2296,23 +2358,23 @@ msgstr "访问所有 Pro 小部件"
 msgid "Don’t show again."
 msgstr "不再显示。"
 
-#: includes/managers/controls.php:1301 assets/js/editor.js:53090
+#: includes/managers/controls.php:1301 assets/js/editor.js:53106
 msgid "Scrolling Effects"
 msgstr "滚动效果"
 
-#: includes/managers/controls.php:1310 assets/js/editor.js:53105
+#: includes/managers/controls.php:1310 assets/js/editor.js:53121
 msgid "Mouse Effects"
 msgstr "鼠标效果"
 
 #: includes/managers/controls.php:1319
 #: modules/floating-buttons/base/widget-floating-bars-base.php:1453
-#: assets/js/editor.js:53120
+#: assets/js/editor.js:53136
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:22
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:157
 msgid "Sticky"
 msgstr "Sticky (粘性定位)"
 
-#: core/admin/admin-notices.php:703 includes/controls/gallery.php:144
+#: core/admin/admin-notices.php:707 includes/controls/gallery.php:144
 #: includes/controls/media.php:338 includes/widgets/heading.php:473
 msgid "Install Plugin"
 msgstr "安装插件"
@@ -2376,7 +2438,7 @@ msgstr "您无权访问此模板"
 msgid "Invalid template type or template does not exist."
 msgstr "模板类型无效或模板不存在"
 
-#: includes/managers/controls.php:1270 assets/js/editor.js:53075
+#: includes/managers/controls.php:1270 assets/js/editor.js:53091
 msgid "Display Conditions"
 msgstr "显示条件"
 
@@ -2410,8 +2472,8 @@ msgid "Invalid file name."
 msgstr "文件名无效。"
 
 #: includes/editor-templates/templates.php:170
-#: assets/js/element-manager-admin.js:662
-#: assets/js/element-manager-admin.js:731
+#: assets/js/element-manager-admin.js:671
+#: assets/js/element-manager-admin.js:743
 msgid "Usage"
 msgstr "使用"
 
@@ -2525,13 +2587,13 @@ msgstr "优化古腾堡加载"
 #: assets/js/ai-unify-product-images.js:2491
 #: assets/js/ai-unify-product-images.js:3218 assets/js/ai.js:1822
 #: assets/js/ai.js:1869 assets/js/ai.js:3279 assets/js/ai.js:4006
-#: assets/js/app.js:8844 assets/js/editor.js:8241 assets/js/editor.js:8243
+#: assets/js/app.js:8878 assets/js/editor.js:8241 assets/js/editor.js:8243
 #: assets/js/editor.js:9861 assets/js/editor.js:9862
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1927
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1997
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:2009
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5103
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5232
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1938
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:2008
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:2020
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5115
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5244
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:325
 msgid "Upgrade now"
 msgstr "现在升级"
@@ -2742,8 +2804,8 @@ msgstr "容器内的项目可以保持单行排列（不换行），也可以拆
 msgid "You do not have permission to perform this action."
 msgstr "您没有执行此操作的权限。"
 
-#: modules/nested-tabs/widgets/nested-tabs.php:1175
-#: modules/nested-tabs/widgets/nested-tabs.php:1240
+#: modules/nested-tabs/widgets/nested-tabs.php:1176
+#: modules/nested-tabs/widgets/nested-tabs.php:1242
 msgid "Tabs. Open items with Enter or Space, close with Escape and navigate using the Arrow keys."
 msgstr "标签页组件操作提示：使用 Enter 或 Space 键打开项目，使用 Escape 键关闭，使用方向键进行导航。"
 
@@ -2751,7 +2813,7 @@ msgstr "标签页组件操作提示：使用 Enter 或 Space 键打开项目，�
 #. translators: %s: Post type (e.g. Page, Post, etc.)
 #: core/document-types/page-base.php:204
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.js:2
-#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:13
+#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:17
 msgid "View %s"
 msgstr "查看 %s"
 
@@ -2777,7 +2839,7 @@ msgstr "上方"
 #: assets/js/packages/editor-global-classes/editor-global-classes.js:2
 #: assets/js/packages/editor-global-classes/editor-global-classes.strings.js:69
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.js:2
-#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:15
+#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:19
 msgid "Rename"
 msgstr "重命名"
 
@@ -2908,23 +2970,23 @@ msgstr "对象位置"
 msgid "Fit to Size"
 msgstr "适合尺寸"
 
-#: includes/frontend.php:1393
+#: includes/frontend.php:1397
 msgid "Go to slide"
 msgstr "转到幻灯片"
 
-#: includes/frontend.php:1392
+#: includes/frontend.php:1396
 msgid "This is the last slide"
 msgstr "这是最后一张幻灯片"
 
-#: includes/frontend.php:1391
+#: includes/frontend.php:1395
 msgid "This is the first slide"
 msgstr "这是第一张幻灯片"
 
-#: includes/frontend.php:1390
+#: includes/frontend.php:1394
 msgid "Next slide"
 msgstr "下一张幻灯片"
 
-#: includes/frontend.php:1389
+#: includes/frontend.php:1393
 msgid "Previous slide"
 msgstr "上一张幻灯片"
 
@@ -2952,7 +3014,7 @@ msgstr "调整结构大小"
 msgid "Panels"
 msgstr "面板"
 
-#: includes/controls/gallery.php:105 assets/js/editor.js:14736
+#: includes/controls/gallery.php:105 assets/js/editor.js:14735
 msgid "Clear gallery"
 msgstr "清除画廊"
 
@@ -3016,7 +3078,7 @@ msgstr "全局"
 msgid "Close structure"
 msgstr "关闭结构"
 
-#: includes/editor-templates/navigator.php:32 assets/js/editor.js:35824
+#: includes/editor-templates/navigator.php:32 assets/js/editor.js:35840
 msgid "Expand all elements"
 msgstr "展开所有元素"
 
@@ -3079,7 +3141,7 @@ msgstr "Auto Flow (排列)"
 
 #: includes/editor-templates/global.php:68 includes/elements/container.php:96
 #: includes/elements/container.php:104 includes/elements/container.php:379
-#: assets/js/editor.js:33749 assets/js/editor.js:42839
+#: assets/js/editor.js:33765 assets/js/editor.js:42855
 msgid "Grid"
 msgstr "网格"
 
@@ -3109,7 +3171,7 @@ msgstr "平板电脑横向"
 msgid "Tablet Portrait"
 msgstr "平板电脑纵向"
 
-#: core/admin/admin-notices.php:804 core/admin/admin.php:1034
+#: core/admin/admin-notices.php:808 core/admin/admin.php:1034
 msgid "Dismiss this notice."
 msgstr "忽略此通知。"
 
@@ -3376,7 +3438,7 @@ msgstr "容器内距"
 msgid "Performance"
 msgstr "性能"
 
-#: core/admin/admin-notices.php:409
+#: core/admin/admin-notices.php:411
 msgid "Try it out"
 msgstr "试试看"
 
@@ -3384,7 +3446,7 @@ msgstr "试试看"
 #. Translators: %s is the current item index.
 #: modules/nested-accordion/widgets/nested-accordion.php:94
 #: modules/nested-elements/base/widget-nested-base.php:46
-#: assets/js/editor.js:25320
+#: assets/js/editor.js:25334
 msgid "Item #%d"
 msgstr "项目 #%d"
 
@@ -3401,11 +3463,11 @@ msgstr "您可以随时更改%1$s用户首选项%2$s中的设置"
 msgid "Now you can choose where you want to go on the site from the following options"
 msgstr "现在您可以从以下选项中选择您想要访问该网站的位置"
 
-#: core/admin/admin-notices.php:406
+#: core/admin/admin-notices.php:408
 msgid "With our experimental speed boosting features you can go faster than ever before. Look for the Performance label on our Experiments page and activate those experiments to improve your site loading speed."
 msgstr "借助我们的实验性提速功能，您可以比以往更快。在我们的实验页面上查找性能标签并激活这些实验以提高您的网站加载速度。"
 
-#: core/admin/admin-notices.php:405
+#: core/admin/admin-notices.php:407
 msgid "Improve your site’s performance score."
 msgstr "提高网站的性能得分。"
 
@@ -3417,7 +3479,7 @@ msgstr "设置您的网站名称时出现问题。"
 msgid "WP Dashboard"
 msgstr "WP 仪表盘"
 
-#: core/editor/notice-bar.php:45 assets/js/element-manager-admin.js:724
+#: core/editor/notice-bar.php:45 assets/js/element-manager-admin.js:735
 msgid "Unleash the full power of Elementor's features and web creation tools."
 msgstr "释放 Elementor 功能和 Web 创建工具的全部威力。"
 
@@ -3443,10 +3505,10 @@ msgstr "释放 Elementor 功能和 Web 创建工具的全部威力。"
 #: modules/promotions/promotion-data.php:99
 #: modules/promotions/promotion-data.php:116 assets/js/app-packages.js:919
 #: assets/js/app-packages.js:4491 assets/js/app-packages.js:4767
-#: assets/js/app.js:1262 assets/js/checklist.js:240 assets/js/editor.js:6188
-#: assets/js/editor.js:10915 assets/js/editor.js:53080
-#: assets/js/editor.js:53095 assets/js/editor.js:53110
-#: assets/js/editor.js:53125
+#: assets/js/app.js:1263 assets/js/checklist.js:240 assets/js/editor.js:6188
+#: assets/js/editor.js:10914 assets/js/editor.js:53096
+#: assets/js/editor.js:53111 assets/js/editor.js:53126
+#: assets/js/editor.js:53141
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:325
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2112
 msgid "Upgrade Now"
@@ -3482,10 +3544,10 @@ msgstr "备注"
 #: assets/js/ai-unify-product-images.js:2960
 #: assets/js/ai-unify-product-images.js:3088 assets/js/ai.js:1812
 #: assets/js/ai.js:3748 assets/js/ai.js:3876 assets/js/app-packages.js:4732
-#: assets/js/app.js:9635 assets/js/e-react-promotions.js:195
+#: assets/js/app.js:9669 assets/js/e-react-promotions.js:195
 #: assets/js/editor.js:4709
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1445
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:3924
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1456
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:3936
 #: assets/js/notes.js:147
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:801
 #: assets/js/styleguide.js:195
@@ -3496,8 +3558,8 @@ msgstr "升级"
 msgid "Let's do it"
 msgstr "我们开始行动吧"
 
-#: core/admin/admin-notices.php:539 assets/js/app.js:6108
-#: assets/js/app.js:12460 assets/js/app.js:15033
+#: core/admin/admin-notices.php:543 assets/js/app.js:6109
+#: assets/js/app.js:12494 assets/js/app.js:15067
 #: assets/js/packages/editor-controls/editor-controls.js:28
 #: assets/js/packages/editor-controls/editor-controls.strings.js:73
 #: assets/js/packages/editor-variables/editor-variables.js:2
@@ -3545,7 +3607,7 @@ msgstr "Elementor 事件跟踪器"
 #: core/experiments/manager.php:342 includes/elements/container.php:72
 #: includes/elements/container.php:357
 #: modules/library/documents/container.php:52 assets/js/editor.js:8496
-#: assets/js/editor.js:33749 assets/js/editor.js:39611
+#: assets/js/editor.js:33765 assets/js/editor.js:39627
 msgid "Container"
 msgstr "容器"
 
@@ -3556,7 +3618,7 @@ msgstr "分页"
 #: elementor.php:83 elementor.php:107 assets/js/ai-admin.js:1063
 #: assets/js/ai-gutenberg.js:1201 assets/js/ai-layout.js:761
 #: assets/js/ai-media-library.js:1063 assets/js/ai-unify-product-images.js:1063
-#: assets/js/ai.js:1851 assets/js/app.js:7624 assets/js/app.js:12454
+#: assets/js/ai.js:1851 assets/js/app.js:7658 assets/js/app.js:12488
 msgid "Show me how"
 msgstr "告诉我怎么做"
 
@@ -3607,7 +3669,7 @@ msgstr "上传您的文件时出现问题。"
 msgid "Copies all of the selected sections and columns and pastes them in a container beneath the original."
 msgstr "复制所有选中的分区和列，并将其粘贴到原始内容下方的容器中。"
 
-#: includes/editor-templates/global.php:33 assets/js/editor.js:33608
+#: includes/editor-templates/global.php:33 assets/js/editor.js:33624
 msgid "Add New Container"
 msgstr "新增容器"
 
@@ -3643,7 +3705,7 @@ msgid "Terms of Service"
 msgstr "服务条款"
 
 #: core/utils/hints.php:466
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:150
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:150
 msgid "Customize"
 msgstr "自定义"
 
@@ -3947,17 +4009,17 @@ msgstr "更多自定义断点"
 
 #: core/common/modules/finder/categories/settings.php:74
 #: core/experiments/manager.php:480
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:4476
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:4488
 msgid "Features"
 msgstr "特性"
 
 #: includes/template-library/sources/admin-menu-items/templates-categories-menu-item.php:23
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:4467
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:4479
 msgid "Categories"
 msgstr "分类"
 
 #: includes/managers/elements.php:328
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:3945
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:3957
 msgid "Favorites"
 msgstr "收藏"
 
@@ -3983,7 +4045,7 @@ msgid "Sections"
 msgstr "区段"
 
 #: includes/settings/tools.php:431 includes/settings/tools.php:434
-#: assets/js/editor.js:28986
+#: assets/js/editor.js:29000
 msgid "Recreate Kit"
 msgstr "重建套件"
 
@@ -3999,7 +4061,7 @@ msgstr "尝试创建套件时发生错误。"
 msgid "There's already an active kit."
 msgstr "已经有一个活跃的套件。"
 
-#: includes/editor-templates/panel.php:296 assets/js/editor.js:13875
+#: includes/editor-templates/panel.php:296 assets/js/editor.js:13874
 msgid "Color Sampler"
 msgstr "颜色采样器"
 
@@ -4017,20 +4079,20 @@ msgid "Kit not exists."
 msgstr "套件不存在。"
 
 #: app/modules/kit-library/connect/kit-library.php:16
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:6092
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:6424
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:6104
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:6436
 msgid "Kit Library"
 msgstr "套件库"
 
 #: app/modules/import-export-customization/module.php:153
-#: app/modules/import-export/module.php:154 assets/js/app.js:7568
-#: assets/js/app.js:7654 assets/js/app.js:7786 assets/js/app.js:7974
-#: assets/js/app.js:13806 assets/js/app.js:17326
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5386
+#: app/modules/import-export/module.php:154 assets/js/app.js:7594
+#: assets/js/app.js:7688 assets/js/app.js:7820 assets/js/app.js:8008
+#: assets/js/app.js:13840 assets/js/app.js:17360
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5398
 msgid "Import"
 msgstr "导入"
 
-#: includes/settings/tools.php:341 assets/js/app.js:13412
+#: includes/settings/tools.php:341 assets/js/app.js:13446
 msgid "Important:"
 msgstr "重要"
 
@@ -4071,7 +4133,7 @@ msgstr "未指定兼容性"
 msgid "API Key"
 msgstr "API 密钥"
 
-#: core/admin/admin-notices.php:368
+#: core/admin/admin-notices.php:370
 msgid "Managing a multi-user site?"
 msgstr "管理多用户站点？"
 
@@ -4191,7 +4253,7 @@ msgstr "桌面端 <br> 为基准设备添加的设置将应用于所有断点，
 msgid "Database update process is running in the background. Taking a while?"
 msgstr "​​数据库更新进程正在后台运行。可能需要一段时间？​​"
 
-#: core/admin/admin-notices.php:369
+#: core/admin/admin-notices.php:371
 msgid "With Elementor Pro, you can control user access and make sure no one messes up your design."
 msgstr "​​Elementor Pro 让您能够精确控制用户访问权限，从而确保您的设计成果万无一失。​​"
 
@@ -4291,10 +4353,10 @@ msgid "Repeat-y"
 msgstr "纵向重复"
 
 #: app/modules/import-export-customization/module.php:206
-#: app/modules/import-export/module.php:207 core/admin/admin-notices.php:286
-#: core/admin/admin-notices.php:414 core/admin/admin-notices.php:505
-#: core/admin/admin-notices.php:545 core/admin/admin-notices.php:593
-#: core/admin/admin-notices.php:641 core/experiments/manager.php:317
+#: app/modules/import-export/module.php:207 core/admin/admin-notices.php:288
+#: core/admin/admin-notices.php:416 core/admin/admin-notices.php:509
+#: core/admin/admin-notices.php:549 core/admin/admin-notices.php:597
+#: core/admin/admin-notices.php:645 core/experiments/manager.php:317
 #: core/experiments/manager.php:333 core/experiments/manager.php:363
 #: core/experiments/manager.php:534 includes/controls/url.php:78
 #: includes/elements/section.php:473 includes/settings/settings-page.php:404
@@ -4302,14 +4364,14 @@ msgstr "纵向重复"
 #: modules/ai/feature-intro/product-image-unification-intro.php:40
 #: modules/checklist/steps/step-base.php:102
 #: modules/nested-elements/module.php:21
-#: modules/shapes/widgets/text-path.php:150 assets/js/app.js:4808
-#: assets/js/app.js:7923 assets/js/app.js:8795 assets/js/app.js:8803
-#: assets/js/app.js:8809 assets/js/app.js:8817 assets/js/app.js:8823
-#: assets/js/app.js:10598 assets/js/app.js:13402
+#: modules/shapes/widgets/text-path.php:150 assets/js/app.js:4809
+#: assets/js/app.js:7957 assets/js/app.js:8829 assets/js/app.js:8837
+#: assets/js/app.js:8843 assets/js/app.js:8851 assets/js/app.js:8857
+#: assets/js/app.js:10632 assets/js/app.js:13436
 #: assets/js/editor-v4-opt-in-alphachip.js:186
 #: assets/js/editor-v4-opt-in.js:496 assets/js/editor-v4-welcome-opt-in.js:83
-#: assets/js/editor.js:28046
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5428
+#: assets/js/editor.js:28060
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5440
 msgid "Learn more"
 msgstr "了解更多"
 
@@ -4516,6 +4578,14 @@ msgstr "开发"
 msgid "Experiments"
 msgstr "实验"
 
+#: core/role-manager/role-manager.php:125
+#: includes/settings/settings-page.php:386 assets/js/editor.js:45682
+#: assets/js/element-manager-admin.js:643
+#: assets/js/packages/editor-app-bar/editor-app-bar.js:12
+#: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:13
+msgid "Save Changes"
+msgstr "保存更改"
+
 #: core/experiments/manager.php:465
 msgid "No available experiments"
 msgstr "无可用的实验"
@@ -4592,8 +4662,8 @@ msgid "Tested up to %s version"
 msgstr "测试到%s版本"
 
 #: modules/compatibility-tag/views/plugin-update-message-compatibility.php:42
-#: assets/js/element-manager-admin.js:670
-#: assets/js/element-manager-admin.js:731
+#: assets/js/element-manager-admin.js:679
+#: assets/js/element-manager-admin.js:743
 msgid "Plugin"
 msgstr "插件"
 
@@ -4615,7 +4685,7 @@ msgstr "自定义列间距"
 #: modules/landing-pages/documents/landing-page.php:54
 #: modules/landing-pages/module.php:46 modules/landing-pages/module.php:163
 #: modules/landing-pages/module.php:294 modules/landing-pages/module.php:306
-#: assets/js/app.js:16239 assets/js/editor.js:52839
+#: assets/js/app.js:16273 assets/js/editor.js:52855
 msgid "Landing Pages"
 msgstr "着陆页面"
 
@@ -4657,8 +4727,8 @@ msgid "Choose SVG"
 msgstr "选择 SVG 文件"
 
 #: core/kits/documents/tabs/global-colors.php:24
-#: core/kits/documents/tabs/global-colors.php:43 assets/js/app.js:11102
-#: assets/js/app.js:16247 assets/js/editor.js:47825
+#: core/kits/documents/tabs/global-colors.php:43 assets/js/app.js:11136
+#: assets/js/app.js:16281 assets/js/editor.js:47841
 #: assets/js/styleguide-app.77392704cadf8bc1ca69.bundle.js:172
 msgid "Global Colors"
 msgstr "全局颜色"
@@ -4669,12 +4739,12 @@ msgid "Breakpoint"
 msgstr "断点"
 
 #: core/kits/documents/tabs/settings-layout.php:183
-#: modules/page-templates/module.php:157 assets/js/app.js:10161
-#: assets/js/app.js:10167
+#: modules/page-templates/module.php:157 assets/js/app.js:10195
+#: assets/js/app.js:10201
 msgid "Theme"
 msgstr "主题"
 
-#: includes/frontend.php:1380
+#: includes/frontend.php:1384
 msgid "Download"
 msgstr "下载"
 
@@ -4693,11 +4763,11 @@ msgstr "应用链接在"
 msgid "Items"
 msgstr "项目"
 
-#: modules/nested-tabs/widgets/nested-tabs.php:376 assets/js/editor.js:48184
+#: modules/nested-tabs/widgets/nested-tabs.php:376 assets/js/editor.js:48200
 msgid "Additional Settings"
 msgstr "附加设置"
 
-#: core/settings/editor-preferences/model.php:174 assets/js/editor.js:48192
+#: core/settings/editor-preferences/model.php:174 assets/js/editor.js:48208
 msgid "Design System"
 msgstr "设计系统"
 
@@ -4726,8 +4796,8 @@ msgstr "断点"
 msgid "Default Page Layout"
 msgstr "默认页面布局"
 
-#: core/kits/documents/tabs/settings-layout.php:47 assets/js/app.js:11102
-#: assets/js/app.js:16247
+#: core/kits/documents/tabs/settings-layout.php:47 assets/js/app.js:11136
+#: assets/js/app.js:16281
 msgid "Layout Settings"
 msgstr "布局设置"
 
@@ -4736,15 +4806,15 @@ msgid "Mobile Browser Background"
 msgstr "移动浏览器背景"
 
 #: core/settings/editor-preferences/model.php:38
-#: includes/editor-templates/hotkeys.php:146 assets/js/editor.js:38724
+#: includes/editor-templates/hotkeys.php:146 assets/js/editor.js:38740
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:5
 msgid "User Preferences"
 msgstr "用户首选项"
 
 #: core/kits/manager.php:436 includes/editor-templates/hotkeys.php:112
-#: assets/js/app.js:16245 assets/js/app.js:16742 assets/js/editor.js:47774
-#: assets/js/editor.js:47778 assets/js/editor.js:47788
+#: assets/js/app.js:16279 assets/js/app.js:16776 assets/js/editor.js:47790
+#: assets/js/editor.js:47794 assets/js/editor.js:47804
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:12
 msgid "Site Settings"
@@ -4833,7 +4903,7 @@ msgstr "单击媒体图标上传文件"
 #: assets/js/ai-unify-product-images.js:63
 #: assets/js/ai-unify-product-images.js:73 assets/js/ai.js:63
 #: assets/js/ai.js:73 assets/js/common.js:63 assets/js/common.js:73
-#: assets/js/editor.js:40532 assets/js/editor.js:40542
+#: assets/js/editor.js:40548 assets/js/editor.js:40558
 msgid "Enable Unfiltered File Uploads"
 msgstr "启用未过滤的文件上传"
 
@@ -4845,7 +4915,7 @@ msgstr "如果您遇到加载问题，请与您的站点管理员联系，以使
 msgid "Dynamic Tags"
 msgstr "动态标签"
 
-#: includes/frontend.php:1381
+#: includes/frontend.php:1385
 msgid "Download image"
 msgstr "下载图片"
 
@@ -4861,11 +4931,11 @@ msgstr "升级过程包括数据库更新"
 msgid "Attributes"
 msgstr "属性"
 
-#: core/kits/documents/tabs/settings-lightbox.php:66 includes/frontend.php:1382
+#: core/kits/documents/tabs/settings-lightbox.php:66 includes/frontend.php:1386
 msgid "Fullscreen"
 msgstr "全屏"
 
-#: core/kits/documents/tabs/settings-lightbox.php:86 includes/frontend.php:1384
+#: core/kits/documents/tabs/settings-lightbox.php:86 includes/frontend.php:1388
 msgid "Share"
 msgstr "分享"
 
@@ -4873,7 +4943,7 @@ msgstr "分享"
 #: includes/editor-templates/templates.php:224 assets/js/ai-admin.js:9559
 #: assets/js/ai-gutenberg.js:9777 assets/js/ai-media-library.js:9559
 #: assets/js/ai-unify-product-images.js:9559 assets/js/ai.js:11111
-#: assets/js/app.js:7696 assets/js/app.js:12882 assets/js/editor.js:48080
+#: assets/js/app.js:7730 assets/js/app.js:12916 assets/js/editor.js:48096
 msgid "Back"
 msgstr "返回"
 
@@ -4909,7 +4979,7 @@ msgstr "段落间距"
 msgid "Toolbar Icons Size"
 msgstr "工具栏图标大小"
 
-#: includes/frontend.php:1378
+#: includes/frontend.php:1382
 msgid "Share on Twitter"
 msgstr "分享到Twitter"
 
@@ -4930,11 +5000,11 @@ msgstr "符合我们的属性"
 msgid "You’re missing out!"
 msgstr "您错过了！"
 
-#: includes/frontend.php:1377
+#: includes/frontend.php:1381
 msgid "Share on Facebook"
 msgstr "在脸书上分享"
 
-#: includes/frontend.php:1379
+#: includes/frontend.php:1383
 msgid "Pin it"
 msgstr "钉住"
 
@@ -5038,7 +5108,7 @@ msgstr "连接到库失败。请尝试重新加载页面，然后重试"
 #: assets/js/ai-media-library.js:15906
 #: assets/js/ai-unify-product-images.js:15906 assets/js/ai.js:7841
 #: assets/js/ai.js:17458 assets/js/editor.js:8000
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:321
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:321
 msgid "Get Started"
 msgstr "开始使用"
 
@@ -5217,8 +5287,8 @@ msgstr "部落"
 msgid "Basic Gallery"
 msgstr "基本图库"
 
-#: includes/frontend.php:1387 assets/js/app.js:12701 assets/js/app.js:14652
-#: assets/js/app.js:15597
+#: includes/frontend.php:1391 assets/js/app.js:12735 assets/js/app.js:14686
+#: assets/js/app.js:15631
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2332
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2385
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2683
@@ -5226,8 +5296,8 @@ msgstr "基本图库"
 msgid "Next"
 msgstr "下一页"
 
-#: includes/frontend.php:1386 assets/js/app.js:13794 assets/js/app.js:14639
-#: assets/js/app.js:15590
+#: includes/frontend.php:1390 assets/js/app.js:13828 assets/js/app.js:14673
+#: assets/js/app.js:15624
 msgid "Previous"
 msgstr "上一页"
 
@@ -5600,8 +5670,8 @@ msgstr "分类"
 #: includes/template-library/sources/local.php:1740
 #: modules/promotions/admin-menu-items/popups-promotion-item.php:41
 #: modules/promotions/admin-menu-items/popups-promotion-item.php:45
-#: assets/js/app.js:11091 assets/js/app.js:16230
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:2971
+#: assets/js/app.js:11125 assets/js/app.js:16264
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:2980
 msgid "Popups"
 msgstr "弹窗"
 
@@ -5609,12 +5679,12 @@ msgstr "弹窗"
 msgid "Get Popup Builder"
 msgstr "获取弹窗构建器"
 
-#: includes/frontend.php:1515
+#: includes/frontend.php:1519
 msgid "(more&hellip;)"
 msgstr "(更多&hellip;)"
 
 #. translators: %s: Current post name.
-#: includes/frontend.php:1522
+#: includes/frontend.php:1526
 msgid "Continue reading %s"
 msgstr "继续阅读%s"
 
@@ -5640,7 +5710,7 @@ msgstr "仍然遇到问题？"
 #: app/modules/site-editor/module.php:31
 #: core/common/modules/finder/categories/general.php:72
 #: includes/template-library/sources/local.php:1739
-#: assets/js/app-packages.js:4811 assets/js/editor.js:47799
+#: assets/js/app-packages.js:4811 assets/js/editor.js:47815
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:6
 msgid "Theme Builder"
@@ -5675,8 +5745,8 @@ msgstr "不支持"
 msgid "Users"
 msgstr "用户"
 
-#: core/common/modules/finder/categories/site.php:76 assets/js/app.js:6087
-#: assets/js/app.js:7538 assets/js/app.js:11110 assets/js/app.js:16750
+#: core/common/modules/finder/categories/site.php:76 assets/js/app.js:6088
+#: assets/js/app.js:7564 assets/js/app.js:11144 assets/js/app.js:16784
 msgid "Plugins"
 msgstr "插件"
 
@@ -5724,7 +5794,7 @@ msgstr "撤销"
 msgid "Customizer"
 msgstr "自定义"
 
-#: core/common/modules/finder/categories/site.php:58 assets/js/app.js:7505
+#: core/common/modules/finder/categories/site.php:58 assets/js/app.js:7531
 msgid "Menus"
 msgstr "菜单"
 
@@ -5734,7 +5804,7 @@ msgstr "连接到 Elementor"
 
 #: core/common/modules/connect/apps/base-app.php:216
 #: core/common/modules/connect/rest/rest-api.php:87 assets/js/editor.js:9906
-#: assets/js/editor.js:9971 assets/js/editor.js:10953
+#: assets/js/editor.js:9971 assets/js/editor.js:10952
 msgid "Connected successfully."
 msgstr "连接成功。"
 
@@ -5749,7 +5819,7 @@ msgstr "连接成功。"
 #: assets/js/ai-media-library.js:6391 assets/js/ai-unify-product-images.js:1072
 #: assets/js/ai-unify-product-images.js:6391 assets/js/ai.js:1860
 #: assets/js/ai.js:7852 assets/js/ai.js:7943 assets/js/editor.js:9856
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:3920
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:3932
 msgid "Connect"
 msgstr "连接"
 
@@ -5759,7 +5829,7 @@ msgid "Disconnected successfully."
 msgstr "已成功断开连接。"
 
 #: core/common/modules/finder/categories/create.php:27 assets/js/editor.js:8883
-#: assets/js/editor.js:46397
+#: assets/js/editor.js:46413
 #: assets/js/packages/editor-components/editor-components.js:2
 #: assets/js/packages/editor-components/editor-components.strings.js:8
 #: assets/js/packages/editor-variables/editor-variables.js:2
@@ -5769,7 +5839,7 @@ msgstr "创建"
 
 #: core/common/modules/finder/categories/site.php:46
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.js:2
-#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:26
+#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:12
 msgid "Homepage"
 msgstr "首页"
 
@@ -5778,7 +5848,7 @@ msgid "Dashboard"
 msgstr "仪表盘"
 
 #: includes/editor-templates/hotkeys.php:96 assets/js/admin-top-bar.js:186
-#: assets/js/common.js:2885 assets/js/editor.js:38736
+#: assets/js/common.js:2886 assets/js/editor.js:38752
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:22
 msgid "Finder"
@@ -5852,7 +5922,7 @@ msgstr "延迟加载"
 #: includes/editor-templates/library-layout.php:13
 #: includes/settings/admin-menu-items/getting-started-menu-item.php:56
 #: modules/announcements/module.php:124 assets/js/app-packages.js:1364
-#: assets/js/app.js:1829
+#: assets/js/app.js:1830
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2146
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2260
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2499
@@ -5865,11 +5935,11 @@ msgstr "跳过"
 msgid "Debug Bar"
 msgstr "调试栏"
 
-#: core/admin/admin-notices.php:330
+#: core/admin/admin-notices.php:332
 msgid "Hide Notification"
 msgstr "隐藏通知"
 
-#: core/admin/admin-notices.php:320
+#: core/admin/admin-notices.php:322
 msgid "Congrats!"
 msgstr "恭喜！"
 
@@ -5887,7 +5957,7 @@ msgstr "创建您的第一个页面"
 msgid "Empty"
 msgstr "空白"
 
-#: core/admin/admin-notices.php:324
+#: core/admin/admin-notices.php:326
 msgid "Happy To Help"
 msgstr "乐于帮助"
 
@@ -5908,7 +5978,7 @@ msgstr "输入您的网址"
 msgid "Getting Started"
 msgstr "入门"
 
-#: includes/widgets/inner-section.php:35 assets/js/editor.js:28060
+#: includes/widgets/inner-section.php:35 assets/js/editor.js:28074
 msgid "Inner Section"
 msgstr "内部区段"
 
@@ -5928,7 +5998,7 @@ msgstr "当页面内容填充完成后，此窗口将显示所有页面元素的
 msgid "Paste URL or type"
 msgstr "粘贴网址或直接输入"
 
-#: core/admin/admin-notices.php:321
+#: core/admin/admin-notices.php:323
 msgid "You created over 10 pages with Elementor. Great job! If you can spare a minute, please help us by leaving a five star review on WordPress.org."
 msgstr "您已使用 Elementor 创建了超过 10 个页面。做得真棒！如果您能抽出一分钟时间，请在 WordPress.org 上为我们留下五星好评，这将对我们有巨大帮助。"
 
@@ -5944,7 +6014,7 @@ msgstr "轻松导航，来袭！"
 msgid "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis, pulvinar dapibus leo."
 msgstr "这是示例文本，单击 “编辑” 按钮更改此文本。"
 
-#: core/kits/documents/tabs/settings-lightbox.php:76 includes/frontend.php:1383
+#: core/kits/documents/tabs/settings-lightbox.php:76 includes/frontend.php:1387
 #: includes/widgets/google-maps.php:174 assets/js/ai-admin.js:10219
 #: assets/js/ai-admin.js:10222 assets/js/ai-gutenberg.js:10437
 #: assets/js/ai-gutenberg.js:10440 assets/js/ai-media-library.js:10219
@@ -5978,7 +6048,7 @@ msgstr "Logo"
 #: assets/js/ai-admin.js:7986 assets/js/ai-gutenberg.js:8204
 #: assets/js/ai-layout.js:3474 assets/js/ai-media-library.js:7986
 #: assets/js/ai-unify-product-images.js:7986 assets/js/ai.js:9538
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:4370
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:4382
 msgid "Pro"
 msgstr "专业版"
 
@@ -6046,7 +6116,7 @@ msgstr "对比"
 
 #: includes/editor-templates/hotkeys.php:38
 #: includes/editor-templates/templates.php:160 assets/js/editor.js:8581
-#: assets/js/editor.js:8595 assets/js/editor.js:30757
+#: assets/js/editor.js:8595 assets/js/editor.js:30771
 msgid "Copy"
 msgstr "复制"
 
@@ -6177,7 +6247,7 @@ msgstr "无页眉、页脚，只有使用 Elementor 添加的内容"
 msgid "This template includes the header, full-width content and footer"
 msgstr "此模板包含页眉、全宽内容区和页脚。"
 
-#: includes/frontend.php:1385 includes/widgets/video.php:999
+#: includes/frontend.php:1389 includes/widgets/video.php:999
 msgid "Play Video"
 msgstr "播放视频"
 
@@ -6215,7 +6285,7 @@ msgstr "选择模板类型"
 #: core/kits/documents/tabs/global-typography.php:182
 #: modules/promotions/admin-menu-items/custom-fonts-promotion-item.php:15
 #: modules/promotions/admin-menu-items/custom-fonts-promotion-item.php:19
-#: assets/js/app.js:11102
+#: assets/js/app.js:11136
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:22
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:280
 #: assets/js/styleguide-app.77392704cadf8bc1ca69.bundle.js:234
@@ -6235,8 +6305,8 @@ msgid "Search Templates:"
 msgstr "搜索模板："
 
 #: core/document-types/page.php:72 modules/library/documents/page.php:61
-#: assets/js/app.js:8765 assets/js/app.js:17049 assets/js/editor.js:7963
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:2943
+#: assets/js/app.js:8799 assets/js/app.js:17083 assets/js/editor.js:7963
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:2952
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.js:2
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:1
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:3
@@ -6318,7 +6388,7 @@ msgstr "管理用户可以在 Elementor 中编辑的内容"
 msgid "Add New"
 msgstr "添加"
 
-#: includes/template-library/sources/local.php:1284 assets/js/app.js:8488
+#: includes/template-library/sources/local.php:1284 assets/js/app.js:8522
 msgid "All"
 msgstr "所有"
 
@@ -6401,7 +6471,7 @@ msgid "Save Options"
 msgstr "保存选项"
 
 #: core/base/document.php:174 includes/editor-templates/panel.php:108
-#: assets/js/editor.js:25725
+#: assets/js/editor.js:25739
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:35
 msgid "Publish"
@@ -6420,7 +6490,7 @@ msgid "Save as Template"
 msgstr "另存为模板"
 
 #: includes/editor-templates/panel.php:145
-#: includes/editor-templates/panel.php:147 assets/js/editor.js:37019
+#: includes/editor-templates/panel.php:147 assets/js/editor.js:37035
 msgid "Hide Panel"
 msgstr "隐藏面板"
 
@@ -6434,7 +6504,7 @@ msgstr "导入模板到您的模版库"
 
 #: includes/widgets/traits/button-trait.php:57
 #: modules/atomic-widgets/elements/atomic-button/atomic-button.php:50
-#: assets/js/app.js:13668
+#: assets/js/app.js:13702
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:3200
 msgid "Click here"
 msgstr "点击这里"
@@ -6466,25 +6536,25 @@ msgstr "我最喜欢的"
 msgid "Import Template"
 msgstr "导入模板"
 
-#: core/common/modules/finder/template.php:19 assets/js/editor.js:11017
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:2349
+#: core/common/modules/finder/template.php:19 assets/js/editor.js:11016
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:2360
 msgid "No Results Found"
 msgstr "未找到结果"
 
 #: includes/editor-templates/templates.php:546 assets/js/app-packages.js:1033
-#: assets/js/app.js:1498
+#: assets/js/app.js:1499
 msgid "Select File"
 msgstr "选择文件"
 
 #: includes/editor-templates/templates.php:545
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:2037
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:2048
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2846
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:3188
 msgid "or"
 msgstr "要么"
 
 #: includes/editor-templates/templates.php:81
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5682
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5694
 msgid "Popular"
 msgstr "流行"
 
@@ -6503,7 +6573,7 @@ msgstr "趋势"
 #: assets/js/ai-media-library.js:7477 assets/js/ai-unify-product-images.js:2308
 #: assets/js/ai-unify-product-images.js:7477 assets/js/ai.js:3096
 #: assets/js/ai.js:9029
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:635
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:635
 #: assets/js/packages/editor-controls/editor-controls.js:2
 #: assets/js/packages/editor-controls/editor-controls.js:28
 #: assets/js/packages/editor-controls/editor-controls.strings.js:79
@@ -6569,14 +6639,14 @@ msgid "Decoration"
 msgstr "文本装饰"
 
 #: includes/editor-templates/hotkeys.php:70
-#: includes/editor-templates/repeater.php:18 assets/js/editor.js:30742
-#: assets/js/editor.js:51545
+#: includes/editor-templates/repeater.php:18 assets/js/editor.js:30756
+#: assets/js/editor.js:51561
 #: assets/js/packages/editor-controls/editor-controls.js:2
 #: assets/js/packages/editor-controls/editor-controls.js:28
 #: assets/js/packages/editor-controls/editor-controls.strings.js:76
 #: assets/js/packages/editor-controls/editor-controls.strings.js:182
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.js:2
-#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:16
+#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:20
 msgid "Duplicate"
 msgstr "复制到此对象下"
 
@@ -6637,9 +6707,9 @@ msgstr "创建者："
 #: includes/editor-templates/templates.php:120
 #: includes/editor-templates/templates.php:619
 #: assets/js/atomic-widgets-editor.js:1260
-#: assets/js/atomic-widgets-editor.js:1270 assets/js/editor.js:33596
-#: assets/js/editor.js:34093
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5678
+#: assets/js/atomic-widgets-editor.js:1270 assets/js/editor.js:33612
+#: assets/js/editor.js:34109
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5690
 msgid "New"
 msgstr "新"
 
@@ -6733,7 +6803,7 @@ msgstr "很抱歉，出现了问题。请点击“了解更多”并按照步骤
 msgid "The preview could not be loaded"
 msgstr "预览加载失败"
 
-#: core/admin/admin-notices.php:149 core/admin/admin-notices.php:184
+#: core/admin/admin-notices.php:151 core/admin/admin-notices.php:186
 msgid "Update Notification"
 msgstr "更新通知"
 
@@ -6749,8 +6819,8 @@ msgstr "https://elementor.com/?utm_source=wp-plugins&utm_campaign=author-uri&utm
 
 #: includes/editor-templates/hotkeys.php:16
 #: includes/editor-templates/templates.php:203
-#: modules/history/views/history-panel-template.php:9 assets/js/editor.js:51272
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1271
+#: modules/history/views/history-panel-template.php:9 assets/js/editor.js:51288
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1282
 msgid "Actions"
 msgstr "操作"
 
@@ -6758,14 +6828,14 @@ msgstr "操作"
 #: includes/editor-templates/panel.php:90 assets/js/ai-admin.js:2057
 #: assets/js/ai-gutenberg.js:2195 assets/js/ai-media-library.js:2057
 #: assets/js/ai-unify-product-images.js:2057 assets/js/ai.js:2845
-#: assets/js/editor.js:51867
+#: assets/js/editor.js:51883
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:20
 msgid "History"
 msgstr "历史"
 
 #: modules/history/views/history-panel-template.php:10
-#: assets/js/editor.js:51275
+#: assets/js/editor.js:51291
 msgid "Revisions"
 msgstr "修订"
 
@@ -6920,10 +6990,10 @@ msgstr "Elementor 版本 %s 遇到问题？回滚到问题出现之前的先前�
 #. Translators: %s: Element name.
 #. translators: %s: Element type title.
 #: core/document-types/page-base.php:194
-#: assets/js/atomic-widgets-editor.js:1453 assets/js/editor.js:30536
-#: assets/js/editor.js:30729 assets/js/editor.js:33169
-#: assets/js/editor.js:33644 assets/js/editor.js:33745
-#: assets/js/editor.js:34071 assets/js/editor.js:37612
+#: assets/js/atomic-widgets-editor.js:1454 assets/js/editor.js:30550
+#: assets/js/editor.js:30743 assets/js/editor.js:33184
+#: assets/js/editor.js:33660 assets/js/editor.js:33761
+#: assets/js/editor.js:34087 assets/js/editor.js:37628
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:17
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:18
 msgid "Edit %s"
@@ -6948,8 +7018,8 @@ msgstr "CSS 打印方法"
 
 #: core/base/document.php:1995 modules/ai/preferences.php:67
 #: modules/pro-install/pro-install-menu-item.php:95
-#: assets/js/element-manager-admin.js:654
-#: assets/js/element-manager-admin.js:731
+#: assets/js/element-manager-admin.js:662
+#: assets/js/element-manager-admin.js:743
 msgid "Status"
 msgstr "状态"
 
@@ -6962,8 +7032,8 @@ msgstr "状态"
 #: modules/safe-mode/module.php:48 assets/js/admin.js:293
 #: assets/js/ai-admin.js:63 assets/js/ai-gutenberg.js:63
 #: assets/js/ai-media-library.js:63 assets/js/ai-unify-product-images.js:63
-#: assets/js/ai.js:63 assets/js/app-packages.js:1360 assets/js/app.js:1825
-#: assets/js/common.js:63 assets/js/editor.js:40532
+#: assets/js/ai.js:63 assets/js/app-packages.js:1360 assets/js/app.js:1826
+#: assets/js/common.js:63 assets/js/editor.js:40548
 #: assets/js/packages/editor-controls/editor-controls.js:18
 #: assets/js/packages/editor-controls/editor-controls.strings.js:96
 msgid "Enable"
@@ -6985,7 +7055,7 @@ msgid "Disable"
 msgstr "禁用"
 
 #: core/kits/documents/kit.php:154 includes/maintenance-mode.php:215
-#: assets/js/editor.js:51544
+#: assets/js/editor.js:51560
 msgid "Disabled"
 msgstr "已停用"
 
@@ -7019,8 +7089,8 @@ msgstr "选择模式"
 msgid "Maintenance Mode"
 msgstr "维护模式"
 
-#: core/common/modules/finder/categories/edit.php:118 assets/js/editor.js:10658
-#: assets/js/editor.js:19373
+#: core/common/modules/finder/categories/edit.php:118 assets/js/editor.js:10657
+#: assets/js/editor.js:19387
 msgid "Template"
 msgstr "模板"
 
@@ -7033,7 +7103,7 @@ msgid "Hide Title"
 msgstr "隐藏标题"
 
 #: includes/maintenance-mode.php:292 includes/maintenance-mode.php:369
-#: includes/template-library/sources/local.php:231 assets/js/app.js:15463
+#: includes/template-library/sources/local.php:231 assets/js/app.js:15497
 msgid "Edit Template"
 msgstr "编辑模板"
 
@@ -7435,7 +7505,7 @@ msgstr "特小号"
 msgid "Improve Elementor"
 msgstr "完善 Elementor"
 
-#: includes/frontend.php:1228
+#: includes/frontend.php:1232
 msgid "Invalid Data: The Template ID cannot be the same as the currently edited template. Please choose a different one."
 msgstr "无效数据：模板 ID 不能​​与当前编辑的模板相同，换一个其他的试试。"
 
@@ -7447,7 +7517,7 @@ msgstr "%s被禁用"
 msgid "Update changes to page"
 msgstr "更新变更到所有页面"
 
-#: core/admin/admin-notices.php:245
+#: core/admin/admin-notices.php:247
 msgid "No thanks"
 msgstr "不，谢谢"
 
@@ -7471,7 +7541,7 @@ msgstr "（使用 JS）将区块拉伸至页面全宽。"
 msgid "Stretch Section"
 msgstr "拉伸区块"
 
-#: core/admin/admin-notices.php:233
+#: core/admin/admin-notices.php:235
 msgid "Learn more."
 msgstr "了解更多。"
 
@@ -7534,16 +7604,16 @@ msgid "Page"
 msgstr "页面"
 
 #: core/base/document.php:173 includes/editor-templates/global.php:21
-#: includes/editor-templates/responsive-bar.php:65 includes/frontend.php:1388
+#: includes/editor-templates/responsive-bar.php:65 includes/frontend.php:1392
 #: assets/js/152f977e0c1304a3b0db.bundle.js:207 assets/js/ai-admin.js:585
 #: assets/js/ai-gutenberg.js:723 assets/js/ai-layout.js:417
 #: assets/js/ai-media-library.js:585 assets/js/ai-unify-product-images.js:585
 #: assets/js/ai.js:1373 assets/js/app-packages.js:525
 #: assets/js/app-packages.js:2581 assets/js/app-packages.js:3140
-#: assets/js/app.js:696 assets/js/app.js:2958 assets/js/app.js:3381
-#: assets/js/app.js:7566 assets/js/app.js:10489 assets/js/app.js:17166
-#: assets/js/editor.js:48083 assets/js/import-export-admin.js:312
-#: assets/js/import-export-customization-admin.js:401
+#: assets/js/app.js:697 assets/js/app.js:2959 assets/js/app.js:3382
+#: assets/js/app.js:7592 assets/js/app.js:10523 assets/js/app.js:17200
+#: assets/js/editor.js:48099 assets/js/import-export-admin.js:312
+#: assets/js/import-export-customization-admin.js:402
 msgid "Close"
 msgstr "关闭"
 
@@ -7552,9 +7622,9 @@ msgstr "关闭"
 #: includes/editor-templates/templates.php:316
 #: includes/editor-templates/templates.php:347
 #: includes/editor-templates/templates.php:400
-#: includes/template-library/sources/local.php:1206 assets/js/app.js:5962
-#: assets/js/app.js:6160 assets/js/app.js:6244 assets/js/app.js:10452
-#: assets/js/app.js:17326
+#: includes/template-library/sources/local.php:1206 assets/js/app.js:5963
+#: assets/js/app.js:6161 assets/js/app.js:6245 assets/js/app.js:10486
+#: assets/js/app.js:17360
 msgid "Export"
 msgstr "导出"
 
@@ -7580,7 +7650,7 @@ msgid "Enter Template Name"
 msgstr "输入模板名称"
 
 #: includes/editor-templates/templates.php:41
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1615
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1626
 msgid "Back to Library"
 msgstr "返回到模版库"
 
@@ -7603,14 +7673,14 @@ msgstr "添加模板"
 
 #: core/common/modules/connect/apps/library.php:16 assets/js/editor.js:9659
 #: assets/js/import-export-admin.js:299
-#: assets/js/import-export-customization-admin.js:381
+#: assets/js/import-export-customization-admin.js:382
 msgid "Library"
 msgstr "模版库"
 
 #: core/common/modules/finder/categories/general.php:49
 #: includes/template-library/sources/admin-menu-items/saved-templates-menu-item.php:23
-#: includes/template-library/sources/local.php:1738 assets/js/app.js:11090
-#: assets/js/app.js:16229
+#: includes/template-library/sources/local.php:1738 assets/js/app.js:11124
+#: assets/js/app.js:16263
 msgid "Saved Templates"
 msgstr "已保存模板"
 
@@ -7627,18 +7697,18 @@ msgstr "Elementor 模板库会每日自动更新。您也可以点击同步按�
 msgid "If you want to modify the source code of your theme, we recommend using a <a href=\"%s\">child theme</a>."
 msgstr "如果您想修改主题的源代码，我们建议使用<a href=\"%s\">子主题</a>。"
 
-#: core/admin/admin-notices.php:373 modules/apps/admin-apps-page.php:182
+#: core/admin/admin-notices.php:375 modules/apps/admin-apps-page.php:182
 #: modules/safe-mode/module.php:359 modules/safe-mode/module.php:368
 #: modules/safe-mode/mu-plugin/elementor-safe-mode.php:105
 #: assets/js/app-packages.js:1231 assets/js/app-packages.js:4573
-#: assets/js/app-packages.js:4681 assets/js/app.js:1696 assets/js/app.js:12710
-#: assets/js/app.js:13032 assets/js/app.js:14081 assets/js/app.js:15618
-#: assets/js/app.js:15948 assets/js/app.js:15994 assets/js/app.js:17165
-#: assets/js/editor.js:15071 assets/js/editor.js:28590
-#: assets/js/editor.js:28621 assets/js/editor.js:41251
-#: assets/js/element-manager-admin.js:541
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:4699
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5763
+#: assets/js/app-packages.js:4681 assets/js/app.js:1697 assets/js/app.js:12744
+#: assets/js/app.js:13066 assets/js/app.js:14115 assets/js/app.js:15652
+#: assets/js/app.js:15982 assets/js/app.js:16028 assets/js/app.js:17199
+#: assets/js/editor.js:15070 assets/js/editor.js:28604
+#: assets/js/editor.js:28635 assets/js/editor.js:41267
+#: assets/js/element-manager-admin.js:542
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:4711
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5775
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:10
 #: assets/js/packages/editor-controls/editor-controls.js:28
@@ -7647,8 +7717,8 @@ msgid "Learn More"
 msgstr "了解更多"
 
 #: core/kits/documents/tabs/global-typography.php:28
-#: core/kits/documents/tabs/global-typography.php:47 assets/js/app.js:11102
-#: assets/js/app.js:16247 assets/js/editor.js:47834
+#: core/kits/documents/tabs/global-typography.php:47 assets/js/app.js:11136
+#: assets/js/app.js:16281 assets/js/editor.js:47850
 #: assets/js/styleguide-app.77392704cadf8bc1ca69.bundle.js:221
 msgid "Global Fonts"
 msgstr "全局字体"
@@ -7774,7 +7844,7 @@ msgstr "推荐信"
 msgid "Buy Button"
 msgstr "购买按钮"
 
-#: core/admin/admin-notices.php:145 core/admin/admin-notices.php:153
+#: core/admin/admin-notices.php:147 core/admin/admin-notices.php:155
 #: core/base/db-upgrades-manager.php:97
 msgid "Update Now"
 msgstr "立即更新"
@@ -7853,7 +7923,7 @@ msgid "I no longer need the plugin"
 msgstr "我不再需要插件了"
 
 #. translators: %s: Elementor version.
-#: core/admin/admin-notices.php:140
+#: core/admin/admin-notices.php:142
 msgid "View Elementor version %s details"
 msgstr "查看 Elementor 版本 %s 细节"
 
@@ -7872,7 +7942,7 @@ msgstr "如果您有时间，可以告诉我们为什么停用 Elementor 吗？"
 
 #. translators: 1: Details URL, 2: Accessibility text, 3: Version number, 4:
 #. Update URL, 5: Accessibility text.
-#: core/admin/admin-notices.php:136
+#: core/admin/admin-notices.php:138
 msgid "There is a new version of Elementor Page Builder available. <a href=\"%1$s\" class=\"thickbox open-plugin-details-modal\" aria-label=\"%2$s\">View version %3$s details</a> or <a href=\"%4$s\" class=\"update-link\" aria-label=\"%5$s\">update now</a>."
 msgstr "Elementor 页面生成器 现已推出新版本。 <a href=\"%1$s\" class=\"thickbox open-plugin-details-modal\" aria-label=\"%2$s\">查看版本 %3$s 详细信息</a> 或 <a href=\"%4$s\" class=\"update-link\" aria-label=\"%5$s\">立即更新</a>。"
 
@@ -7901,9 +7971,9 @@ msgstr "宽阔"
 msgid "Custom URL"
 msgstr "自定义 URL"
 
-#: includes/editor-templates/hotkeys.php:46 assets/js/editor.js:30769
-#: assets/js/editor.js:33098 assets/js/editor.js:42729
-#: assets/js/editor.js:43778
+#: includes/editor-templates/hotkeys.php:46 assets/js/editor.js:30783
+#: assets/js/editor.js:33113 assets/js/editor.js:42745
+#: assets/js/editor.js:43794
 msgid "Paste"
 msgstr "粘贴"
 
@@ -8091,9 +8161,9 @@ msgstr "添加不带点的自定义类。例如：my-class"
 msgid "The list of fonts used if the chosen font is not available."
 msgstr "当首选字体不可用时，将依次使用的字体列表。"
 
-#: includes/editor-templates/panel-elements.php:14 assets/js/editor.js:20009
-#: assets/js/editor.js:21906 assets/js/editor.js:22314
-#: assets/js/editor.js:37774
+#: includes/editor-templates/panel-elements.php:14 assets/js/editor.js:20023
+#: assets/js/editor.js:21920 assets/js/editor.js:22328
+#: assets/js/editor.js:37790
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:23
 #: assets/js/packages/editor-canvas/editor-canvas.js:2
@@ -8126,7 +8196,7 @@ msgstr "表单"
 #: modules/atomic-widgets/elements/div-block/div-block.php:72
 #: modules/atomic-widgets/elements/flexbox/flexbox.php:72
 #: modules/usage/settings-reporter.php:13 assets/js/editor.js:7484
-#: assets/js/editor.js:38720 assets/js/editor.js:48200
+#: assets/js/editor.js:38736 assets/js/editor.js:48216
 msgid "Settings"
 msgstr "设置"
 
@@ -8353,7 +8423,7 @@ msgstr "拉伸"
 #: core/kits/documents/tabs/theme-style-typography.php:37
 #: includes/controls/groups/typography.php:436 includes/elements/column.php:674
 #: includes/elements/section.php:1131 assets/js/editor-modules.js:1430
-#: assets/js/editor.js:43450
+#: assets/js/editor.js:43466
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:22
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:13
 msgid "Typography"
@@ -8361,7 +8431,7 @@ msgstr "排版"
 
 #: core/base/traits/shared-widget-controls-trait.php:270
 #: includes/base/element-base.php:1386 includes/editor-templates/panel.php:277
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:6296
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:6308
 #: assets/js/packages/editor-responsive/editor-responsive.js:2
 #: assets/js/packages/editor-responsive/editor-responsive.strings.js:1
 msgid "Desktop"
@@ -8467,7 +8537,7 @@ msgid "Responsive Mode"
 msgstr "响应模式"
 
 #: includes/editor-templates/panel.php:66
-#: includes/editor-templates/panel.php:67 assets/js/app.js:7505
+#: includes/editor-templates/panel.php:67 assets/js/app.js:7531
 msgid "Menu"
 msgstr "菜单"
 
@@ -8505,7 +8575,7 @@ msgstr "新增项目"
 #: modules/floating-buttons/base/widget-contact-button-base.php:2618
 #: modules/floating-buttons/base/widget-contact-button-base.php:2687
 #: modules/floating-buttons/base/widget-contact-button-base.php:2818
-#: modules/shapes/module.php:52 assets/js/editor.js:46223
+#: modules/shapes/module.php:52 assets/js/editor.js:46239
 #: assets/js/packages/editor-controls/editor-controls.js:72
 #: assets/js/packages/editor-controls/editor-controls.strings.js:19
 #: assets/js/packages/editor-controls/editor-controls.strings.js:64
@@ -8521,10 +8591,10 @@ msgstr "自定义"
 #: includes/editor-templates/panel.php:169
 #: includes/editor-templates/templates.php:426
 #: modules/history/views/revisions-panel-template.php:14
-#: assets/js/editor.js:8181 assets/js/editor.js:38801
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:739
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:767
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1301
+#: assets/js/editor.js:8181 assets/js/editor.js:38817
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:742
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:773
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1312
 msgid "Apply"
 msgstr "应用"
 
@@ -8533,16 +8603,16 @@ msgstr "应用"
 #: includes/editor-templates/templates.php:286 assets/js/ai-admin.js:7564
 #: assets/js/ai-gutenberg.js:7782 assets/js/ai-layout.js:3052
 #: assets/js/ai-media-library.js:7564 assets/js/ai-unify-product-images.js:7564
-#: assets/js/ai.js:9116 assets/js/editor.js:28248
+#: assets/js/ai.js:9116 assets/js/editor.js:28262
 msgid "Preview"
 msgstr "预览"
 
 #: includes/editor-templates/hotkeys.php:78
 #: includes/editor-templates/templates.php:23
 #: includes/editor-templates/templates.php:457
-#: includes/editor-templates/templates.php:469 assets/js/e-home-screen.js:243
-#: assets/js/editor.js:8569 assets/js/editor.js:45673
-#: assets/js/element-manager-admin.js:784
+#: includes/editor-templates/templates.php:469 assets/js/e-home-screen.js:2062
+#: assets/js/editor.js:8569 assets/js/editor.js:45689
+#: assets/js/element-manager-admin.js:801
 #: assets/js/kit-elements-defaults-editor.js:596
 #: assets/js/packages/editor-variables/editor-variables.js:2
 #: assets/js/packages/editor-variables/editor-variables.strings.js:41
@@ -8562,7 +8632,7 @@ msgstr "重置"
 #: includes/editor-templates/hotkeys.php:120
 #: includes/editor-templates/navigator.php:35
 #: includes/editor-templates/panel.php:86 includes/elements/section.php:511
-#: includes/elements/section.php:519 assets/js/editor.js:32019
+#: includes/elements/section.php:519 assets/js/editor.js:32034
 #: assets/js/packages/editor-app-bar/editor-app-bar.js:12
 #: assets/js/packages/editor-app-bar/editor-app-bar.strings.js:7
 msgid "Structure"
@@ -8572,7 +8642,7 @@ msgstr "结构"
 #: includes/widgets/icon-list.php:296 assets/js/ai-admin.js:10497
 #: assets/js/ai-gutenberg.js:10715 assets/js/ai-media-library.js:10497
 #: assets/js/ai-unify-product-images.js:10497 assets/js/ai.js:12049
-#: assets/js/editor.js:7487 assets/js/editor.js:37579
+#: assets/js/editor.js:7487 assets/js/editor.js:37595
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:17
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:25
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:2
@@ -8588,9 +8658,9 @@ msgstr "样式"
 #: modules/floating-buttons/base/widget-floating-bars-base.php:1419
 #: modules/floating-buttons/module.php:79
 #: modules/floating-buttons/module.php:84 assets/js/editor.js:7490
-#: assets/js/editor.js:37582
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:4370
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:4374
+#: assets/js/editor.js:37598
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:4382
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:4386
 #: assets/js/onboarding.a7a34522c0205e4ea1ea.bundle.js:2092
 msgid "Advanced"
 msgstr "高级设置"
@@ -8631,7 +8701,7 @@ msgstr "宽度"
 #: modules/floating-buttons/base/widget-contact-button-base.php:2928
 #: modules/floating-buttons/base/widget-floating-bars-base.php:1425
 #: modules/nested-accordion/widgets/nested-accordion.php:116
-#: assets/js/editor.js:37585
+#: assets/js/editor.js:37601
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:22
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:9
 msgid "Layout"
@@ -8726,7 +8796,7 @@ msgstr "文章类型"
 #: modules/floating-buttons/base/widget-contact-button-base.php:209
 #: modules/floating-buttons/base/widget-contact-button-base.php:653
 #: modules/floating-buttons/base/widget-contact-button-base.php:1737
-#: assets/js/app.js:12603
+#: assets/js/app.js:12637
 #: assets/js/packages/editor-components/editor-components.js:2
 #: assets/js/packages/editor-components/editor-components.strings.js:5
 #: assets/js/packages/editor-variables/editor-variables.js:2
@@ -8758,7 +8828,7 @@ msgstr "类型"
 
 #: includes/widgets/alert.php:122 includes/widgets/progress.php:172
 #: includes/widgets/traits/button-trait.php:72 assets/js/app-packages.js:4562
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:5368
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:5380
 msgid "Info"
 msgstr "信息"
 
@@ -8800,7 +8870,7 @@ msgstr "边框颜色"
 #: modules/floating-buttons/base/widget-contact-button-base.php:2527
 #: modules/floating-buttons/base/widget-floating-bars-base.php:230
 #: modules/floating-buttons/base/widget-floating-bars-base.php:297
-#: assets/js/element-manager-admin.js:448
+#: assets/js/element-manager-admin.js:449
 #: assets/js/packages/editor-controls/editor-controls.js:2
 #: assets/js/packages/editor-controls/editor-controls.js:28
 #: assets/js/packages/editor-controls/editor-controls.strings.js:77
@@ -8985,9 +9055,9 @@ msgstr "数字前缀"
 #: assets/js/ai-unify-product-images.js:2331
 #: assets/js/ai-unify-product-images.js:10192
 #: assets/js/ai-unify-product-images.js:10199 assets/js/ai.js:3119
-#: assets/js/ai.js:11744 assets/js/ai.js:11751 assets/js/app.js:9648
-#: assets/js/app.js:9660 assets/js/element-manager-admin.js:872
-#: assets/js/element-manager-admin.js:928
+#: assets/js/ai.js:11744 assets/js/ai.js:11751 assets/js/app.js:9682
+#: assets/js/app.js:9694 assets/js/element-manager-admin.js:890
+#: assets/js/element-manager-admin.js:948
 msgid "Edit"
 msgstr "编辑"
 
@@ -9161,8 +9231,8 @@ msgstr "图像框"
 #: modules/shapes/widgets/text-path.php:508
 #: modules/shapes/widgets/text-path.php:528
 #: modules/shapes/widgets/text-path.php:579
-#: modules/shapes/widgets/text-path.php:599 assets/js/editor.js:48338
-#: assets/js/editor.js:48381
+#: modules/shapes/widgets/text-path.php:599 assets/js/editor.js:48354
+#: assets/js/editor.js:48397
 #: assets/js/packages/editor-controls/editor-controls.js:72
 #: assets/js/packages/editor-controls/editor-controls.strings.js:55
 #: assets/js/packages/editor-controls/editor-controls.strings.js:143
@@ -9482,9 +9552,9 @@ msgstr "内距"
 #: modules/atomic-widgets/elements/atomic-svg/atomic-svg.php:58
 #: modules/atomic-widgets/elements/atomic-youtube/atomic-youtube.php:72
 #: modules/nested-accordion/widgets/nested-accordion.php:501
-#: modules/nested-tabs/widgets/nested-tabs.php:995 assets/js/app.js:6075
-#: assets/js/app.js:7526 assets/js/app.js:11078 assets/js/app.js:16237
-#: assets/js/app.js:16746 assets/js/editor.js:37576
+#: modules/nested-tabs/widgets/nested-tabs.php:995 assets/js/app.js:6076
+#: assets/js/app.js:7552 assets/js/app.js:11112 assets/js/app.js:16271
+#: assets/js/app.js:16780 assets/js/editor.js:37592
 msgid "Content"
 msgstr "内容"
 
@@ -9498,18 +9568,18 @@ msgstr "谷歌"
 #: includes/editor-templates/templates.php:325
 #: includes/editor-templates/templates.php:356
 #: includes/editor-templates/templates.php:409 assets/js/editor.js:8937
-#: assets/js/editor.js:8956 assets/js/editor.js:9117 assets/js/editor.js:28309
-#: assets/js/editor.js:30834 assets/js/editor.js:48391
+#: assets/js/editor.js:8956 assets/js/editor.js:9117 assets/js/editor.js:28323
+#: assets/js/editor.js:30848 assets/js/editor.js:48407
 #: assets/js/import-export-admin.js:271
-#: assets/js/import-export-customization-admin.js:341
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1075
-#: assets/js/kit-library.b318572cfbb0d7ab505b.bundle.js:1219
+#: assets/js/import-export-customization-admin.js:342
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1086
+#: assets/js/kit-library.2e38a4b9ca626956b67f.bundle.js:1230
 #: assets/js/packages/editor-global-classes/editor-global-classes.js:2
 #: assets/js/packages/editor-global-classes/editor-global-classes.strings.js:42
 #: assets/js/packages/editor-global-classes/editor-global-classes.strings.js:70
 #: assets/js/packages/editor-site-navigation/editor-site-navigation.js:2
-#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:17
-#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:25
+#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:21
+#: assets/js/packages/editor-site-navigation/editor-site-navigation.strings.js:29
 #: assets/js/packages/editor-variables/editor-variables.js:2
 #: assets/js/packages/editor-variables/editor-variables.strings.js:49
 #: assets/js/packages/editor-variables/editor-variables.strings.js:103
@@ -9610,12 +9680,12 @@ msgstr "标准"
 #: modules/floating-buttons/base/widget-contact-button-base.php:2817
 #: modules/link-in-bio/base/widget-link-in-bio-base.php:179
 #: modules/page-templates/module.php:299
-#: modules/shapes/widgets/text-path.php:203 assets/js/editor.js:46215
-#: assets/js/editor.js:46226
+#: modules/shapes/widgets/text-path.php:203 assets/js/editor.js:46231
+#: assets/js/editor.js:46242
 #: assets/js/packages/editor-controls/editor-controls.js:88
 #: assets/js/packages/editor-controls/editor-controls.strings.js:107
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:25
-#: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:80
+#: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:81
 msgid "Default"
 msgstr "默认"
 
@@ -9654,7 +9724,7 @@ msgstr "常规设置"
 #: modules/link-in-bio/base/widget-link-in-bio-base.php:1556
 #: modules/link-in-bio/base/widget-link-in-bio-base.php:1614
 #: modules/nested-accordion/widgets/nested-accordion.php:318
-#: modules/styleguide/module.php:132 assets/js/app.js:14806
+#: modules/styleguide/module.php:132 assets/js/app.js:14840
 msgid "Yes"
 msgstr "是"
 
@@ -9710,7 +9780,7 @@ msgstr "否"
 #: includes/settings/settings.php:500 modules/compatibility-tag/module.php:36
 #: modules/history/views/history-panel-template.php:23
 #: modules/history/views/revisions-panel-template.php:38
-#: assets/js/app-packages.js:319 assets/js/app.js:490
+#: assets/js/app-packages.js:319 assets/js/app.js:491
 msgid "Elementor"
 msgstr "Elementor"
 
@@ -9754,7 +9824,7 @@ msgstr "Elementor"
 msgid "Center"
 msgstr "居中"
 
-#: core/admin/admin-notices.php:240
+#: core/admin/admin-notices.php:242
 msgid "Sure! I'd love to help"
 msgstr "当然！我很乐意帮忙"
 
@@ -9782,7 +9852,7 @@ msgid "The ID of Menu Anchor."
 msgstr "菜单锚点的 ID。"
 
 #: modules/history/views/revisions-panel-template.php:11
-#: assets/js/editor.js:45674
+#: assets/js/editor.js:45690
 #: assets/js/packages/editor-global-classes/editor-global-classes.js:2
 #: assets/js/packages/editor-global-classes/editor-global-classes.strings.js:48
 #: assets/js/packages/editor-variables/editor-variables.js:2
@@ -9812,8 +9882,8 @@ msgid "This ID will be the CSS ID you will have to use in your own page, Without
 msgstr "这个 ID 是您在页面中使用的 CSS ID，不加 #"
 
 #: core/experiments/manager.php:392 core/experiments/manager.php:682
-#: modules/element-cache/module.php:108 assets/js/editor.js:28040
-#: assets/js/element-manager-admin.js:596
+#: modules/element-cache/module.php:108 assets/js/editor.js:28054
+#: assets/js/element-manager-admin.js:599
 msgid "Inactive"
 msgstr "未启用"
 
@@ -9844,8 +9914,8 @@ msgstr "手机横向"
 #: modules/nested-accordion/widgets/nested-accordion.php:739
 #: modules/nested-tabs/widgets/nested-tabs.php:634
 #: modules/nested-tabs/widgets/nested-tabs.php:814
-#: modules/nested-tabs/widgets/nested-tabs.php:976 assets/js/editor.js:28042
-#: assets/js/element-manager-admin.js:593
+#: modules/nested-tabs/widgets/nested-tabs.php:976 assets/js/editor.js:28056
+#: assets/js/element-manager-admin.js:596
 msgid "Active"
 msgstr "启用"
 
@@ -9855,7 +9925,7 @@ msgstr "启用"
 #: includes/editor-templates/templates.php:54 modules/gutenberg/module.php:123
 #: assets/js/ai-admin.js:1738 assets/js/ai-gutenberg.js:1876
 #: assets/js/ai-media-library.js:1738 assets/js/ai-unify-product-images.js:1738
-#: assets/js/ai.js:2526 assets/js/app-packages.js:4174 assets/js/app.js:1218
+#: assets/js/ai.js:2526 assets/js/app-packages.js:4174 assets/js/app.js:1219
 msgid "Loading"
 msgstr "加载中…"
 
@@ -9898,7 +9968,7 @@ msgstr "悬停时暂停"
 
 #: includes/widgets/divider.php:832 includes/widgets/icon-box.php:130
 #: includes/widgets/icon.php:131 includes/widgets/text-editor.php:421
-#: assets/js/editor.js:10665
+#: assets/js/editor.js:10664
 msgid "View"
 msgstr "视图"
 
@@ -9907,9 +9977,9 @@ msgstr "视图"
 #: modules/nested-tabs/widgets/nested-tabs.php:112
 #: modules/nested-tabs/widgets/nested-tabs.php:449
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.js:25
-#: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:79
-#: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:86
+#: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:80
 #: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:87
+#: assets/js/packages/editor-editing-panel/editor-editing-panel.strings.js:88
 msgid "Tabs"
 msgstr "Tab选项卡"
 
@@ -10062,7 +10132,7 @@ msgctxt "Background Control"
 msgid "Repeat"
 msgstr "背景重复"
 
-#: core/admin/admin-notices.php:700 includes/controls/gallery.php:144
+#: core/admin/admin-notices.php:704 includes/controls/gallery.php:144
 #: includes/controls/media.php:338 includes/widgets/heading.php:477
 msgid "Activate Plugin"
 msgstr "激活插件"
