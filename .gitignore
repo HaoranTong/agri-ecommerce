@@ -38,3 +38,29 @@ Thumbs.db
 # 忽略其他可能的构建工具目录（如未来有）
 node_modules/
 npm-debug.log*
+
+# 忽略压缩文件
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+*.exe
+*.dmg
+*.iso
+*.img
+*.pkg
+*.deb
+*.rpm
+*.msi
+*.apk
+*.ipa
+*.jar
+*.war
+*.ear
+*.zip
+*.rar
+*.7z
+*.tar   
