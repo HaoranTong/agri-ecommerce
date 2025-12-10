@@ -10,12 +10,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "POT-Creation-Date: 2025-05-21T10:00:04+00:00\n"
-"PO-Revision-Date: 2025-11-15 02:51+0000\n"
+"PO-Revision-Date: 2025-12-10 11:10+0000\n"
 "X-Generator: Loco https://localise.biz/\n"
 "X-Domain: cartflows\n"
 "Language: zh_CN\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Loco-Version: 2.8.0; wp-6.8.3; php-8.3.26"
+"X-Loco-Version: 2.8.0; wp-6.9; php-8.3.26"
 
 #. Plugin Name of the plugin
 #: cartflows.php classes/class-cartflows-admin-notices.php:217
@@ -3150,7 +3150,7 @@ msgstr ""
 #: modules/checkout/templates/checkout/collapsed-order-summary.php:46
 #: modules/checkout/templates/checkout/instant-checkout-review-order.php:82
 msgid "Coupon Code"
-msgstr ""
+msgstr "优惠券代码"
 
 #: modules/checkout/classes/class-cartflows-checkout-markup.php:1468
 #: modules/checkout/classes/class-cartflows-checkout-markup.php:1520
@@ -3195,7 +3195,7 @@ msgstr ""
 #: admin-core/assets/build/editor-app.js:36
 #: admin-core/assets/build/settings-app.js:48
 msgid "Shipping"
-msgstr ""
+msgstr "运输"
 
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:138
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:943
@@ -3659,7 +3659,7 @@ msgstr ""
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:1287
 #: modules/thankyou/templates/instant-thankyou-your-product.php:23
 msgid "Your Order"
-msgstr ""
+msgstr "你的订单"
 
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:1289
 msgid "Your order"
@@ -3685,7 +3685,7 @@ msgstr ""
 #: modules/checkout/classes/layouts/class-cartflows-modern-checkout.php:276
 #: modules/thankyou/templates/instant-thankyou-order-details.php:127
 msgid "Payment"
-msgstr ""
+msgstr "付款"
 
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:1310
 msgid "Enable Field validation error message"
@@ -3779,7 +3779,7 @@ msgstr ""
 #: modules/checkout/classes/layouts/class-cartflows-instant-checkout.php:562
 #: modules/thankyou/templates/instant-thankyou-order-details.php:67
 msgid "Contact"
-msgstr ""
+msgstr "联系人"
 
 #. translators: %1$s: Link HTML start, %2$s Link HTML End
 #: modules/checkout/classes/layouts/class-cartflows-instant-checkout.php:564
@@ -4579,7 +4579,7 @@ msgstr ""
 #. Translators: First name.
 #: modules/thankyou/templates/instant-thankyou-order-details.php:41
 msgid "Thank you, %s!"
-msgstr ""
+msgstr "感谢您， %s!"
 
 #: modules/thankyou/templates/instant-thankyou-order-details.php:58
 msgid "Order Updates"
@@ -4591,7 +4591,7 @@ msgstr "您将通过电子邮件收到订单和发货的最新通知。"
 
 #: modules/thankyou/templates/instant-thankyou-order-details.php:78
 msgid "Address"
-msgstr ""
+msgstr "收货地址"
 
 #: modules/thankyou/templates/instant-thankyou-order-details.php:78
 #: admin-core/assets/build/editor-app.js:36
@@ -4601,7 +4601,7 @@ msgstr ""
 
 #: modules/thankyou/templates/instant-thankyou-order-details.php:155
 msgid "Continue Shopping"
-msgstr ""
+msgstr "欢迎继续购物"
 
 #: modules/thankyou/templates/instant-thankyou.php:37
 msgid ""
@@ -8139,7 +8139,7 @@ msgstr ""
 
 #: modules/gutenberg/build/blocks.js:7 modules/gutenberg/dist/blocks.build.js:1
 msgid "Order Detail"
-msgstr ""
+msgstr "订单详情"
 
 #: modules/gutenberg/build/blocks.js:7 modules/gutenberg/dist/blocks.build.js:1
 msgid "Hide/Show Order Detail."
