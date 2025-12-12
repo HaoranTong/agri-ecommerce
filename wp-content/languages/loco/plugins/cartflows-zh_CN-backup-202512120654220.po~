@@ -10,7 +10,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "POT-Creation-Date: 2025-05-21T10:00:04+00:00\n"
-"PO-Revision-Date: 2025-12-10 11:10+0000\n"
+"PO-Revision-Date: 2025-12-12 06:47+0000\n"
 "X-Generator: Loco https://localise.biz/\n"
 "X-Domain: cartflows\n"
 "Language: zh_CN\n"
@@ -1468,7 +1468,7 @@ msgstr ""
 #: modules/checkout/classes/layouts/class-cartflows-instant-checkout.php:579
 #: modules/checkout/classes/layouts/class-cartflows-modern-checkout.php:174
 msgid "Email Address"
-msgstr ""
+msgstr "电子邮件"
 
 #: admin-core/inc/global-settings.php:1398
 msgid ""
@@ -1674,7 +1674,7 @@ msgstr ""
 #: classes/class-cartflows-default-meta.php:176
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:1345
 msgid "Place Order"
-msgstr ""
+msgstr "提交订单"
 
 #: classes/class-cartflows-default-meta.php:367
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:1320
@@ -2908,7 +2908,7 @@ msgstr ""
 #: modules/elementor/widgets/class-cartflows-el-order-details-form.php:221
 #: modules/gutenberg/build/blocks.js:7 modules/gutenberg/dist/blocks.build.js:1
 msgid "Shipping Address"
-msgstr ""
+msgstr "收货地址"
 
 #: modules/beaver-builder/cartflows-bb-order-details/cartflows-bb-order-details.php:178
 #: modules/bricks/elements/class-cartflows-bricks-order-details-form.php:74
@@ -3157,7 +3157,7 @@ msgstr "优惠券代码"
 #: modules/checkout/templates/checkout/collapsed-order-summary.php:51
 #: modules/checkout/templates/checkout/instant-checkout-review-order.php:87
 msgid "Apply"
-msgstr ""
+msgstr "应用"
 
 #: modules/checkout/classes/class-cartflows-checkout-markup.php:1544
 msgid "Entered email address is not a valid email."
@@ -3195,7 +3195,7 @@ msgstr ""
 #: admin-core/assets/build/editor-app.js:36
 #: admin-core/assets/build/settings-app.js:48
 msgid "Shipping"
-msgstr "运输"
+msgstr "发货/运输"
 
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:138
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:943
@@ -3843,7 +3843,7 @@ msgstr ""
 #: modules/checkout/classes/layouts/class-cartflows-instant-checkout.php:660
 #: modules/checkout/classes/layouts/class-cartflows-modern-checkout.php:258
 msgid " Welcome Back %1$s ( %2$s )"
-msgstr ""
+msgstr "欢迎回来%1$s ( %2$s )"
 
 #: modules/checkout/classes/layouts/class-cartflows-instant-checkout.php:915
 msgid ""
@@ -3882,13 +3882,13 @@ msgstr ""
 #: modules/checkout/templates/checkout/order-review-table.php:43
 #: modules/thankyou/templates/instant-thankyou-your-product.php:118
 msgid "Subtotal"
-msgstr ""
+msgstr "小计"
 
 #: modules/checkout/templates/checkout/instant-checkout-review-order.php:147
 #: modules/checkout/templates/checkout/order-review-table.php:79
 #: modules/thankyou/templates/instant-thankyou-your-product.php:148
 msgid "Total"
-msgstr ""
+msgstr "合计"
 
 #: modules/checkout/templates/checkout/order-review-table.php:16
 #: admin-core/assets/build/editor-app.js:36

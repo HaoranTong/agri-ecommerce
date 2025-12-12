@@ -10,7 +10,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "POT-Creation-Date: 2025-05-21T10:00:04+00:00\n"
-"PO-Revision-Date: 2025-12-10 11:13+0000\n"
+"PO-Revision-Date: 2025-12-12 06:44+0000\n"
 "X-Generator: Loco https://localise.biz/\n"
 "X-Domain: cartflows\n"
 "Language: zh_CN\n"
@@ -1468,7 +1468,7 @@ msgstr ""
 #: modules/checkout/classes/layouts/class-cartflows-instant-checkout.php:579
 #: modules/checkout/classes/layouts/class-cartflows-modern-checkout.php:174
 msgid "Email Address"
-msgstr ""
+msgstr "电子邮件"
 
 #: admin-core/inc/global-settings.php:1398
 msgid ""
@@ -1674,7 +1674,7 @@ msgstr ""
 #: classes/class-cartflows-default-meta.php:176
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:1345
 msgid "Place Order"
-msgstr ""
+msgstr "提交订单"
 
 #: classes/class-cartflows-default-meta.php:367
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:1320
@@ -3195,7 +3195,7 @@ msgstr ""
 #: admin-core/assets/build/editor-app.js:36
 #: admin-core/assets/build/settings-app.js:48
 msgid "Shipping"
-msgstr "运输"
+msgstr "发货/运输"
 
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:138
 #: modules/checkout/classes/class-cartflows-checkout-meta-data.php:943
