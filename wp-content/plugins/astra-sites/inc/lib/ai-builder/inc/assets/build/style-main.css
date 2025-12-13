@@ -836,8 +836,6 @@ select {
   top: 0px;
 }.top-1 {
   top: 0.25rem;
-}.top-1\/2 {
-  top: 50%;
 }.top-2 {
   top: 0.5rem;
 }.top-3 {
@@ -846,6 +844,8 @@ select {
   top: 1rem;
 }.top-5 {
   top: 1.25rem;
+}.top-8 {
+  top: 2rem;
 }.top-\[0\.875rem\] {
   top: 0.875rem;
 }.top-\[45\%\] {
@@ -2487,6 +2487,9 @@ select {
 }.text-alert-error {
   --tw-text-opacity: 1;
   color: rgb(var(--zip-alert-error) / var(--tw-text-opacity));
+}.text-alert-error-text {
+  --tw-text-opacity: 1;
+  color: rgb(220 38 38 / var(--tw-text-opacity));
 }.text-alert-info {
   --tw-text-opacity: 1;
   color: rgb(59 130 246 / var(--tw-text-opacity));
@@ -2511,6 +2514,9 @@ select {
 }.text-body-text {
   --tw-text-opacity: 1;
   color: rgb(55 65 81 / var(--tw-text-opacity));
+}.text-border-primary {
+  --tw-text-opacity: 1;
+  color: rgb(209 213 219 / var(--tw-text-opacity));
 }.text-border-secondary {
   --tw-text-opacity: 1;
   color: rgb(107 114 128 / var(--tw-text-opacity));
@@ -2973,6 +2979,9 @@ select {
 }.hover\:bg-zip-dark-theme-content-background:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(var(--zip-dark-theme-content-background) / var(--tw-bg-opacity));
+}.hover\:text-accent-hover-st:hover {
+  --tw-text-opacity: 1;
+  color: rgb(var(--accent-hover-st) / var(--tw-text-opacity));
 }.hover\:text-gray-300:hover {
   --tw-text-opacity: 1;
   color: rgb(209 213 219 / var(--tw-text-opacity));
@@ -3126,10 +3135,6 @@ select {
 
   .sm\:mt-0 {
     margin-top: 0px;
-  }
-
-  .sm\:inline {
-    display: inline;
   }
 
   .sm\:flex {
@@ -3335,6 +3340,10 @@ select {
     right: 20rem;
   }
 
+  .md\:top-1\/2 {
+    top: 50%;
+  }
+
   .md\:my-0 {
     margin-top: 0px;
     margin-bottom: 0px;
@@ -3350,6 +3359,10 @@ select {
 
   .md\:block {
     display: block;
+  }
+
+  .md\:inline {
+    display: inline;
   }
 
   .md\:hidden {
@@ -3380,6 +3393,10 @@ select {
 
   .md\:flex-nowrap {
     flex-wrap: nowrap;
+  }
+
+  .md\:items-start {
+    align-items: flex-start;
   }
 
   .md\:items-center {
@@ -3435,6 +3452,10 @@ select {
 
   .md\:pt-8 {
     padding-top: 2rem;
+  }
+
+  .md\:text-left {
+    text-align: left;
   }
 
   .md\:text-xs {

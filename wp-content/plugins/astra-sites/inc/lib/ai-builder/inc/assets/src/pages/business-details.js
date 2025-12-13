@@ -107,7 +107,6 @@ const BusinessDetails = () => {
 							'Enter name or title of the website',
 							'ai-builder'
 						) }
-						inputClassname="p-0"
 						register={ register }
 						maxLength={ 100 }
 						validations={ {

@@ -2408,8 +2408,27 @@ if ( ! class_exists( 'WXR_Importer' ) && class_exists( 'WP_Importer' ) ) :
 		public function is_valid_meta_key( $key ) {
 			// skip attachment metadata since we'll regenerate it from scratch
 			// skip _edit_lock as not relevant for import.
-			if ( in_array( $key, array( '_wp_attached_file', '_wp_attachment_metadata', '_edit_lock' ) ) ) { // phpcs:ignore WordPress.PHP.StrictInArray.MissingTrueStrict -- 3rd party library.
+			// skip main page id as not relevant for import.
+			$skip_keys = array(
+				'_wp_attached_file',
+				'_wp_attachment_metadata',
+				'_edit_lock',
+				'astra-main-page-id',
+			);
+
+			if ( in_array( $key, $skip_keys ) ) { // phpcs:ignore WordPress.PHP.StrictInArray.MissingTrueStrict -- 3rd party library.
 				return false;
+			}
+
+			// Skip keys matching these regex patterns (site-specific keys in multisite).
+			$skip_patterns = array(
+				'/^ast_self_id_\d+$/', // To skip `ast_self_id_%d` keys.
+			);
+
+			foreach ( $skip_patterns as $pattern ) {
+				if ( preg_match( $pattern, $key ) ) {
+					return false;
+				}
 			}
 
 			return $key;

@@ -573,6 +573,7 @@ const Images = () => {
 		blackListedEngines.current.clear();
 		setPage( 1 );
 		setImages( [] );
+		setHasMore( true );
 	}, [ keyword, orientation ] );
 
 	// Trigger to load more images.

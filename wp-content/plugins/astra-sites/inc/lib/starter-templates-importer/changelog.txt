@@ -1,3 +1,8 @@
+v1.1.23 - 05-December-2025
+- Improvement: Enhanced the SureCart product creation flow to use template products when available, providing a smoother setup experience.
+- Improvement: Skip irrelevant site-specific meta keys during import.
+- Improvement: Added WPForms plugin compatibility for Elementor templates.
+
 v1.1.22 - 13-November-2025
 - Security: Enhanced file upload validation to prevent double extension attacks.
 - Fix: Prevented potential fatal errors when updating the site options if an exception occurs from Elementor.

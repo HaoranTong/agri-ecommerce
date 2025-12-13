@@ -1,3 +1,7 @@
+v1.2.66 - 5th December 2025
+- New: Added switch team and disconnect AI links in the Zip Plan info modal.
+- Fix: Resolved an issue where the search box stopped working after clearing the keyword and searching again.
+
 v1.2.65 - 27th November 2025
 - Fix: Prevented potential fatal errors related to logging when running CLI import processes.
 - Fix: Resolved UI issue affecting visibility of Footer CTAs.

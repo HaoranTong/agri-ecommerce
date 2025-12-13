@@ -184,8 +184,6 @@ export const fetchRequiredPlugins = async (
 		);
 	}
 
-	console.log( permissionCheck );
-
 	if ( permissionCheck ) {
 		reqPlugins.append( 'ai_plugin_permission', '1' );
 	}

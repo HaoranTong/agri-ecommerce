@@ -303,14 +303,14 @@ const SiteList = () => {
 
 	const fetchSitesAndCategories = async () => {
 		try {
-			const syncUptoDate = await isSyncUptoDate();
-
 			dispatch( {
 				type: 'set',
 				syncPageInProgress: 0,
 				syncPageCount: 0,
+				bgSyncInProgress: !! astraSitesVars?.bgSyncInProgress,
 			} );
 
+			const syncUptoDate = await isSyncUptoDate();
 			if ( syncUptoDate ) {
 				dispatch( {
 					type: 'set',

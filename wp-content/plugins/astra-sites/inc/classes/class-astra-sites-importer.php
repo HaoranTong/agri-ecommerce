@@ -71,6 +71,7 @@ if ( ! class_exists( 'Astra_Sites_Importer' ) ) {
 
 			add_action( 'init', array( $this, 'disable_default_woo_pages_creation' ), 2 );
 			add_filter( 'upgrader_package_options', array( $this, 'plugin_install_clear_directory' ) );
+			add_filter( 'plugins_api', array( $this, 'maybe_download_spectra_v3_beta_version' ), 10, 3 );
 		}
 
 		/**
@@ -230,6 +231,50 @@ if ( ! class_exists( 'Astra_Sites_Importer' ) ) {
 			}
 
 			return $options;
+		}
+
+		/**
+		 * Maybe download Spectra v3 beta version during Astra Sites import.
+		 *
+		 * @param false|object|array $result The result object or array. Default false.
+		 * @param string             $action The type of information being requested from the Plugin Installation API.
+		 * @param object             $args   Plugin API arguments.
+		 * @return false|object|array Modified result.
+		 */
+		public function maybe_download_spectra_v3_beta_version( $result, $action, $args ) {
+			// Only apply during Astra Sites import and for plugin_information action.
+			if ( true !== astra_sites_has_import_started() || 'plugin_information' !== $action ) {
+				return $result;
+			}
+
+			// Only modify for ultimate-addons-for-gutenberg.
+			if ( ! isset( $args->slug ) || 'ultimate-addons-for-gutenberg' !== $args->slug ) {
+				return $result;
+			}
+
+			// Check for our custom request parameter to ensure it's an Astra Sites import request.
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce verification is not required here as we are just reading a request parameter.
+			if ( ! isset( $_REQUEST['is_ast_request'] ) || 'true' !== sanitize_text_field( $_REQUEST['is_ast_request'] ) ) {
+				return $result;
+			}
+
+			$spectra_blocks_version = astra_get_site_data( 'spectra-blocks-ver' );
+			$class_list             = astra_get_site_data( 'class_list' );
+
+			// Only proceed if it's v3 template.
+			if ( empty( $spectra_blocks_version ) || ! in_array( 'spectra-blocks-ver-v3', $class_list, true ) ) {
+				return $result;
+			}
+
+			// Prepare custom response for Spectra v3 beta.
+			if ( ! is_object( $result ) ) {
+				$result = new stdClass();
+			}
+
+			$result->version       = '3.0.0-beta.1';
+			$result->download_link = 'https://downloads.wordpress.org/plugin/ultimate-addons-for-gutenberg.3.0.0-beta.1.zip';
+
+			return $result;
 		}
 
 		/**

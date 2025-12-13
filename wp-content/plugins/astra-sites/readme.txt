@@ -4,8 +4,8 @@ Donate link: https://wpastra.com/pro/
 Tags: Elementor,Templates,Gutenberg,Block Editor,Astra Starter Sites
 Requires at least: 6.6
 Requires PHP: 7.4
-Tested up to: 6.8.1
-Stable tag: 4.4.43
+Tested up to: 6.9
+Stable tag: 4.4.44
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -245,6 +245,19 @@ You can report the issue through our [Bug Bounty Program](https://brainstormforc
 6. Use the power of AI with a single click to write copy, proofread, translate content into different languages. Adjust content length and tone seamlessly for maximum appeal.
 
 == Changelog ==
+v4.4.44 - 08-December2025
+- New:
+    - AI Builder: Added switch team and disconnect AI links in the Zip Plan info modal.
+- Improvement:
+    - Enabled distribution of Spectra v3 templates for fresh installations.
+    - Enhanced the SureCart product creation flow to use template products when available, providing a smoother setup experience.
+    - Importer: Skip irrelevant site-specific meta keys during import.
+    - Importer: Added WPForms plugin compatibility for Elementor templates.
+- Fix:
+    - AI Builder: Resolved an issue where the search box stopped working after clearing the keyword and searching again.
+    - Resolved CORS error showing on template preview on the onboarding.
+    - Resolved console error related to Button 'after' prop usage in ImportLoader.
+
 v4.4.43 - 27-November-2025
 - New:
     - Added support for Astra Sites Exporter plugin.

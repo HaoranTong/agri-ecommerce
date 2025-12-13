@@ -187,6 +187,10 @@ if ( ! class_exists( 'Astra_Sites' ) ) :
 			add_filter( 'wp_import_insert_term', array( $this, 'store_original_term_id' ), 10, 2 );
 			add_filter( 'getting_started_is_setup_wizard_showing', array( $this, 'maybe_setup_wizard_showing' ) );
 			add_filter( 'getting_started_logo_url', array( $this, 'starter_templates_logo_url' ) );
+
+			// Enable/disable templates force syncing.
+			add_action( 'ast_block_templates_enable_force_sync', array( __CLASS__, 'enable_force_sync' ) );
+			add_filter( 'ast_block_templates_disable_force_sync', 'astra_sites_has_import_started' );
 		}
 
 		/**
@@ -2749,6 +2753,7 @@ if ( ! class_exists( 'Astra_Sites' ) ) :
 							</div>
 						</div>'
 					),
+					'display-with-other-notices' => false,
 				)
 			);
 		}
@@ -3142,10 +3147,12 @@ JS;
 
 			$all_plugins = get_plugins();
 
-			// If spectra is not installed, consider fresh install.
+			// If spectra is installed, check its version.
 			if ( isset( $all_plugins[ $spectra_init ] ) ) {
 				$spectra_plugin  = $all_plugins[ $spectra_init ];
 				$spectra_version = isset( $spectra_plugin['Version'] ) ? $spectra_plugin['Version'] : '';
+
+				// Remove any suffix from the version (e.g., '-beta', '-rc1').
 				$spectra_version = preg_replace_callback(
 					'/-.+$/',
 					function() {
@@ -3160,8 +3167,8 @@ JS;
 				}
 			}
 
-			// Default to v2 if version info is unavailable. will be updated to v3 after stable Spectra v3 release.
-			return 'v2';
+			// Default to v3 for fresh installs.
+			return 'v3';
 		}
 
 		/**
@@ -3177,6 +3184,18 @@ JS;
 			}
  
 			return self::get_spectra_blocks_version();
+		}
+
+		/**
+		 * Enable force sync
+		 *
+		 * Sets the site option to force sync templates.
+		 *
+		 * @since 4.4.44
+		 * @return void
+		 */
+		public static function enable_force_sync() {
+			update_site_option( 'astra-sites-force-sync', 'yes' );
 		}
 	}
 

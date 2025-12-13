@@ -239,7 +239,7 @@ const FontSelector = ( { options, onSelect, selected } ) => {
 				type="other"
 			/>
 
-			<Button className="ist-button" onClick={ nextStep } after>
+			<Button className="ist-button" onClick={ nextStep } after={ true }>
 				{ isSaving ? (
 					<LoadingSpinner />
 				) : (

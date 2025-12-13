@@ -177,7 +177,8 @@ const OnboardingAI = () => {
 
 	useLayoutEffect( () => {
 		const token = urlParams.get( 'token' );
-		if ( token ) {
+		const shouldResume = urlParams.get( 'should_resume' );
+		if ( token || shouldResume ) {
 			const url = removeQueryArgs(
 				window.location.href,
 				'token',

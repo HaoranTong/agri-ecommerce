@@ -226,6 +226,9 @@ if ( ! class_exists( 'ST_Batch_Processing' ) ) :
 			// Add "gutenberg" in import [queue].
 			$classes[] = ST_Batch_Processing_Gutenberg::get_instance();
 
+			// Add "elementor" in import [queue].
+			$classes[] = ST_Batch_Processing_Elementor::get_instance();
+
 			// Add "brizy" in import [queue].
 
 			// Add "misc" in import [queue].

@@ -159,7 +159,6 @@ const ImportSite = () => {
 		let formsStatus = false;
 		let customizerStatus = false;
 		let spectraStatus = false;
-		let sureCartStatus = false;
 
 		resetStatus = await resetOldSite();
 
@@ -188,10 +187,6 @@ const ImportSite = () => {
 		}
 
 		if ( spectraStatus ) {
-			sureCartStatus = await importSureCartSettings();
-		}
-
-		if ( sureCartStatus ) {
 			await importSiteContent();
 		}
 	};
@@ -200,12 +195,17 @@ const ImportSite = () => {
 	 * Start Import Part 2.
 	 */
 	const importPart2 = async () => {
+		let sureCartStatus = false;
 		let optionsStatus = false;
 		let widgetStatus = false;
 		let customizationsStatus = false;
 		let finalStepStatus = false;
 
-		optionsStatus = await importSiteOptions();
+		sureCartStatus = await importSureCartSettings();
+
+		if ( sureCartStatus ) {
+			optionsStatus = await importSiteOptions();
+		}
 
 		if ( optionsStatus ) {
 			widgetStatus = await importWidgets();

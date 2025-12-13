@@ -1,3 +1,6 @@
+v.2.4.16 - 05-December-2025
+Improvement: Added automatic library sync when Spectra plugin is installed, updated, or deleted to ensure proper version switching between v2 and v3.
+
 v.2.4.15 - 03-November-2025
 Improvement: Streamlined Spectra version handling by unifying multiple version filters into a single state and refining the toggle UX for Pages tab.
 Improvement: Enhanced premium patterns import flow.

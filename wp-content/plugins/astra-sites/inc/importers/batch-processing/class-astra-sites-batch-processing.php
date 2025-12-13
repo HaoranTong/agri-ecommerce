@@ -205,6 +205,18 @@ if ( ! class_exists( 'Astra_Sites_Batch_Processing' ) ) :
 			if ( isset( $_GET['st-force-sync'] ) && 'true' === $_GET['st-force-sync'] ) { //phpcs:ignore WordPress.Security.NonceVerification.Recommended
 				self::$is_force_sync = true;
 			}
+
+			// Check from site option.
+			$force_sync = get_site_option( 'astra-sites-force-sync', 'no' );
+			if ( 'yes' === $force_sync ) {
+				self::$is_force_sync = true;
+
+				// Reset options to update onboarding modal UI.
+				update_site_option( 'astra-sites-batch-is-complete', 'no' );
+				update_site_option( 'astra-sites-manual-sync-complete', 'no' );
+				delete_site_option( 'astra-sites-last-export-checksums-latest' );
+				delete_site_option( 'astra-sites-last-export-checksums' );
+			}
 		}
 
 		/**
@@ -532,6 +544,9 @@ if ( ! class_exists( 'Astra_Sites_Batch_Processing' ) ) :
 			if ( self::$is_force_sync || ( empty( $is_fresh_site ) && '' === $is_fresh_site ) ) {
 				$this->process_import();
 				update_site_option( 'astra-sites-fresh-site', 'no' );
+
+				// Remove force sync flag once background sync is started.
+				delete_site_option( 'astra-sites-force-sync' );
 			}
 		}
 

@@ -194,7 +194,7 @@ const ImportLoader = () => {
 						<div className="import-done-text">
 							<Button
 								className="view-website-btn import-done-button"
-								after
+								after={ true }
 								onClick={ () => {
 									window.open( siteUrl, '_blank' );
 								} }

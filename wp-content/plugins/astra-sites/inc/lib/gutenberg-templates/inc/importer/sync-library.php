@@ -41,6 +41,10 @@ class Sync_Library {
 		add_action( 'sync_blocks', array( $this, 'sync_blocks' ) );
 		add_action( 'wp_ajax_ast-block-templates-get-sites-request-count', array( $this, 'ajax_sites_requests_count' ) );
 		add_action( 'wp_ajax_ast-block-templates-import-sites', array( $this, 'ajax_import_sites' ) );
+
+		// To force sync library after Spectra plugin installation, update or deletion for switching between v2 and v3.
+		add_action( 'upgrader_process_complete', array( $this, 'handle_spectra_install_update' ), 10, 2 );
+		add_action( 'deleted_plugin', array( $this, 'handle_spectra_deletion' ), 10, 1 );
 	}
 
 	/**
@@ -900,4 +904,86 @@ class Sync_Library {
 		);
 	}
 
+	/**
+	 * Enable force sync
+	 *
+	 * Sets the force sync flag to 'yes'.
+	 *
+	 * @since 2.4.16
+	 * @return void
+	 */
+	public static function enable_force_sync() {
+		delete_site_option( 'ast-block-templates-last-export-checksums-time' );
+		Helper::instance()->update_json_file( 'ast-block-templates-last-export-checksums', '' );
+
+		/**
+		 * Action to trigger force sync of block templates.
+		 *
+		 * @since 2.4.16
+		 * @return void
+		 */
+		do_action( 'ast_block_templates_enable_force_sync' );
+	}
+
+	/**
+	 * Handle Spectra plugin deletion.
+	 *
+	 * Sets the force sync flag when Spectra plugin is deleted.
+	 *
+	 * @since 2.4.16
+	 * @param string $plugin Path to the plugin file relative to the plugins directory.
+	 * @return void
+	 */
+	public function handle_spectra_deletion( $plugin ) {
+		if ( 'ultimate-addons-for-gutenberg/ultimate-addons-for-gutenberg.php' === $plugin ) {
+			self::enable_force_sync();
+		}
+	}
+
+
+	/**
+	 * Handle Spectra plugin installation or update.
+	 *
+	 * Sets the force sync flag when Spectra plugin is installed or updated.
+	 *
+	 * @since 2.4.16
+	 * @param \WP_Upgrader         $upgrader_object WP_Upgrader instance.
+	 * @param array<string, mixed> $options         Array of bulk item update data.
+	 * @return void
+	 */
+	public function handle_spectra_install_update( $upgrader_object, $options ) {
+		/**
+		 * Filter to disable force sync on Spectra plugin install or update.
+		 *
+		 * @param bool $disable_sync True to disable sync, false to enable.
+		 *
+		 * @since 2.4.16
+		 * @return bool True to disable sync, false to enable.
+		 */
+		if ( apply_filters( 'ast_block_templates_disable_force_sync', false ) ) {
+			return;
+		}
+
+		// Bail early if not a plugin install or update action.
+		if ( empty( $options['type'] ) || 'plugin' !== $options['type'] || ! in_array( $options['action'], array( 'install', 'update' ), true ) ) {
+			return;
+		}
+
+		// Handle bulk plugin install/update.
+		if ( isset( $options['plugins'] ) && is_array( $options['plugins'] ) ) {
+			foreach ( $options['plugins'] as $plugin ) {
+				if ( 'ultimate-addons-for-gutenberg/ultimate-addons-for-gutenberg.php' === $plugin ) {
+					self::enable_force_sync();
+					break;
+				}
+			}
+		} elseif ( isset( $options['plugin'] ) ) {
+			// Handle single plugin update.
+			if ( 'ultimate-addons-for-gutenberg/ultimate-addons-for-gutenberg.php' === $options['plugin'] ) {
+				self::enable_force_sync();
+			}
+		} elseif ( is_array( $upgrader_object->result ) && 'ultimate-addons-for-gutenberg' === $upgrader_object->result['destination_name'] ) {
+			self::enable_force_sync();
+		}
+	}
 }

@@ -174,8 +174,6 @@ const SiteType = () => {
 			) : (
 				<WandIcon className="w-12 h-12 text-accent-st-secondary stroke-1" />
 			),
-			className:
-				'shadow-card gradient-border-cover gradient-border-cover-button',
 			onKeyDown: ( event ) =>
 				handleKeyPress( event, () => {
 					dispatch( {
@@ -201,6 +199,7 @@ const SiteType = () => {
 				text:
 					customTemplateData?.button_text ||
 					__( 'Go to Templates', 'astra-sites' ),
+				type: 'secondary',
 				onClick: () => {
 					dispatch( {
 						type: 'set',

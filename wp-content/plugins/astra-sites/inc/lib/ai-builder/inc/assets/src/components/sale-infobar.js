@@ -67,7 +67,7 @@ const SaleInfobar = () => {
 					{ /* Close Button */ }
 					<button
 						onClick={ handleClose }
-						className="absolute right-6 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 focus:outline-none"
+						className="absolute right-6 top-8 md:top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 focus:outline-none"
 						aria-label={ __( 'Close', 'ai-builder' ) }
 					>
 						<svg
@@ -81,7 +81,7 @@ const SaleInfobar = () => {
 							<path d="M 39.486328 6.9785156 A 1.50015 1.50015 0 0 0 38.439453 7.4394531 L 24 21.878906 L 9.5605469 7.4394531 A 1.50015 1.50015 0 0 0 8.484375 6.984375 A 1.50015 1.50015 0 0 0 7.4394531 9.5605469 L 21.878906 24 L 7.4394531 38.439453 A 1.50015 1.50015 0 1 0 9.5605469 40.560547 L 24 26.121094 L 38.439453 40.560547 A 1.50015 1.50015 0 1 0 40.560547 38.439453 L 26.121094 24 L 40.560547 9.5605469 A 1.50015 1.50015 0 0 0 39.486328 6.9785156 z"></path>
 						</svg>
 					</button>
-					<div className="flex items-center justify-center gap-4 md:gap-8 py-3 relative">
+					<div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 py-3 relative">
 						{ /* Timer Display - Compact version for info bar */ }
 						<div className="flex items-center gap-4">
 							<CountdownDisplay
@@ -93,18 +93,18 @@ const SaleInfobar = () => {
 							/>
 						</div>
 						{ /* Sale Message */ }
-						<div className="flex items-start gap-[0.3rem] flex-col justify-center">
+						<div className="flex items-center md:items-start gap-[0.3rem] flex-col justify-center text-center md:text-left">
 							<div className="flex items-center gap-2">
-								<span className="text-lg font-bold hidden sm:inline">
-									🔥 { getSaleTitle() } 🔥
-								</span>
 								<span className="text-sm sm:text-base font-bold">
+									<span className="text-lg font-bold block md:inline">
+										🔥 { getSaleTitle() } 🔥
+									</span>{ ' ' }
 									{ __(
 										'Unlock all premium templates and useful design tools with an incredible',
 										'ai-builder'
 									) }{ ' ' }
 									<span className="font-bold text-yellow-300">
-										41%
+										{ __( '41%', 'ai-builder' ) }
 									</span>{ ' ' }
 									{ __( 'discount.', 'ai-builder' ) }
 								</span>

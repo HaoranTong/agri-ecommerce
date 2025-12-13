@@ -1,8 +1,10 @@
 export const withinIframe = () => {
-	if ( window.location.href !== window.parent.location.href ) {
+	try {
+		return window.self !== window.top;
+	} catch ( e ) {
+		// Cross-origin access blocked, we're in an iframe
 		return true;
 	}
-	return false;
 };
 
 export const getStorgeData = ( key ) => {

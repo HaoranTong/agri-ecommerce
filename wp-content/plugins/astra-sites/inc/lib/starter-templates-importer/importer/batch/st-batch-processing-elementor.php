@@ -144,6 +144,14 @@ if ( ! class_exists( 'ST_Batch_Processing_Elementor' ) ) :
 
 			foreach ( $widgets as &$widget ) {
 
+				if ( isset( $widget['widgetType'] ) && 'shortcode' === $widget['widgetType'] && has_shortcode( $widget['settings']['shortcode'], 'wpforms' ) ) {
+					$this->replace_wpforms_ids( $widget );
+				}
+
+				if ( isset( $widget['widgetType'] ) && 'wpforms' === $widget['widgetType'] ) {
+					$this->replace_wpforms_widget_ids( $widget );
+				}
+
 				if ( isset( $widget['widgetType'] ) && 'shortcode' === $widget['widgetType'] && has_shortcode( $widget['settings']['shortcode'], 'sureforms' ) ) {
 					$this->replace_sureforms_ids( $widget );
 				}
@@ -160,6 +168,46 @@ if ( ! class_exists( 'ST_Batch_Processing_Elementor' ) ) :
 					$this->process_elementor_widgets( $widget['elements'] );
 				}
 			}
+		}
+
+		/**
+		 * Replace wpforms IDs in shortcode widget.
+		 *
+		 * @since 1.1.23
+		 *
+		 * @param array<string, mixed> $widget Widget data.
+		 * @return void
+		 */
+		public function replace_wpforms_ids( &$widget ) {
+			$ids_mapping = get_option( 'astra_sites_wpforms_ids_mapping', array() );
+
+			if ( empty( $ids_mapping ) ) {
+				return;
+			}
+
+			// Update wpforms_id in shortcode widget.
+			foreach ( $ids_mapping as $old_id => $new_id ) {
+				$widget['settings']['shortcode'] = str_replace( '[wpforms id="' . $old_id . '"]', '[wpforms id="' . $new_id . '"]', $widget['settings']['shortcode'] );
+			}
+		}
+
+		/**
+		 * Replace form IDs in WPForms widget.
+		 *
+		 * @since 1.1.23
+		 *
+		 * @param array<string, mixed> $widget Widget data.
+		 * @return void
+		 */
+		public function replace_wpforms_widget_ids( &$widget ) {
+			$ids_mapping = get_option( 'astra_sites_wpforms_ids_mapping', array() );
+
+			if ( empty( $ids_mapping ) ) {
+				return;
+			}
+
+			// Update form_id for WPForms widget.
+			$widget['settings']['form_id'] = $ids_mapping[ $widget['settings']['form_id'] ] ?? $widget['settings']['form_id'];
 		}
 
 		/**

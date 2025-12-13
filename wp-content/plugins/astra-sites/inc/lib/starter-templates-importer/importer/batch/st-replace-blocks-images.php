@@ -466,7 +466,9 @@ if ( ! class_exists( 'ST_Replace_Blocks_Images' ) ) :
 				$block['innerHTML'] = str_replace( 'alt=""', 'alt="' . esc_attr( $alt_text ) . '"', $block['innerHTML'] );
 			}
 
-			$block['innerHTML'] = str_replace( $block['alt'], $attachment['alt'], $block['innerHTML'] );
+			if ( isset( $block['alt'] ) && ! empty( $attachment['alt'] ) ) {
+				$block['innerHTML'] = str_replace( $block['alt'], $attachment['alt'], $block['innerHTML'] );
+			}
 
 			$tablet_size_slug = ! empty( $block['attrs']['sizeSlugTablet'] ) ? $block['attrs']['sizeSlugTablet'] : '';
 			$mobile_size_slug = ! empty( $block['attrs']['sizeSlugMobile'] ) ? $block['attrs']['sizeSlugMobile'] : '';
