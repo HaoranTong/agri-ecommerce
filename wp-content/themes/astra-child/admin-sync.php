@@ -6,6 +6,11 @@
 // 3. 提供完整字段清单 + 插件列表供人工复核
 // 作者：Qwen | 日期：2025-12-13
 
+// 强制设置页面编码为 UTF-8
+if (!headers_sent()) {
+    header('Content-Type: text/html; charset=utf-8');
+}
+
 if (!current_user_can('manage_options')) {
     wp_die('权限不足');
 }
@@ -146,22 +151,49 @@ if (isset($_POST['export_config'])) {
 // 导入处理
 // ========================
 if (isset($_POST['import_config'])) {
-    $json = trim($_POST['import_json'] ?? '');
-    if (!$json) {
-        echo '<div class="notice notice-error"><p>❌ 请输入有效的 JSON 内容。</p></div>';
-    } else {
-        $data = json_decode($json, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            echo '<div class="notice notice-error"><p>❌ JSON 格式错误：' . json_last_error_msg() . '</p></div>';
-        } else {
-            foreach ($data as $key => $value) {
-                update_option($key, $value);
-            }
-            echo '<div class="notice notice-success"><p>✅ 配置导入成功！共更新 ' . count($data) . ' 项。</p></div>';
+    // 使用 filter_input 获取原始数据，避免 wp_kses 等干扰
+    $raw_json = filter_input(INPUT_POST, 'import_json', FILTER_UNSAFE_RAW);
+    
+    if (!$raw_json) {
+        echo '<div class="notice notice-error"><p>❌ 输入为空。</p></div>';
+        return;
+    }
+
+    // 移除 BOM
+    $bom_patterns = ["\xEF\xBB\xBF", "\xFF\xFE", "\xFE\xFF"];
+    foreach ($bom_patterns as $bom) {
+        if (strpos($raw_json, $bom) === 0) {
+            $raw_json = substr($raw_json, strlen($bom));
+            break;
         }
     }
-}
 
+    // 清理前后空白
+    $json = trim($raw_json);
+
+    // 输出调试信息（仅用于诊断）
+    $first_char = substr($json, 0, 1);
+    $ord_first = ord($first_char);
+    echo '<div class="notice notice-warning"><p>🔍 首字符: \'' . 
+         htmlspecialchars($first_char) . '\' (ASCII: ' . $ord_first . ')</p></div>';
+
+    // 显示前50字符（原始内容）
+    echo '<div class="notice notice-info"><p><strong>输入预览:</strong><br/>' .
+         '<code style="background:#eee; padding:4px; display:block; white-space:pre-wrap;">' .
+         htmlspecialchars(substr($json, 0, 50)) . '</code></p></div>';
+
+    // 尝试解析
+    $data = json_decode($json, true);
+
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        echo '<div class="notice notice-error"><p>❌ JSON 错误：' . htmlspecialchars(json_last_error_msg()) . '</p></div>';
+    } else {
+        foreach ($data as $key => $value) {
+            update_option($key, $value);
+        }
+        echo '<div class="notice notice-success"><p>✅ 导入成功！共 ' . count($data) . ' 项。</p></div>';
+    }
+}
 // ========================
 // 页面渲染
 // ========================
