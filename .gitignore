@@ -91,3 +91,6 @@ npm-debug.log*
 /wp-content/languages/*
 !/wp-content/languages/loco/
 !/wp-content/languages/loco/**
+# Loco 自动备份/临时文件，不入库
+/wp-content/languages/loco/**/*.po~
+/wp-content/languages/loco/**/*.po~
