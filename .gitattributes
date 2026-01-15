@@ -4,3 +4,4 @@
 # Windows 脚本（如果有）可以指定 crlf（按需）
 *.ps1 text eol=crlf
 *.bat text eol=crlf
+*.cmd text eol=crlf
