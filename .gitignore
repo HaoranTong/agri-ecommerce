@@ -1,40 +1,97 @@
-# WordPress core
-.htaccess
+# ================================
+# AgriEcommerce - 精准忽略规则（白名单发布配套）
+# 目标：仅跟踪我们自己的代码与自定义翻译；忽略 WP Core / 第三方插件主题 / 配置 / 数据
+# ================================
 
-# Config & secrets
+# ----------------
+# 环境/站点配置（必须忽略）
+# ----------------
 wp-config.php
+.htaccess
 .env
+*.env.local
+.user.ini
+.maintenance
+.maintenance_flag
+maintenance.html
+wp-content/maintenance.php
 
+# ----------------
+# 依赖/构建产物（必须忽略）
+# ----------------
+/vendor/
+/node_modules/
 
-# Uploads & dynamic content
-wp-content/uploads/
-wp-content/cache/
-wp-content/upgrade/
-wp-content/debug.log
-
-# Third-party plugins (keep only your own)
-
-# Themes (unless you built one)
-
-# Logs & temp
-error_log
+# ----------------
+# 数据/缓存/升级/日志（必须忽略）
+# ----------------
+/wp-content/uploads/
+/wp-content/cache/
+/wp-content/upgrade/
 *.log
-*.tmp
+wp-content/debug.log
+error_log
 
-# OS & IDE
-.DS_Store
-Thumbs.db
+# ----------------
+# IDE/系统杂项
+# ----------------
 .vscode/
 .idea/
 *.swp
 *.swo
-.vscode/
-.idea/
 .DS_Store
 Thumbs.db
 
-# 忽略依赖安装目录（如 node_modules）
-node_modules/
+# 压缩/安装包（可选）
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+*.exe
+*.msi
+*.apk
+*.ipa
 
-# 忽略日志文件
-*.logwp-config.php
+# ================================
+# WordPress Core（不入库）
+# ================================
+/wp-admin/
+/wp-includes/
+/wp-*.php
+/index.php
+/xmlrpc.php
+/readme.html
+/license.txt
+
+# ================================
+# wp-content：只保留我们自己的内容
+# ================================
+
+# wp-content 下这些 index.php 不需要进仓库（减少噪音）
+/wp-content/index.php
+/wp-content/plugins/index.php
+/wp-content/themes/index.php
+
+# ----------------
+# 翻译：仅保留 Loco 自定义翻译
+# ----------------
+/wp-content/languages/*
+!/wp-content/languages/loco/
+!/wp-content/languages/loco/**
+# Loco 自动备份/临时文件不入库
+/wp-content/languages/loco/**/*.po~
+/wp-content/languages/loco/**/*-backup-*.po~
+
+# ----------------
+# 第三方插件/主题：全部忽略，只放行我们的白名单
+# ----------------
+/wp-content/plugins/*
+!/wp-content/plugins/myshop-core/
+!/wp-content/plugins/myshop-core/**
+
+/wp-content/themes/*
+!/wp-content/themes/astra-child/
+!/wp-content/themes/astra-child/**
