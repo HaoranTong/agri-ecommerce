@@ -93,4 +93,11 @@ npm-debug.log*
 !/wp-content/languages/loco/**
 # Loco 自动备份/临时文件，不入库
 /wp-content/languages/loco/**/*.po~
-/wp-content/languages/loco/**/*.po~
+# wp-content 根目录的 index.php 不需要进仓库
+/wp-content/index.php
+
+# 第三方插件/主题不入库（白名单策略已生效时，这两段可选，用于减少 status 噪音）
+/wp-content/plugins/*
+!/wp-content/plugins/myshop-core/
+/wp-content/themes/*
+!/wp-content/themes/astra-child/
