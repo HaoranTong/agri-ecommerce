@@ -1,44 +1,48 @@
 # ================================
-# AgriEcommerce - 精准忽略规则（最终版）
-# 目标：跟踪所有代码，忽略所有配置和数据
+# AgriEcommerce - 精准忽略规则（白名单发布配套）
+# 目标：仅跟踪我们自己的代码与自定义翻译；忽略 WP Core / 第三方插件主题 / 配置 / 数据
 # ================================
 
-# [核心] 忽略环境配置文件（每个服务器独有，必须忽略！）
+# ----------------
+# 环境/站点配置（必须忽略）
+# ----------------
 wp-config.php
 .htaccess
 .env
 *.env.local
+.user.ini
+.maintenance
+.maintenance_flag
+maintenance.html
+wp-content/maintenance.php
 
-# [核心] 忽略Composer依赖目录（由composer.json和composer.lock管理，勿跟踪！）
+# ----------------
+# 依赖/构建产物（必须忽略）
+# ----------------
 /vendor/
+/node_modules/
 
-# [核心] 忽略用户上传的内容（媒体库、文件等）
+# ----------------
+# 数据/缓存/升级/日志（必须忽略）
+# ----------------
 /wp-content/uploads/
-
-# [核心] 忽略各种缓存目录（非源代码，自动生成）
 /wp-content/cache/
 /wp-content/upgrade/
-
-# [核心] 忽略所有日志文件（开发、生产环境各自生成）
 *.log
 wp-content/debug.log
 error_log
 
-# 忽略IDE和编辑器配置文件（个人工具设置）
+# ----------------
+# IDE/系统杂项
+# ----------------
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# 忽略操作系统生成的文件
 .DS_Store
 Thumbs.db
 
-# 忽略其他可能的构建工具目录（如未来有）
-node_modules/
-npm-debug.log*
-
-# 忽略压缩文件
+# 压缩/安装包（可选）
 *.zip
 *.rar
 *.7z
@@ -47,34 +51,12 @@ npm-debug.log*
 *.bz2
 *.xz
 *.exe
-*.dmg
-*.iso
-*.img
-*.pkg
-*.deb
-*.rpm
 *.msi
 *.apk
 *.ipa
-*.jar
-*.war
-*.ear
-*.zip
-*.rar
-*.7z
-*.tar   
-# ================================
-# WordPress 运行时/环境文件（必须忽略）
-# ================================
-/.user.ini
-/.maintenance
-/.maintenance_flag
-/maintenance.html
-/wp-content/maintenance.php
 
 # ================================
-# WordPress Core（瘦身核心：停止跟踪后必须忽略）
-# 注意：仅写 gitignore 不会取消“已跟踪”，必须配合 git rm --cached
+# WordPress Core（不入库）
 # ================================
 /wp-admin/
 /wp-includes/
@@ -85,19 +67,31 @@ npm-debug.log*
 /license.txt
 
 # ================================
-# 翻译文件：只保留你自己做的 Loco Translate 自定义翻译
-# （你提供的扫描结果已经证明 loco 目录存在）
+# wp-content：只保留我们自己的内容
 # ================================
+
+# wp-content 下这些 index.php 不需要进仓库（减少噪音）
+/wp-content/index.php
+/wp-content/plugins/index.php
+/wp-content/themes/index.php
+
+# ----------------
+# 翻译：仅保留 Loco 自定义翻译
+# ----------------
 /wp-content/languages/*
 !/wp-content/languages/loco/
 !/wp-content/languages/loco/**
-# Loco 自动备份/临时文件，不入库
+# Loco 自动备份/临时文件不入库
 /wp-content/languages/loco/**/*.po~
-# wp-content 根目录的 index.php 不需要进仓库
-/wp-content/index.php
+/wp-content/languages/loco/**/*-backup-*.po~
 
-# 第三方插件/主题不入库（白名单策略已生效时，这两段可选，用于减少 status 噪音）
+# ----------------
+# 第三方插件/主题：全部忽略，只放行我们的白名单
+# ----------------
 /wp-content/plugins/*
 !/wp-content/plugins/myshop-core/
+!/wp-content/plugins/myshop-core/**
+
 /wp-content/themes/*
 !/wp-content/themes/astra-child/
+!/wp-content/themes/astra-child/**
