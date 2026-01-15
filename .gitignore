@@ -11,7 +11,6 @@ wp-config.php
 
 # [核心] 忽略Composer依赖目录（由composer.json和composer.lock管理，勿跟踪！）
 /vendor/
-composer.lock
 
 # [核心] 忽略用户上传的内容（媒体库、文件等）
 /wp-content/uploads/
@@ -64,3 +63,31 @@ npm-debug.log*
 *.rar
 *.7z
 *.tar   
+# ================================
+# WordPress 运行时/环境文件（必须忽略）
+# ================================
+/.user.ini
+/.maintenance
+/.maintenance_flag
+/maintenance.html
+/wp-content/maintenance.php
+
+# ================================
+# WordPress Core（瘦身核心：停止跟踪后必须忽略）
+# 注意：仅写 gitignore 不会取消“已跟踪”，必须配合 git rm --cached
+# ================================
+/wp-admin/
+/wp-includes/
+/wp-*.php
+/index.php
+/xmlrpc.php
+/readme.html
+/license.txt
+
+# ================================
+# 翻译文件：只保留你自己做的 Loco Translate 自定义翻译
+# （你提供的扫描结果已经证明 loco 目录存在）
+# ================================
+/wp-content/languages/*
+!/wp-content/languages/loco/
+!/wp-content/languages/loco/**
