@@ -9,13 +9,14 @@
 wp-config.php
 .htaccess
 .env
-*.env.local
+.venv/
+.venv
 .user.ini
 .maintenance
 .maintenance_flag
 maintenance.html
 wp-content/maintenance.php
-*.gitignore
+
 
 # ----------------
 # 依赖/构建产物（必须忽略）

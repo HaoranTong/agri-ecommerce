@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-01-16T09:31:24Z",
+  "core_version": "6.8.3",
+  "plugins": [
+    {
+      "slug": "advanced-woo-labels",
+      "version": "2.30",
+      "status": "inactive"
+    },
+    {
+      "slug": "astra-sites",
+      "version": "4.4.43",
+      "status": "active"
+    },
+    {
+      "slug": "cartflows",
+      "version": "2.1.17",
+      "status": "active"
+    },
+    {
+      "slug": "elementor",
+      "version": "3.33.2",
+      "status": "active"
+    },
+    {
+      "slug": "filter-everything",
+      "version": "1.9.1",
+      "status": "inactive"
+    },
+    {
+      "slug": "flexible-shipping",
+      "version": "6.4.3",
+      "status": "inactive"
+    },
+    {
+      "slug": "header-footer-elementor",
+      "version": "2.7.0",
+      "status": "active"
+    },
+    {
+      "slug": "hello",
+      "version": "1.7.2",
+      "status": "inactive"
+    },
+    {
+      "slug": "image-optimization",
+      "version": "1.6.9",
+      "status": "active"
+    },
+    {
+      "slug": "jwt-authentication-for-wp-rest-api",
+      "version": "1.4.1",
+      "status": "inactive"
+    },
+    {
+      "slug": "loco-translate",
+      "version": "2.8.0",
+      "status": "active"
+    },
+    {
+      "slug": "modern-cart",
+      "version": "1.0.4",
+      "status": "active"
+    },
+    {
+      "slug": "sureforms",
+      "version": "2.0.1",
+      "status": "inactive"
+    },
+    {
+      "slug": "variation-swatches-woo",
+      "version": "1.0.13",
+      "status": "active"
+    },
+    {
+      "slug": "woo-cart-abandonment-recovery",
+      "version": "2.0.4",
+      "status": "inactive"
+    },
+    {
+      "slug": "woo-extra-product-options",
+      "version": "3.3.3",
+      "status": "inactive"
+    },
+    {
+      "slug": "woocommerce",
+      "version": "10.3.5",
+      "status": "active"
+    },
+    {
+      "slug": "woocommerce-payments",
+      "version": "10.2.0",
+      "status": "inactive"
+    },
+    {
+      "slug": "woocommerce-products-filter",
+      "version": "1.3.7.3",
+      "status": "inactive"
+    },
+    {
+      "slug": "wp-reset",
+      "version": "2.06",
+      "status": "active"
+    }
+  ],
+  "themes": [
+    {
+      "stylesheet": "astra",
+      "version": "4.11.15",
+      "status": "parent"
+    },
+    {
+      "stylesheet": "twentytwentyfive",
+      "version": "1.3",
+      "status": "inactive"
+    },
+    {
+      "stylesheet": "twentytwentyfour",
+      "version": "1.3",
+      "status": "inactive"
+    },
+    {
+      "stylesheet": "twentytwentythree",
+      "version": "1.6",
+      "status": "inactive"
+    }
+  ],
+  "skip_plugins": [
+    "myshop-core"
+  ],
+  "skip_themes": [
+    "astra-child"
+  ],
+  "export_meta": {
+    "plugin_list_strategy": "fields=name,version,status",
+    "theme_list_strategy": "fields=name,version,status"
+  }
+}
