@@ -9,7 +9,8 @@
 wp-config.php
 .htaccess
 .env
-*.env.local
+.venv/
+.venv
 .user.ini
 .maintenance
 .maintenance_flag
