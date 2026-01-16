@@ -4,38 +4,39 @@
 File: apply_lock.py
 Path: ops/wp_lock/apply_lock.py
 Purpose:
-  将 wp-lock.json（export_lock.py 导出）应用到“线上 WordPress 站点”，实现版本对齐。
+  将 wp-lock.json（export_lock.py 导出）应用到“线上 WordPress 站点”，实现：
+  - Core 版本对齐
+  - 插件/主题版本对齐
+  - 启停状态对齐（activate/deactivate）
+  - 删除未启用或多余的插件/主题（prune）
 
-Key decisions (你已确认的方案B + 你的新要求):
-  - 默认只处理“线下处于 active 的插件/主题”（scope=active）。
-    线下未启用(inactive)的一律跳过：不安装、不更新、不降级、不激活。
-  - 默认不改线上启用状态（不做 activate/deactivate），只做安装/版本对齐。
-    如果你未来想确保 active 的一定是 active，可加 --enforce-status。
+Modes:
+  1) 安全模式（默认，兼容你旧流程）：
+     - scope=active：只处理 lock 中 status=active 的插件/主题（主题的 parent 也视为必须处理）
+     - 默认不改启停，不删除
+  2) 严格模式（满足你最新冻结要求）：
+     - --strict 一键启用：全量对齐 + 启停对齐 + 删除多余/未启用
+     - 线上最终只保留线下启用插件；主题只保留“active theme + parent theme（如有）”
 
-Why:
-  - 变更范围最小：只有线下正在用的组件才同步到线上。
-  - 风险最低：避免把线下测试用/未启用插件带到线上，避免不必要降级。
+Important:
+  - skip_plugins / skip_themes（Git 管理项）：
+    apply_lock 不通过 wp-cli 安装/更新/卸载这些目录，但会按 lock 做启停对齐。
+    若你要“删除自研项”，应修改部署白名单（否则 rsync 下一次又会同步回来）。
 
-Usage:
-  # 预演：只看计划，不执行
+Usage (server):
+  # 预演（推荐）
   python3 ops/wp_lock/apply_lock.py \
     --wp /usr/local/bin/wp --allow-root \
     --site-dir /www/wwwroot/staging.fanbaoer.com \
     --lock-file ops/wp_lock/wp-lock.json \
-    --dry-run --verbose
+    --strict --dry-run --verbose
 
-  # 分批执行（更安全）：
-  # 1) 先只同步插件
-  python3 ops/wp_lock/apply_lock.py ... --plugins-only --dry-run --verbose
-  python3 ops/wp_lock/apply_lock.py ... --plugins-only --verbose
-  # 2) 再同步主题
-  python3 ops/wp_lock/apply_lock.py ... --themes-only --dry-run --verbose
-  python3 ops/wp_lock/apply_lock.py ... --themes-only --verbose
-
-Options:
-  --scope active   (默认) 只处理 status=active
-  --scope all              处理 active + inactive（全量对齐，风险更高）
-  --enforce-status         按 lock 的 status 执行 activate/deactivate（默认不做）
+  # 严格执行（hooks 中就用这一条）
+  python3 ops/wp_lock/apply_lock.py \
+    --wp /usr/local/bin/wp --allow-root \
+    --site-dir /www/wwwroot/staging.fanbaoer.com \
+    --lock-file ops/wp_lock/wp-lock.json \
+    --strict --verbose
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ import json
 import os
 import subprocess
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -80,11 +81,13 @@ def _run_json(cmd: List[str], verbose: bool) -> List[Dict[str, Any]]:
         return []
     try:
         data = json.loads(raw)
-        if isinstance(data, list):
-            return data
-    except json.JSONDecodeError:
-        pass
-    raise RuntimeError(f"wp-cli JSON output parse failed.\ncmd={' '.join(cmd)}\noutput:\n{raw}")
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"wp-cli JSON output parse failed.\ncmd={' '.join(cmd)}\noutput(head 800):\n{raw[:800]}"
+        ) from exc
+    if isinstance(data, list):
+        return [x for x in data if isinstance(x, dict)]
+    raise RuntimeError(f"wp-cli JSON output is not a list.\ncmd={' '.join(cmd)}\noutput:\n{raw}")
 
 
 def _safe_get(d: Dict[str, Any], *keys: str) -> Optional[Any]:
@@ -96,9 +99,9 @@ def _safe_get(d: Dict[str, Any], *keys: str) -> Optional[Any]:
 
 def _get_item_id(item: Dict[str, Any], kind: str) -> Optional[str]:
     if kind == "plugin":
-        v = _safe_get(item, "slug", "name")
+        v = _safe_get(item, "slug", "name", "plugin")
         return str(v).strip() if v else None
-    v = _safe_get(item, "stylesheet", "slug", "name")
+    v = _safe_get(item, "stylesheet", "slug", "name", "theme")
     return str(v).strip() if v else None
 
 
@@ -110,6 +113,12 @@ def _get_item_version(item: Dict[str, Any]) -> Optional[str]:
 def _get_item_status(item: Dict[str, Any]) -> Optional[str]:
     v = _safe_get(item, "status")
     return str(v).strip() if v else None
+
+
+def _get_item_managed_by(item: Dict[str, Any]) -> str:
+    v = _safe_get(item, "managed_by")
+    s = str(v).strip().lower() if v else ""
+    return s if s in ("git", "wporg") else "wporg"
 
 
 def _index_installed(items: List[Dict[str, Any]], kind: str) -> Dict[str, Dict[str, Any]]:
@@ -127,27 +136,401 @@ def load_lock(lock_file: str) -> Dict[str, Any]:
         data = json.load(f)
     if not isinstance(data, dict):
         raise ValueError("Invalid lock file: root must be an object")
+
     schema = data.get("schema_version")
-    if schema != 1:
-        raise ValueError(f"Unsupported schema_version={schema}, expected 1")
+    if schema not in (1, 2):
+        raise ValueError(f"Unsupported schema_version={schema}, expected 1 or 2")
+
     if not data.get("core_version"):
         raise ValueError("Invalid lock file: missing core_version")
+
     data.setdefault("plugins", [])
     data.setdefault("themes", [])
     data.setdefault("skip_plugins", [])
     data.setdefault("skip_themes", [])
+    data.setdefault("site_meta", {})
+
+    # schema v1: 补齐 managed_by
+    if schema == 1:
+        skip_plugins = {str(x).strip() for x in (data.get("skip_plugins") or []) if str(x).strip()}
+        skip_themes = {str(x).strip() for x in (data.get("skip_themes") or []) if str(x).strip()}
+
+        for p in data.get("plugins") or []:
+            if isinstance(p, dict) and "managed_by" not in p:
+                pid = _get_item_id(p, "plugin")
+                p["managed_by"] = "git" if (pid and pid in skip_plugins) else "wporg"
+
+        for t in data.get("themes") or []:
+            if isinstance(t, dict) and "managed_by" not in t:
+                tid = _get_item_id(t, "theme")
+                t["managed_by"] = "git" if (tid and tid in skip_themes) else "wporg"
+
     return data
 
 
-def _should_process(status: Optional[str], scope: str) -> bool:
+def _should_process_theme_status(status: Optional[str], scope: str) -> bool:
     """
     scope:
-      - active: only status==active
-      - all:    active + inactive (and others)
+      - active: 处理 active + parent（parent 是子主题依赖父主题的必要状态）
+      - all:    全部处理
     """
     if scope == "all":
         return True
+    return status in ("active", "parent")
+
+
+def _should_process_plugin_status(status: Optional[str], scope: str) -> bool:
+    if scope == "all":
+        return True
     return status == "active"
+
+
+def _find_desired_active_theme(lock: Dict[str, Any]) -> Optional[str]:
+    meta = lock.get("site_meta") or {}
+    active = str(meta.get("active_theme") or "").strip()
+    if active:
+        return active
+
+    # fallback: 从 themes 列表里找 status=active
+    for t in lock.get("themes") or []:
+        if not isinstance(t, dict):
+            continue
+        if _get_item_status(t) == "active":
+            tid = _get_item_id(t, "theme")
+            if tid:
+                return tid
+    return None
+
+
+def _find_desired_parent_theme(lock: Dict[str, Any]) -> Optional[str]:
+    meta = lock.get("site_meta") or {}
+    parent = str(meta.get("parent_theme") or "").strip()
+    return parent if parent else None
+
+
+def _plan_core(
+    steps: List[PlanStep],
+    notes: List[str],
+    wp_bin: str,
+    allow_root: bool,
+    site_dir: str,
+    desired_core: str,
+    verbose: bool,
+) -> None:
+    cur_core_cmd = _build_wp_cmd(wp_bin, site_dir, allow_root, ["core", "version"])
+    cur_core = _run(cur_core_cmd, verbose=verbose)
+
+    if cur_core != desired_core:
+        steps.append(
+            PlanStep(
+                title=f"Update core {cur_core} -> {desired_core}",
+                cmd=_build_wp_cmd(
+                    wp_bin,
+                    site_dir,
+                    allow_root,
+                    ["core", "update", f"--version={desired_core}", "--force"],
+                ),
+            )
+        )
+        # DB upgrade after core update
+        steps.append(
+            PlanStep(
+                title="Run core database upgrade (update-db)",
+                cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, ["core", "update-db"]),
+            )
+        )
+    else:
+        notes.append(f"Core already matches: {cur_core}")
+
+
+def _plan_plugins(
+    steps: List[PlanStep],
+    notes: List[str],
+    wp_bin: str,
+    allow_root: bool,
+    site_dir: str,
+    lock: Dict[str, Any],
+    verbose: bool,
+    scope: str,
+    enforce_status: bool,
+    prune: bool,
+) -> None:
+    skip_plugins: Set[str] = {
+        str(x).strip() for x in (lock.get("skip_plugins") or []) if str(x).strip()
+    }
+    desired_plugins: List[Dict[str, Any]] = [
+        x for x in (lock.get("plugins") or []) if isinstance(x, dict)
+    ]
+
+    installed_plugins = _index_installed(
+        _run_json(
+            _build_wp_cmd(wp_bin, site_dir, allow_root, ["plugin", "list", "--format=json"]),
+            verbose=verbose,
+        ),
+        kind="plugin",
+    )
+
+    desired_ids: Set[str] = set()
+    desired_active: Set[str] = set()
+    desired_inactive: Set[str] = set()
+    desired_map: Dict[str, Dict[str, Any]] = {}
+
+    for p in desired_plugins:
+        pid = _get_item_id(p, "plugin")
+        if not pid:
+            continue
+        desired_ids.add(pid)
+        desired_map[pid] = p
+        st = _get_item_status(p)
+        if st == "active":
+            desired_active.add(pid)
+        else:
+            desired_inactive.add(pid)
+
+    # 1) 确保 active 插件：安装/锁版本（wporg），然后 activate（如需要）
+    for pid in sorted(desired_active):
+        p = desired_map[pid]
+        managed_by = _get_item_managed_by(p)
+        want_ver = _get_item_version(p)
+        cur = installed_plugins.get(pid)
+
+        if managed_by != "git":
+            if cur is None:
+                sub = ["plugin", "install", pid, "--force"]
+                if want_ver:
+                    sub.append(f"--version={want_ver}")
+                steps.append(
+                    PlanStep(
+                        title=f"Install plugin {pid} ({want_ver or 'latest'})",
+                        cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub),
+                    )
+                )
+            else:
+                cur_ver = _get_item_version(cur)
+                if want_ver and cur_ver != want_ver:
+                    sub = ["plugin", "install", pid, "--force", f"--version={want_ver}"]
+                    steps.append(
+                        PlanStep(
+                            title=f"Pin plugin {pid} {cur_ver} -> {want_ver}",
+                            cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub),
+                        )
+                    )
+                else:
+                    if verbose:
+                        notes.append(f"Plugin version ok: {pid} ({cur_ver})")
+        else:
+            if verbose:
+                notes.append(f"Git-managed plugin (skip install/update): {pid}")
+
+        if enforce_status:
+            # activate (even for git-managed)
+            if cur is None:
+                # might be copied by rsync; still try activate (if not exists, wp-cli will fail)
+                steps.append(
+                    PlanStep(
+                        title=f"Activate plugin {pid}",
+                        cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, ["plugin", "activate", pid]),
+                    )
+                )
+            else:
+                cur_status = _get_item_status(cur)
+                if cur_status != "active":
+                    steps.append(
+                        PlanStep(
+                            title=f"Activate plugin {pid}",
+                            cmd=_build_wp_cmd(
+                                wp_bin, site_dir, allow_root, ["plugin", "activate", pid]
+                            ),
+                        )
+                    )
+
+    # 2) 处理 inactive 插件（严格模式要求删除）
+    for pid in sorted(desired_inactive):
+        p = desired_map[pid]
+        st = _get_item_status(p)
+        managed_by = _get_item_managed_by(p)
+        cur = installed_plugins.get(pid)
+
+        if not _should_process_plugin_status(st, scope) and not prune:
+            continue
+
+        if prune:
+            if cur is None:
+                continue
+            if managed_by == "git" or pid in skip_plugins:
+                # Git 项：不卸载目录，但可对齐为 inactive
+                if enforce_status:
+                    cur_status = _get_item_status(cur)
+                    if cur_status == "active":
+                        steps.append(
+                            PlanStep(
+                                title=f"Deactivate plugin {pid} (git-managed)",
+                                cmd=_build_wp_cmd(
+                                    wp_bin, site_dir, allow_root, ["plugin", "deactivate", pid]
+                                ),
+                            )
+                        )
+                if verbose:
+                    notes.append(
+                        f"Prune requested but skip uninstall for git-managed plugin: {pid}"
+                    )
+            else:
+                # wporg 项：卸载并删除
+                steps.append(
+                    PlanStep(
+                        title=f"Uninstall plugin {pid} (status={st})",
+                        cmd=_build_wp_cmd(
+                            wp_bin,
+                            site_dir,
+                            allow_root,
+                            ["plugin", "uninstall", pid, "--deactivate", "--yes"],
+                        ),
+                    )
+                )
+        else:
+            # 非 prune，仅在 enforce_status 且 scope=all 时做 deactivate
+            if enforce_status and scope == "all" and cur is not None:
+                cur_status = _get_item_status(cur)
+                if cur_status == "active":
+                    steps.append(
+                        PlanStep(
+                            title=f"Deactivate plugin {pid}",
+                            cmd=_build_wp_cmd(
+                                wp_bin, site_dir, allow_root, ["plugin", "deactivate", pid]
+                            ),
+                        )
+                    )
+
+    # 3) 删除线上“多余插件”（不在 lock 内）
+    if prune:
+        for installed_id in sorted(installed_plugins.keys()):
+            if installed_id in desired_ids:
+                continue
+            if installed_id in skip_plugins:
+                # Git 白名单项一般应在 lock 内；即便不在，也不由 wp-cli 删除
+                if verbose:
+                    notes.append(f"Skip prune extra plugin (git list): {installed_id}")
+                continue
+            steps.append(
+                PlanStep(
+                    title=f"Uninstall extra plugin {installed_id} (not in lock)",
+                    cmd=_build_wp_cmd(
+                        wp_bin,
+                        site_dir,
+                        allow_root,
+                        ["plugin", "uninstall", installed_id, "--deactivate", "--yes"],
+                    ),
+                )
+            )
+
+
+def _plan_themes(
+    steps: List[PlanStep],
+    notes: List[str],
+    wp_bin: str,
+    allow_root: bool,
+    site_dir: str,
+    lock: Dict[str, Any],
+    verbose: bool,
+    scope: str,
+    enforce_status: bool,
+    prune: bool,
+) -> None:
+    skip_themes: Set[str] = {
+        str(x).strip() for x in (lock.get("skip_themes") or []) if str(x).strip()
+    }
+    desired_themes: List[Dict[str, Any]] = [
+        x for x in (lock.get("themes") or []) if isinstance(x, dict)
+    ]
+
+    installed_themes = _index_installed(
+        _run_json(
+            _build_wp_cmd(wp_bin, site_dir, allow_root, ["theme", "list", "--format=json"]),
+            verbose=verbose,
+        ),
+        kind="theme",
+    )
+
+    desired_theme_map: Dict[str, Dict[str, Any]] = {}
+    for t in desired_themes:
+        tid = _get_item_id(t, "theme")
+        if not tid:
+            continue
+        desired_theme_map[tid] = t
+
+    active_theme = _find_desired_active_theme(lock)
+    if not active_theme:
+        raise RuntimeError("Cannot determine desired active theme from lock (site_meta.active_theme missing).")
+
+    parent_theme = _find_desired_parent_theme(lock)
+    keep: Set[str] = {active_theme}
+    if parent_theme and parent_theme != active_theme:
+        keep.add(parent_theme)
+
+    # 1) 确保 keep 主题安装/锁版本（wporg）
+    for tid in sorted(keep):
+        t = desired_theme_map.get(tid)
+        managed_by = _get_item_managed_by(t) if t else ("git" if tid in skip_themes else "wporg")
+        want_ver = _get_item_version(t) if t else None
+        cur = installed_themes.get(tid)
+
+        if managed_by != "git":
+            if cur is None:
+                sub = ["theme", "install", tid, "--force"]
+                if want_ver:
+                    sub.append(f"--version={want_ver}")
+                steps.append(
+                    PlanStep(
+                        title=f"Install theme {tid} ({want_ver or 'latest'})",
+                        cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub),
+                    )
+                )
+            else:
+                cur_ver = _get_item_version(cur)
+                if want_ver and cur_ver != want_ver:
+                    # 用 theme install --force --version 做“锁定/降级”更可靠
+                    sub = ["theme", "install", tid, "--force", f"--version={want_ver}"]
+                    steps.append(
+                        PlanStep(
+                            title=f"Pin theme {tid} {cur_ver} -> {want_ver}",
+                            cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub),
+                        )
+                    )
+                else:
+                    if verbose:
+                        notes.append(f"Theme version ok: {tid} ({cur_ver})")
+        else:
+            if verbose:
+                notes.append(f"Git-managed theme (skip install/update): {tid}")
+
+    # 2) 启用 active theme
+    if enforce_status:
+        steps.append(
+            PlanStep(
+                title=f"Activate theme {active_theme}",
+                cmd=_build_wp_cmd(
+                    wp_bin, site_dir, allow_root, ["theme", "activate", active_theme]
+                ),
+            )
+        )
+
+    # 3) prune：删除不在 keep 集合的主题（但不删除 git-managed 主题）
+    if prune:
+        for installed_id in sorted(installed_themes.keys()):
+            if installed_id in keep:
+                continue
+            if installed_id in skip_themes:
+                if verbose:
+                    notes.append(f"Skip prune theme (git-managed): {installed_id}")
+                continue
+            steps.append(
+                PlanStep(
+                    title=f"Delete theme {installed_id} (not in keep)",
+                    cmd=_build_wp_cmd(
+                        wp_bin, site_dir, allow_root, ["theme", "delete", installed_id, "--yes"]
+                    ),
+                )
+            )
 
 
 def build_plan(
@@ -158,132 +541,64 @@ def build_plan(
     verbose: bool,
     scope: str,
     enforce_status: bool,
+    prune: bool,
+    strict: bool,
     plugins_only: bool,
     themes_only: bool,
 ) -> Tuple[List[PlanStep], List[str]]:
     notes: List[str] = []
     steps: List[PlanStep] = []
 
-    # --- core ---
-    if not plugins_only and not themes_only:
-        cur_core_cmd = _build_wp_cmd(wp_bin, site_dir, allow_root, ["core", "version"])
-        cur_core = _run(cur_core_cmd, verbose=verbose)
-        desired_core = str(lock["core_version"]).strip()
+    # strict overrides
+    eff_scope = "all" if strict else scope
+    eff_enforce = True if strict else enforce_status
+    eff_prune = True if strict else prune
 
-        if cur_core != desired_core:
-            steps.append(
-                PlanStep(
-                    title=f"Update core {cur_core} -> {desired_core}",
-                    cmd=_build_wp_cmd(
-                        wp_bin,
-                        site_dir,
-                        allow_root,
-                        ["core", "update", f"--version={desired_core}", "--force"],
-                    ),
-                )
-            )
-        else:
-            notes.append(f"Core already matches: {cur_core}")
+    # core
+    if not plugins_only and not themes_only:
+        _plan_core(
+            steps=steps,
+            notes=notes,
+            wp_bin=wp_bin,
+            allow_root=allow_root,
+            site_dir=site_dir,
+            desired_core=str(lock["core_version"]).strip(),
+            verbose=verbose,
+        )
     else:
         notes.append("Core skipped (plugins-only/themes-only mode)")
 
-    # --- plugins ---
+    # plugins
     if not themes_only:
-        skip_plugins = set(str(x).strip() for x in (lock.get("skip_plugins") or []) if str(x).strip())
-        desired_plugins = lock.get("plugins") or []
-
-        installed_plugins = _index_installed(
-            _run_json(_build_wp_cmd(wp_bin, site_dir, allow_root, ["plugin", "list", "--format=json"]), verbose=verbose),
-            kind="plugin",
+        _plan_plugins(
+            steps=steps,
+            notes=notes,
+            wp_bin=wp_bin,
+            allow_root=allow_root,
+            site_dir=site_dir,
+            lock=lock,
+            verbose=verbose,
+            scope=eff_scope,
+            enforce_status=eff_enforce,
+            prune=eff_prune,
         )
-
-        for p in desired_plugins:
-            p_id = _get_item_id(p, kind="plugin")
-            if not p_id:
-                continue
-            if p_id in skip_plugins:
-                if verbose:
-                    notes.append(f"Skip plugin (custom/whitelist): {p_id}")
-                continue
-
-            want_status = _get_item_status(p)
-            if not _should_process(want_status, scope):
-                if verbose:
-                    notes.append(f"Skip plugin by scope={scope}: {p_id} (status={want_status})")
-                continue
-
-            want_ver = _get_item_version(p)
-            cur = installed_plugins.get(p_id)
-
-            if cur is None:
-                sub = ["plugin", "install", p_id, "--force"]
-                if want_ver:
-                    sub.append(f"--version={want_ver}")
-                steps.append(PlanStep(title=f"Install plugin {p_id} ({want_ver or 'latest'})", cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub)))
-            else:
-                cur_ver = _get_item_version(cur)
-                if want_ver and cur_ver != want_ver:
-                    sub = ["plugin", "install", p_id, "--force", f"--version={want_ver}"]
-                    steps.append(PlanStep(title=f"Pin plugin {p_id} {cur_ver} -> {want_ver}", cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub)))
-                else:
-                    if verbose:
-                        notes.append(f"Plugin version ok: {p_id} ({cur_ver})")
-
-            if enforce_status and want_status == "active":
-                cur_status = _get_item_status(cur) if cur else None
-                if cur_status != "active":
-                    steps.append(PlanStep(title=f"Activate plugin {p_id}", cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, ["plugin", "activate", p_id])))
-
     else:
         notes.append("Plugins skipped (themes-only mode)")
 
-    # --- themes ---
+    # themes
     if not plugins_only:
-        skip_themes = set(str(x).strip() for x in (lock.get("skip_themes") or []) if str(x).strip())
-        desired_themes = lock.get("themes") or []
-
-        installed_themes = _index_installed(
-            _run_json(_build_wp_cmd(wp_bin, site_dir, allow_root, ["theme", "list", "--format=json"]), verbose=verbose),
-            kind="theme",
+        _plan_themes(
+            steps=steps,
+            notes=notes,
+            wp_bin=wp_bin,
+            allow_root=allow_root,
+            site_dir=site_dir,
+            lock=lock,
+            verbose=verbose,
+            scope=eff_scope,
+            enforce_status=eff_enforce,
+            prune=eff_prune,
         )
-
-        for t in desired_themes:
-            t_id = _get_item_id(t, kind="theme")
-            if not t_id:
-                continue
-            if t_id in skip_themes:
-                if verbose:
-                    notes.append(f"Skip theme (custom/whitelist): {t_id}")
-                continue
-
-            want_status = _get_item_status(t)
-            if not _should_process(want_status, scope):
-                if verbose:
-                    notes.append(f"Skip theme by scope={scope}: {t_id} (status={want_status})")
-                continue
-
-            want_ver = _get_item_version(t)
-            cur = installed_themes.get(t_id)
-
-            if cur is None:
-                sub = ["theme", "install", t_id, "--force"]
-                if want_ver:
-                    sub.append(f"--version={want_ver}")
-                steps.append(PlanStep(title=f"Install theme {t_id} ({want_ver or 'latest'})", cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub)))
-            else:
-                cur_ver = _get_item_version(cur)
-                if want_ver and cur_ver != want_ver:
-                    sub = ["theme", "update", t_id, f"--version={want_ver}"]
-                    steps.append(PlanStep(title=f"Pin theme {t_id} {cur_ver} -> {want_ver}", cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, sub)))
-                else:
-                    if verbose:
-                        notes.append(f"Theme version ok: {t_id} ({cur_ver})")
-
-            if enforce_status and want_status == "active":
-                cur_status = _get_item_status(cur) if cur else None
-                if cur_status != "active":
-                    steps.append(PlanStep(title=f"Activate theme {t_id}", cmd=_build_wp_cmd(wp_bin, site_dir, allow_root, ["theme", "activate", t_id])))
-
     else:
         notes.append("Themes skipped (plugins-only mode)")
 
@@ -307,12 +622,22 @@ def main() -> None:
         "--scope",
         choices=["active", "all"],
         default="active",
-        help="处理范围：active=只处理启用项（默认，最安全）；all=全量对齐（含inactive）",
+        help="处理范围：active=只处理启用项（主题 parent 也会处理）；all=全量对齐",
     )
     parser.add_argument(
         "--enforce-status",
         action="store_true",
-        help="按 lock 的 status 做 activate（scope=active 时仅确保 active）/（scope=all 时可能也会 deactivate）",
+        help="按 lock 的 status 做 activate/deactivate（scope=all 时会执行 deactivate）",
+    )
+    parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="删除不需要的插件/主题：卸载 lock 中 inactive 的 wporg 项，删除线上不在 lock 内的多余项",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="严格模式（一键）：等价于 --scope all --enforce-status --prune",
     )
 
     args = parser.parse_args()
@@ -340,6 +665,8 @@ def main() -> None:
             verbose=args.verbose,
             scope=args.scope,
             enforce_status=args.enforce_status,
+            prune=args.prune,
+            strict=args.strict,
             plugins_only=args.plugins_only,
             themes_only=args.themes_only,
         )
@@ -348,10 +675,19 @@ def main() -> None:
         raise SystemExit(f"wp-cli failed:\n{msg}") from exc
     except FileNotFoundError:
         raise SystemExit(f"Cannot execute wp-cli: {wp_bin}") from None
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
 
     print(f"[apply_lock] site={site_dir}")
     print(f"[apply_lock] lock={lock_file}")
-    print(f"[apply_lock] scope={args.scope} enforce_status={args.enforce_status} plugins_only={args.plugins_only} themes_only={args.themes_only}")
+    print(
+        "[apply_lock] mode="
+        + ("STRICT" if args.strict else "SAFE")
+        + f" scope={('all' if args.strict else args.scope)} "
+        + f"enforce_status={('true' if args.strict else str(args.enforce_status).lower())} "
+        + f"prune={('true' if args.strict else str(args.prune).lower())} "
+        + f"plugins_only={args.plugins_only} themes_only={args.themes_only}"
+    )
 
     if args.verbose:
         for n in notes:
@@ -376,10 +712,19 @@ def main() -> None:
             _ = _run(step.cmd, verbose=args.verbose)
         except subprocess.CalledProcessError as exc:
             msg = exc.output.decode("utf-8", errors="replace") if exc.output else str(exc)
-            raise SystemExit(f"[apply_lock] Step failed: {step.title}\ncmd={' '.join(step.cmd)}\n{msg}") from exc
+            raise SystemExit(
+                f"[apply_lock] Step failed: {step.title}\ncmd={' '.join(step.cmd)}\n{msg}"
+            ) from exc
 
-    core_ver = _run(_build_wp_cmd(wp_bin, site_dir, args.allow_root, ["core", "version"]), verbose=args.verbose)
-    print(f"[apply_lock] DONE. core_version={core_ver}")
+    core_ver = _run(
+        _build_wp_cmd(wp_bin, site_dir, args.allow_root, ["core", "version"]),
+        verbose=args.verbose,
+    )
+    active_theme = _run(
+        _build_wp_cmd(wp_bin, site_dir, args.allow_root, ["option", "get", "stylesheet"]),
+        verbose=args.verbose,
+    )
+    print(f"[apply_lock] DONE. core_version={core_ver} active_theme={active_theme}")
 
 
 if __name__ == "__main__":

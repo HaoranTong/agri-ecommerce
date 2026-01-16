@@ -4,25 +4,24 @@
 File: export_lock.py
 Path: ops/wp_lock/export_lock.py
 Purpose:
-  从“线下（本地）WordPress站点”导出 Core/插件/主题 的版本锁定文件 wp-lock.json（免费源专用）。
+  从“线下（本地）WordPress 站点”导出 Core / 插件 / 主题 的版本与启停状态锁定文件 wp-lock.json。
+
+Important (与你最新冻结要求一致):
+  1) 线下为真源：线上必须与线下绝对一致（版本 + 启停 + 删除未启用/多余项）。
+  2) 自研项（Git 白名单发布）仍需要纳入 lock 的“启停状态对齐”：
+     - 在 lock 中保留它们（包含 version/status）
+     - 但标记 managed_by="git"，提示 apply_lock 不负责安装/更新/卸载，只负责启停对齐。
 
 Design goals:
-  1) Windows: wp-cli 通常是 .bat/.cmd，使用 cmd.exe /c 执行更稳定
-  2) wp-cli 不同版本/不同实现对 list 命令的 --fields 可用字段集合不完全一致
-     本脚本采用“自动探测字段 + 兜底”的方式：
-       - 优先尝试若干组 fields
-       - 若遇到 Invalid field，则自动降级尝试下一组
-       - 最终兜底：不使用 --fields，仅依赖 --format=json 输出，再做键名兼容映射
-  3) lock 内部字段保持稳定：
-       plugins:  {"slug": "<plugin-dir>", "version": "...", "status": "..."}
-       themes:   {"stylesheet": "<theme-dir>", "version": "...", "status": "..."}
-     其中 plugin-dir/theme-dir 可能来自 wp-cli 输出的 name/slug/stylesheet 等字段之一。
+  - Windows 兼容：wp-cli 常为 .bat/.cmd，使用 cmd.exe /c 更稳定
+  - 字段兼容：wp-cli list 的 --fields 在不同环境字段可能不同，本脚本自动探测 fields 组合并回退
+  - lock schema_version=2
 
-Usage:
+Usage (Windows / Laragon):
   python ops\\wp_lock\\export_lock.py --site-dir "E:\\laragon\\www\\agri-ecommerce" --out "ops\\wp_lock\\wp-lock.json"
-  可显式指定 wp-cli：
+  指定 wp-cli：
   python ops\\wp_lock\\export_lock.py --wp "E:\\wp-cli\\wp.bat" --site-dir "..." --out "..."
-  开启调试输出（推荐你现在测一次）：
+  开启探测日志（首次推荐）：
   python ops\\wp_lock\\export_lock.py --verbose --site-dir "..." --out "..."
 """
 
@@ -59,10 +58,6 @@ def _build_wp_cmd(wp_bin: str, site_dir: str, args: List[str]) -> List[str]:
 
 
 def _is_invalid_field_error(output: str) -> bool:
-    """
-    Detect wp-cli invalid field error.
-    Example: "Error: Invalid field: slug."
-    """
     lowered = output.lower()
     return "invalid field" in lowered
 
@@ -78,9 +73,6 @@ def run_wp(wp_bin: str, site_dir: str, args: List[str]) -> str:
 
 
 def run_wp_json(wp_bin: str, site_dir: str, args: List[str]) -> List[Dict[str, Any]]:
-    """
-    Run wp-cli and parse JSON output as a list of dict rows.
-    """
     raw = run_wp(wp_bin, site_dir, args)
     try:
         data = json.loads(raw)
@@ -99,7 +91,6 @@ def run_wp_json(wp_bin: str, site_dir: str, args: List[str]) -> List[Dict[str, A
             f"Output(head 500): {raw[:500]}"
         )
 
-    # Ensure row is dict-like
     rows: List[Dict[str, Any]] = []
     for item in data:
         if isinstance(item, dict):
@@ -118,13 +109,11 @@ def _try_list_json_with_fields(
     Try to run list command with several --fields combinations, fallback to no --fields.
     Returns (rows, used_strategy_desc).
 
-    base_args must include the subcommand and must include '--format=json' or we will add it.
+    base_args must include the subcommand and should include '--format=json'.
     """
-    # Ensure --format=json exists
     args_has_format = any(a.startswith("--format=") for a in base_args)
     safe_base = base_args[:] if args_has_format else base_args + ["--format=json"]
 
-    # First try candidates
     for fields in fields_candidates:
         fields_arg = f"--fields={','.join(fields)}"
         cmd_args = safe_base + [fields_arg]
@@ -136,14 +125,15 @@ def _try_list_json_with_fields(
             return rows, desc
         except RuntimeError as exc:
             msg = str(exc)
-            # Only downgrade on invalid field errors, otherwise bubble up
             if _is_invalid_field_error(msg):
                 if verbose:
-                    print(f"[export_lock] list failed with fields={','.join(fields)} (invalid field), try next")
+                    print(
+                        f"[export_lock] list failed with fields={','.join(fields)} "
+                        "(invalid field), try next"
+                    )
                 continue
             raise
 
-    # Fallback: no --fields
     rows = run_wp_json(wp_bin, site_dir, safe_base)
     desc = "no-fields"
     if verbose:
@@ -159,12 +149,16 @@ def _pick_first_key(row: Dict[str, Any], keys: Sequence[str]) -> Optional[str]:
     return None
 
 
-def _normalize_plugins(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _normalize_plugins(
+    rows: List[Dict[str, Any]],
+    git_plugins: Sequence[str],
+) -> List[Dict[str, Any]]:
     """
     Normalize plugin rows to stable schema:
-      {"slug": <plugin-dir>, "version": <ver>, "status": <status>}
+      {"slug": <plugin-dir>, "version": <ver>, "status": <status>, "managed_by": "wporg|git"}
     Candidate id keys: slug/name/plugin
     """
+    git_set = {str(x).strip() for x in (git_plugins or []) if str(x).strip()}
     normalized: List[Dict[str, Any]] = []
     for r in rows:
         slug = _pick_first_key(r, ["slug", "name", "plugin"])
@@ -172,16 +166,28 @@ def _normalize_plugins(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             continue
         version = str(r.get("version", "") or "").strip()
         status = str(r.get("status", "") or "").strip()
-        normalized.append({"slug": slug, "version": version, "status": status})
+        managed_by = "git" if slug in git_set else "wporg"
+        normalized.append(
+            {
+                "slug": slug,
+                "version": version,
+                "status": status,
+                "managed_by": managed_by,
+            }
+        )
     return normalized
 
 
-def _normalize_themes(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _normalize_themes(
+    rows: List[Dict[str, Any]],
+    git_themes: Sequence[str],
+) -> List[Dict[str, Any]]:
     """
     Normalize theme rows to stable schema:
-      {"stylesheet": <theme-dir>, "version": <ver>, "status": <status>}
+      {"stylesheet": <theme-dir>, "version": <ver>, "status": <status>, "managed_by": "wporg|git"}
     Candidate id keys: stylesheet/name/theme
     """
+    git_set = {str(x).strip() for x in (git_themes or []) if str(x).strip()}
     normalized: List[Dict[str, Any]] = []
     for r in rows:
         stylesheet = _pick_first_key(r, ["stylesheet", "name", "theme"])
@@ -189,7 +195,15 @@ def _normalize_themes(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             continue
         version = str(r.get("version", "") or "").strip()
         status = str(r.get("status", "") or "").strip()
-        normalized.append({"stylesheet": stylesheet, "version": version, "status": status})
+        managed_by = "git" if stylesheet in git_set else "wporg"
+        normalized.append(
+            {
+                "stylesheet": stylesheet,
+                "version": version,
+                "status": status,
+                "managed_by": managed_by,
+            }
+        )
     return normalized
 
 
@@ -198,8 +212,21 @@ def main() -> None:
     parser.add_argument("--site-dir", required=True, help="本地 WP 站点根目录（含 wp-config.php）")
     parser.add_argument("--out", required=True, help="输出 lock 文件路径")
     parser.add_argument("--wp", default=_default_wp_bin(), help="wp-cli 命令（默认自动判断）")
-    parser.add_argument("--skip-plugin", action="append", default=["myshop-core"])
-    parser.add_argument("--skip-theme", action="append", default=["astra-child"])
+
+    # 为兼容旧参数名：仍叫 skip，但语义改为“Git 管理项清单”
+    parser.add_argument(
+        "--skip-plugin",
+        action="append",
+        default=["myshop-core"],
+        help="Git 管理的插件（不走 wp-cli 安装/更新/卸载，但要写入 lock 以便启停对齐）",
+    )
+    parser.add_argument(
+        "--skip-theme",
+        action="append",
+        default=["astra-child"],
+        help="Git 管理的主题（不走 wp-cli 安装/更新/卸载，但要写入 lock 以便启停对齐）",
+    )
+
     parser.add_argument("--verbose", action="store_true", help="输出探测过程（建议首次测试开启）")
     args = parser.parse_args()
 
@@ -211,6 +238,10 @@ def main() -> None:
 
     # Core version
     core_version = run_wp(args.wp, site_dir, ["core", "version"]).strip()
+
+    # Active theme info (DB options)
+    active_theme = run_wp(args.wp, site_dir, ["option", "get", "stylesheet"]).strip()
+    parent_theme = run_wp(args.wp, site_dir, ["option", "get", "template"]).strip()
 
     # Plugin list: auto-detect fields, then fallback
     plugin_fields_candidates = [
@@ -225,7 +256,7 @@ def main() -> None:
         fields_candidates=plugin_fields_candidates,
         verbose=args.verbose,
     )
-    plugins = _normalize_plugins(plugins_rows)
+    plugins = _normalize_plugins(plugins_rows, git_plugins=args.skip_plugin)
 
     # Theme list: auto-detect fields, then fallback
     theme_fields_candidates = [
@@ -240,30 +271,27 @@ def main() -> None:
         fields_candidates=theme_fields_candidates,
         verbose=args.verbose,
     )
-    themes = _normalize_themes(themes_rows)
+    themes = _normalize_themes(themes_rows, git_themes=args.skip_theme)
 
-    # Apply skip lists (for Git-managed items)
-    skip_plugins = set(args.skip_plugin or [])
-    skip_themes = set(args.skip_theme or [])
+    # Sort for stability
+    plugins = sorted(plugins, key=lambda x: x.get("slug", ""))
+    themes = sorted(themes, key=lambda x: x.get("stylesheet", ""))
 
-    plugins = sorted(
-        [p for p in plugins if p.get("slug") not in skip_plugins],
-        key=lambda x: x.get("slug", ""),
-    )
-    themes = sorted(
-        [t for t in themes if t.get("stylesheet") not in skip_themes],
-        key=lambda x: x.get("stylesheet", ""),
-    )
+    git_plugins = sorted({str(x).strip() for x in (args.skip_plugin or []) if str(x).strip()})
+    git_themes = sorted({str(x).strip() for x in (args.skip_theme or []) if str(x).strip()})
 
     lock: Dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
         "core_version": core_version,
+        "site_meta": {
+            "active_theme": active_theme,
+            "parent_theme": parent_theme,
+        },
         "plugins": plugins,
         "themes": themes,
-        "skip_plugins": sorted(list(skip_plugins)),
-        "skip_themes": sorted(list(skip_themes)),
-        # 记录本次探测使用的策略，便于将来升级排查（不影响 apply）
+        "skip_plugins": git_plugins,
+        "skip_themes": git_themes,
         "export_meta": {
             "plugin_list_strategy": plugin_strategy,
             "theme_list_strategy": theme_strategy,
