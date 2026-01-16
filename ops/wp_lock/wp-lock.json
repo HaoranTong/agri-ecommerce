@@ -1,129 +1,169 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-01-16T10:46:35Z",
+  "schema_version": 2,
+  "generated_at": "2026-01-16T14:11:12Z",
   "core_version": "6.9",
+  "site_meta": {
+    "active_theme": "astra-child",
+    "parent_theme": "astra"
+  },
   "plugins": [
     {
       "slug": "advanced-woo-labels",
       "version": "2.33",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "astra-sites",
       "version": "4.4.47",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "cartflows",
       "version": "2.1.19",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "elementor",
-      "version": "3.33.2",
-      "status": "active"
+      "version": "3.34.1",
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "filter-everything",
       "version": "1.9.1",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "flexible-shipping",
       "version": "6.5.3",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "header-footer-elementor",
       "version": "2.8.1",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "hello",
       "version": "1.7.2",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "image-optimization",
       "version": "1.6.9",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "jwt-authentication-for-wp-rest-api",
       "version": "1.4.1",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "loco-translate",
       "version": "2.8.1",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "modern-cart",
       "version": "1.0.6",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
+    },
+    {
+      "slug": "myshop-core",
+      "version": "1.1.0",
+      "status": "active",
+      "managed_by": "git"
     },
     {
       "slug": "sureforms",
-      "version": "2.0.2",
-      "status": "inactive"
+      "version": "2.3.0",
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "variation-swatches-woo",
       "version": "1.0.13",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "woo-cart-abandonment-recovery",
       "version": "2.0.5",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "woo-extra-product-options",
       "version": "3.3.4",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "woocommerce",
-      "version": "10.3.7",
-      "status": "active"
+      "version": "10.4.3",
+      "status": "active",
+      "managed_by": "wporg"
     },
     {
       "slug": "woocommerce-payments",
       "version": "10.4.0",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "woocommerce-products-filter",
       "version": "1.3.7.4",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "slug": "wp-reset",
       "version": "2.06",
-      "status": "active"
+      "status": "active",
+      "managed_by": "wporg"
     }
   ],
   "themes": [
     {
       "stylesheet": "astra",
       "version": "4.11.15",
-      "status": "parent"
+      "status": "parent",
+      "managed_by": "wporg"
+    },
+    {
+      "stylesheet": "astra-child",
+      "version": "1.0.0",
+      "status": "active",
+      "managed_by": "git"
     },
     {
       "stylesheet": "twentytwentyfive",
       "version": "1.3",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "stylesheet": "twentytwentyfour",
       "version": "1.3",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     },
     {
       "stylesheet": "twentytwentythree",
       "version": "1.6",
-      "status": "inactive"
+      "status": "inactive",
+      "managed_by": "wporg"
     }
   ],
   "skip_plugins": [
