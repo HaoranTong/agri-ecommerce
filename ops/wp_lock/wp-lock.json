@@ -1,21 +1,21 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-01-16T09:31:24Z",
-  "core_version": "6.8.3",
+  "generated_at": "2026-01-16T10:46:35Z",
+  "core_version": "6.9",
   "plugins": [
     {
       "slug": "advanced-woo-labels",
-      "version": "2.30",
+      "version": "2.33",
       "status": "inactive"
     },
     {
       "slug": "astra-sites",
-      "version": "4.4.43",
+      "version": "4.4.47",
       "status": "active"
     },
     {
       "slug": "cartflows",
-      "version": "2.1.17",
+      "version": "2.1.19",
       "status": "active"
     },
     {
@@ -30,12 +30,12 @@
     },
     {
       "slug": "flexible-shipping",
-      "version": "6.4.3",
+      "version": "6.5.3",
       "status": "inactive"
     },
     {
       "slug": "header-footer-elementor",
-      "version": "2.7.0",
+      "version": "2.8.1",
       "status": "active"
     },
     {
@@ -55,17 +55,17 @@
     },
     {
       "slug": "loco-translate",
-      "version": "2.8.0",
+      "version": "2.8.1",
       "status": "active"
     },
     {
       "slug": "modern-cart",
-      "version": "1.0.4",
+      "version": "1.0.6",
       "status": "active"
     },
     {
       "slug": "sureforms",
-      "version": "2.0.1",
+      "version": "2.0.2",
       "status": "inactive"
     },
     {
@@ -75,27 +75,27 @@
     },
     {
       "slug": "woo-cart-abandonment-recovery",
-      "version": "2.0.4",
+      "version": "2.0.5",
       "status": "inactive"
     },
     {
       "slug": "woo-extra-product-options",
-      "version": "3.3.3",
+      "version": "3.3.4",
       "status": "inactive"
     },
     {
       "slug": "woocommerce",
-      "version": "10.3.5",
+      "version": "10.3.7",
       "status": "active"
     },
     {
       "slug": "woocommerce-payments",
-      "version": "10.2.0",
+      "version": "10.4.0",
       "status": "inactive"
     },
     {
       "slug": "woocommerce-products-filter",
-      "version": "1.3.7.3",
+      "version": "1.3.7.4",
       "status": "inactive"
     },
     {
