@@ -207,7 +207,7 @@ ps -ef | egrep "mysqld|mariadb" | grep -v grep || true
 
 确保 `wp-config.php` 的 `DB_HOST` 与宝塔 MySQL socket 一致（例如 `localhost:/tmp/mysql.sock`），且不要重复定义。
 
-下面这份就是 staging vs prod hooks 脚本差异点核对清单（≤10 行），你直接粘到部署操作手册末尾即可：
+）下面是 staging/prod hooks 脚本差异点核对清单（≤10 行，可直接贴到手册末尾）：
 
 DEPLOY_ENV：staging=staging；prod=prod
 
@@ -221,10 +221,10 @@ TARGET_BRANCH：staging=trial；prod=master
 
 HEALTH_CHECK_HOST：staging=staging.fanbaoer.com；prod=fanbaoer.com
 
-STATE_FILE：由 DEPLOY_ENV + TARGET_BRANCH 自动区分（不用手改，但要确认路径格式一致）
+STATE_FILE：必须包含 DEPLOY_ENV + TARGET_BRANCH，确保 staging/prod 互不干扰（示例：/tmp/fanbaoer_deploy_${DEPLOY_ENV}_${TARGET_BRANCH}_last_published）
 
-并发锁 LOCK_DIR：建议分别命名（staging 用 staging.lockdir；prod 用 prod.lockdir）
+LOCK_DIR：必须环境隔离（staging 用 ...staging.lockdir；prod 用 ...prod.lockdir），避免互相“误判正在部署”
 
-其他配置应保持一致：REPO_URL / NGINX_RELOAD_CMD / 白名单(ALLOW_*) / WP_CLI / WP-Lock 路径(ops/wp_lock/...)
+白名单发布项必须一致：ALLOW_THEME_CHILD=astra-child、ALLOW_PLUGIN_CORE=myshop-core、ALLOW_LANG_LOCO=loco
 
-一致性验收：日志必须同时出现 ✅ 发布完成（白名单） + ✅ WP-Lock 对齐完成 + ✅ 健康检查通过
+验收标准一致：日志需同时出现 ✅ 发布完成（白名单） + ✅ WP-Lock 对齐完成 + ✅ 健康检查通过 + 更新 STATE_FILE
