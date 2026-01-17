@@ -1,308 +1,194 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""ops/wp_lock/export_lock.py
+
+WordPress 锁文件导出工具（站点 -> wp-lock.json）
+
+目标
+- 以“线下站点”为基线，导出可用于线上严格同步的 lock 文件。
+- **只导出 active 插件**（符合主线：线上只安装激活插件，未激活全部删除）。
+- **只导出 active 主题**，并自动补齐其父主题（template）为 required（父主题必须保留，否则 child theme 无法工作）。
+- 支持标记 git/自研白名单：skip_plugins / skip_themes（不会被 apply_lock 安装/删除，但可对齐启停）。
+
+输出 schema
+- schema_version: 2
+- core_version: str
+- plugins: [{name, version, status:"active"}]
+- themes: [{stylesheet, version, status:"active"|"required"}]
+- skip_plugins / skip_themes: [str]
+
+使用示例（在线下站点目录执行）
+  python3 ops/wp_lock/export_lock.py \
+    --wp /usr/local/bin/wp --allow-root \
+    --site-dir /www/wwwroot/staging.fanbaoer.com \
+    --out ops/wp_lock/wp-lock.json \
+    --skip-plugin myshop-core \
+    --skip-theme astra-child \
+    --verbose
 """
-File: export_lock.py
-Path: ops/wp_lock/export_lock.py
-Purpose:
-  从“线下（本地）WordPress 站点”导出 Core / 插件 / 主题 的版本与启停状态锁定文件 wp-lock.json。
 
-Important (与你最新冻结要求一致):
-  1) 线下为真源：线上必须与线下绝对一致（版本 + 启停 + 删除未启用/多余项）。
-  2) 自研项（Git 白名单发布）仍需要纳入 lock 的“启停状态对齐”：
-     - 在 lock 中保留它们（包含 version/status）
-     - 但标记 managed_by="git"，提示 apply_lock 不负责安装/更新/卸载，只负责启停对齐。
-
-Design goals:
-  - Windows 兼容：wp-cli 常为 .bat/.cmd，使用 cmd.exe /c 更稳定
-  - 字段兼容：wp-cli list 的 --fields 在不同环境字段可能不同，本脚本自动探测 fields 组合并回退
-  - lock schema_version=2
-
-Usage (Windows / Laragon):
-  python ops\\wp_lock\\export_lock.py --site-dir "E:\\laragon\\www\\agri-ecommerce" --out "ops\\wp_lock\\wp-lock.json"
-  指定 wp-cli：
-  python ops\\wp_lock\\export_lock.py --wp "E:\\wp-cli\\wp.bat" --site-dir "..." --out "..."
-  开启探测日志（首次推荐）：
-  python ops\\wp_lock\\export_lock.py --verbose --site-dir "..." --out "..."
-"""
+from __future__ import annotations
 
 import argparse
-import datetime as dt
 import json
 import os
 import subprocess
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 
-def _default_wp_bin() -> str:
-    """
-    Provide a robust default for wp-cli command.
-    - Windows: prefer the known wp.bat path if it exists
-    - Others : use 'wp'
-    """
-    if os.name == "nt":
-        candidate = r"E:\wp-cli\wp.bat"
-        if os.path.exists(candidate):
-            return candidate
-    return "wp"
+def _norm_path(p: str) -> str:
+    return os.path.abspath(os.path.expanduser(p.strip()))
 
 
-def _build_wp_cmd(wp_bin: str, site_dir: str, args: List[str]) -> List[str]:
-    """
-    Build wp-cli command.
-    On Windows, wrap by cmd.exe /c to reliably run .bat/.cmd.
-    """
-    base = [wp_bin, f"--path={site_dir}", "--skip-plugins", "--skip-themes"] + args
-    if os.name == "nt":
-        return [r"C:\Windows\System32\cmd.exe", "/c"] + base
-    return base
-
-
-def _is_invalid_field_error(output: str) -> bool:
-    lowered = output.lower()
-    return "invalid field" in lowered
-
-
-def run_wp(wp_bin: str, site_dir: str, args: List[str]) -> str:
-    cmd = _build_wp_cmd(wp_bin, site_dir, args)
-    try:
-        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        return out.decode("utf-8", errors="replace").strip()
-    except subprocess.CalledProcessError as exc:
-        msg = exc.output.decode("utf-8", errors="replace") if exc.output else str(exc)
-        raise RuntimeError(f"wp-cli failed: {' '.join(cmd)}\n{msg}") from exc
-
-
-def run_wp_json(wp_bin: str, site_dir: str, args: List[str]) -> List[Dict[str, Any]]:
-    raw = run_wp(wp_bin, site_dir, args)
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            "wp-cli returned non-JSON output when JSON was expected.\n"
-            f"Command: {args}\n"
-            f"Output(head 500): {raw[:500]}"
-        ) from exc
-
-    if not isinstance(data, list):
-        raise RuntimeError(
-            "wp-cli JSON output is not a list.\n"
-            f"Command: {args}\n"
-            f"Type: {type(data)}\n"
-            f"Output(head 500): {raw[:500]}"
-        )
-
-    rows: List[Dict[str, Any]] = []
-    for item in data:
-        if isinstance(item, dict):
-            rows.append(item)
-    return rows
-
-
-def _try_list_json_with_fields(
-    wp_bin: str,
-    site_dir: str,
-    base_args: List[str],
-    fields_candidates: Sequence[Sequence[str]],
-    verbose: bool,
-) -> Tuple[List[Dict[str, Any]], str]:
-    """
-    Try to run list command with several --fields combinations, fallback to no --fields.
-    Returns (rows, used_strategy_desc).
-
-    base_args must include the subcommand and should include '--format=json'.
-    """
-    args_has_format = any(a.startswith("--format=") for a in base_args)
-    safe_base = base_args[:] if args_has_format else base_args + ["--format=json"]
-
-    for fields in fields_candidates:
-        fields_arg = f"--fields={','.join(fields)}"
-        cmd_args = safe_base + [fields_arg]
-        try:
-            rows = run_wp_json(wp_bin, site_dir, cmd_args)
-            desc = f"fields={','.join(fields)}"
-            if verbose:
-                print(f"[export_lock] list ok with {desc}")
-            return rows, desc
-        except RuntimeError as exc:
-            msg = str(exc)
-            if _is_invalid_field_error(msg):
-                if verbose:
-                    print(
-                        f"[export_lock] list failed with fields={','.join(fields)} "
-                        "(invalid field), try next"
-                    )
-                continue
-            raise
-
-    rows = run_wp_json(wp_bin, site_dir, safe_base)
-    desc = "no-fields"
+def _run(cmd: List[str], verbose: bool = False) -> str:
     if verbose:
-        print("[export_lock] list ok with no --fields (fallback)")
-    return rows, desc
+        print(f"[export_lock] run: {' '.join(cmd)}")
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(f"wp-cli failed: {' '.join(cmd)}\n{err}")
+    return (proc.stdout or "").strip()
 
 
-def _pick_first_key(row: Dict[str, Any], keys: Sequence[str]) -> Optional[str]:
-    for k in keys:
-        v = row.get(k)
+def _run_json(cmd: List[str], verbose: bool = False) -> List[Dict[str, Any]]:
+    out = _run(cmd, verbose=verbose)
+    if not out:
+        return []
+    data = json.loads(out)
+    if isinstance(data, list):
+        return [x for x in data if isinstance(x, dict)]
+    raise ValueError("Unexpected JSON output (not a list)")
+
+
+def _build_wp_cmd(wp_bin: str, site_dir: str, allow_root: bool, args: List[str]) -> List[str]:
+    cmd = [wp_bin]
+    if allow_root:
+        cmd.append("--allow-root")
+    cmd.append(f"--path={site_dir}")
+    cmd.extend(args)
+    return cmd
+
+
+def _strip_php_suffix(s: str) -> str:
+    s = s.strip()
+    if s.lower().endswith(".php"):
+        return s[:-4]
+    return s
+
+
+def _pick_plugin_id(item: Dict[str, Any]) -> str:
+    # wp-cli 常见字段：name / plugin（可能是 hello.php 或 hello-dolly/hello.php）
+    for k in ("name", "slug"):
+        v = item.get(k)
+        if isinstance(v, str) and v.strip():
+            return _strip_php_suffix(v.strip())
+
+    v = item.get("plugin")
+    if isinstance(v, str) and v.strip():
+        base = v.strip().split("/", 1)[0]
+        return _strip_php_suffix(base)
+
+    return ""
+
+
+def _pick_theme_id(item: Dict[str, Any]) -> str:
+    for k in ("stylesheet", "name"):
+        v = item.get(k)
         if isinstance(v, str) and v.strip():
             return v.strip()
-    return None
+    return ""
 
 
-def _normalize_plugins(
-    rows: List[Dict[str, Any]],
-    git_plugins: Sequence[str],
-) -> List[Dict[str, Any]]:
-    """
-    Normalize plugin rows to stable schema:
-      {"slug": <plugin-dir>, "version": <ver>, "status": <status>, "managed_by": "wporg|git"}
-    Candidate id keys: slug/name/plugin
-    """
-    git_set = {str(x).strip() for x in (git_plugins or []) if str(x).strip()}
-    normalized: List[Dict[str, Any]] = []
-    for r in rows:
-        slug = _pick_first_key(r, ["slug", "name", "plugin"])
-        if not slug:
-            continue
-        version = str(r.get("version", "") or "").strip()
-        status = str(r.get("status", "") or "").strip()
-        managed_by = "git" if slug in git_set else "wporg"
-        normalized.append(
-            {
-                "slug": slug,
-                "version": version,
-                "status": status,
-                "managed_by": managed_by,
-            }
-        )
-    return normalized
-
-
-def _normalize_themes(
-    rows: List[Dict[str, Any]],
-    git_themes: Sequence[str],
-) -> List[Dict[str, Any]]:
-    """
-    Normalize theme rows to stable schema:
-      {"stylesheet": <theme-dir>, "version": <ver>, "status": <status>, "managed_by": "wporg|git"}
-    Candidate id keys: stylesheet/name/theme
-    """
-    git_set = {str(x).strip() for x in (git_themes or []) if str(x).strip()}
-    normalized: List[Dict[str, Any]] = []
-    for r in rows:
-        stylesheet = _pick_first_key(r, ["stylesheet", "name", "theme"])
-        if not stylesheet:
-            continue
-        version = str(r.get("version", "") or "").strip()
-        status = str(r.get("status", "") or "").strip()
-        managed_by = "git" if stylesheet in git_set else "wporg"
-        normalized.append(
-            {
-                "stylesheet": stylesheet,
-                "version": version,
-                "status": status,
-                "managed_by": managed_by,
-            }
-        )
-    return normalized
+def _version(item: Optional[Dict[str, Any]]) -> str:
+    if not item:
+        return ""
+    v = item.get("version")
+    return str(v).strip() if v is not None else ""
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--site-dir", required=True, help="本地 WP 站点根目录（含 wp-config.php）")
-    parser.add_argument("--out", required=True, help="输出 lock 文件路径")
-    parser.add_argument("--wp", default=_default_wp_bin(), help="wp-cli 命令（默认自动判断）")
-
-    # 为兼容旧参数名：仍叫 skip，但语义改为“Git 管理项清单”
-    parser.add_argument(
-        "--skip-plugin",
-        action="append",
-        default=["myshop-core"],
-        help="Git 管理的插件（不走 wp-cli 安装/更新/卸载，但要写入 lock 以便启停对齐）",
-    )
-    parser.add_argument(
-        "--skip-theme",
-        action="append",
-        default=["astra-child"],
-        help="Git 管理的主题（不走 wp-cli 安装/更新/卸载，但要写入 lock 以便启停对齐）",
-    )
-
-    parser.add_argument("--verbose", action="store_true", help="输出探测过程（建议首次测试开启）")
+    parser = argparse.ArgumentParser(description="Export wp-lock.json from a WordPress site (active-only).")
+    parser.add_argument("--wp", required=True, help="Path to wp-cli binary")
+    parser.add_argument("--allow-root", action="store_true", help="Pass --allow-root to wp-cli")
+    parser.add_argument("--site-dir", required=True, help="WordPress site path (the WP root)")
+    parser.add_argument("--out", required=True, help="Output lock file path (e.g. ops/wp_lock/wp-lock.json)")
+    parser.add_argument("--skip-plugin", action="append", default=[], help="Git-managed/custom plugin slug to skip install/delete (repeatable)")
+    parser.add_argument("--skip-theme", action="append", default=[], help="Git-managed/custom theme stylesheet to skip install/delete (repeatable)")
+    parser.add_argument("--verbose", action="store_true", help="Verbose logs")
     args = parser.parse_args()
 
-    site_dir = os.path.abspath(args.site_dir)
-    out_path = os.path.abspath(args.out)
+    wp_bin = _norm_path(args.wp)
+    site_dir = _norm_path(args.site_dir)
+    out_file = _norm_path(args.out)
+    verbose = bool(args.verbose)
+    allow_root = bool(args.allow_root)
 
-    # Probe wp-cli (fail fast)
-    _ = run_wp(args.wp, site_dir, ["--info"])
+    # core
+    core_version = _run(_build_wp_cmd(wp_bin, site_dir, allow_root, ["core", "version"]), verbose=verbose).strip()
 
-    # Core version
-    core_version = run_wp(args.wp, site_dir, ["core", "version"]).strip()
+    # plugins (active-only)
+    plugin_list = _run_json(_build_wp_cmd(wp_bin, site_dir, allow_root, ["plugin", "list", "--format=json"]), verbose=verbose)
+    exported_plugins: List[Dict[str, Any]] = []
+    for p in plugin_list:
+        pid = _pick_plugin_id(p)
+        status = str(p.get("status") or "").strip().lower()
+        if not pid or status != "active":
+            continue
+        exported_plugins.append({"name": pid, "version": _version(p), "status": "active"})
 
-    # Active theme info (DB options)
-    active_theme = run_wp(args.wp, site_dir, ["option", "get", "stylesheet"]).strip()
-    parent_theme = run_wp(args.wp, site_dir, ["option", "get", "template"]).strip()
+    exported_plugins.sort(key=lambda x: x["name"])
 
-    # Plugin list: auto-detect fields, then fallback
-    plugin_fields_candidates = [
-        ("name", "version", "status"),
-        ("slug", "version", "status"),
-        ("plugin", "version", "status"),
-    ]
-    plugins_rows, plugin_strategy = _try_list_json_with_fields(
-        args.wp,
-        site_dir,
-        base_args=["plugin", "list", "--format=json"],
-        fields_candidates=plugin_fields_candidates,
-        verbose=args.verbose,
-    )
-    plugins = _normalize_plugins(plugins_rows, git_plugins=args.skip_plugin)
+    # themes：只导出 active + 自动补 parent 为 required
+    theme_list = _run_json(_build_wp_cmd(wp_bin, site_dir, allow_root, ["theme", "list", "--format=json"]), verbose=verbose)
+    theme_index: Dict[str, Dict[str, Any]] = {}
+    active_theme_id = ""
+    for t in theme_list:
+        tid = _pick_theme_id(t)
+        if not tid:
+            continue
+        theme_index[tid] = t
+        status = str(t.get("status") or "").strip().lower()
+        if status == "active":
+            active_theme_id = tid
 
-    # Theme list: auto-detect fields, then fallback
-    theme_fields_candidates = [
-        ("name", "version", "status"),
-        ("stylesheet", "version", "status"),
-        ("theme", "version", "status"),
-    ]
-    themes_rows, theme_strategy = _try_list_json_with_fields(
-        args.wp,
-        site_dir,
-        base_args=["theme", "list", "--format=json"],
-        fields_candidates=theme_fields_candidates,
-        verbose=args.verbose,
-    )
-    themes = _normalize_themes(themes_rows, git_themes=args.skip_theme)
+    exported_themes: List[Dict[str, Any]] = []
+    if active_theme_id:
+        exported_themes.append({"stylesheet": active_theme_id, "version": _version(theme_index.get(active_theme_id)), "status": "active"})
 
-    # Sort for stability
-    plugins = sorted(plugins, key=lambda x: x.get("slug", ""))
-    themes = sorted(themes, key=lambda x: x.get("stylesheet", ""))
+        # 通过 theme get 获取 template（父主题）
+        try:
+            info_raw = _run(_build_wp_cmd(wp_bin, site_dir, allow_root, ["theme", "get", active_theme_id, "--format=json"]), verbose=verbose)
+            info = json.loads(info_raw) if info_raw else {}
+            parent_id = str(info.get("template") or "").strip() if isinstance(info, dict) else ""
+        except Exception:
+            parent_id = ""
 
-    git_plugins = sorted({str(x).strip() for x in (args.skip_plugin or []) if str(x).strip()})
-    git_themes = sorted({str(x).strip() for x in (args.skip_theme or []) if str(x).strip()})
+        if parent_id and parent_id != active_theme_id:
+            exported_themes.append({"stylesheet": parent_id, "version": _version(theme_index.get(parent_id)), "status": "required"})
+
+    # skip lists
+    skip_plugins = sorted({_strip_php_suffix(str(x).strip()) for x in args.skip_plugin if str(x).strip()})
+    skip_themes = sorted({str(x).strip() for x in args.skip_theme if str(x).strip()})
 
     lock: Dict[str, Any] = {
         "schema_version": 2,
-        "generated_at": dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "core_version": core_version,
-        "site_meta": {
-            "active_theme": active_theme,
-            "parent_theme": parent_theme,
-        },
-        "plugins": plugins,
-        "themes": themes,
-        "skip_plugins": git_plugins,
-        "skip_themes": git_themes,
-        "export_meta": {
-            "plugin_list_strategy": plugin_strategy,
-            "theme_list_strategy": theme_strategy,
-        },
+        "plugins": exported_plugins,
+        "themes": exported_themes,
+        "skip_plugins": skip_plugins,
+        "skip_themes": skip_themes,
     }
 
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    with open(out_file, "w", encoding="utf-8") as f:
         json.dump(lock, f, ensure_ascii=False, indent=2)
+        f.write("\n")
 
-    print(f"OK -> {out_path}")
+    print(f"[export_lock] site={site_dir}")
+    print(f"[export_lock] out={out_file}")
+    print(f"[export_lock] core={core_version}")
+    print(f"[export_lock] plugins(active)={len(exported_plugins)} themes={len(exported_themes)}")
 
 
 if __name__ == "__main__":
