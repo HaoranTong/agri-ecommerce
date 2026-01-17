@@ -16,7 +16,8 @@ class MyShop_Loader {
             'api/referral-controller.php',
             'api/commission-controller.php',
             'api/agent-controller.php',
-            'api/coupon-controller.php'
+            'api/coupon-controller.php',
+            'api/promo-controller.php'
         ];
 
         foreach ($includes as $relative_path) {
@@ -51,7 +52,8 @@ class MyShop_Loader {
             'Referral_Controller',
             'Commission_Controller',
             'Agent_Controller',
-            'Coupon_Controller'
+            'Coupon_Controller',
+            'Promo_Controller'
         ];
 
         foreach ($controllers as $controller) {

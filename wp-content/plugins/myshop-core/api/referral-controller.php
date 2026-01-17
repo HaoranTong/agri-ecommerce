@@ -8,6 +8,17 @@ class Referral_Controller {
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
 
+        register_rest_route('myshop/v1', '/referrals/my-downlines', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'list_downlines'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'page'     => ['type' => 'integer', 'default' => 1],
+                'per_page' => ['type' => 'integer', 'default' => 20],
+                'level'    => ['type' => 'integer', 'required' => false]
+            ]
+        ]);
+
         register_rest_route('myshop/v1', '/referral/members', [
             'methods'  => \WP_REST_Server::READABLE,
             'callback' => [self::class, 'list_members'],
@@ -36,6 +47,104 @@ class Referral_Controller {
             'success' => true,
             'data' => [
                 'referral_code' => self::ensure_referral_code($user->ID)
+            ]
+        ]);
+    }
+
+    public static function list_downlines($request) {
+        global $wpdb;
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $table = $wpdb->prefix . 'myshop_referrals';
+        $users_table = $wpdb->users;
+
+        $user_id = (int) $user->ID;
+        $page = max(1, absint($request->get_param('page') ?: 1));
+        $per_page = absint($request->get_param('per_page') ?: 20);
+        if ($per_page > 100) {
+            $per_page = 100;
+        } elseif ($per_page < 1) {
+            $per_page = 20;
+        }
+
+        $level_filter = $request->get_param('level');
+        $where = ['inviter_id = %d'];
+        $params = [$user_id];
+        if ($level_filter !== null && $level_filter !== '') {
+            $where[] = 'level = %d';
+            $params[] = absint($level_filter);
+        }
+        $where_sql = 'WHERE ' . implode(' AND ', $where);
+
+        $total = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} {$where_sql}",
+            ...$params
+        ));
+
+        $offset = ($page - 1) * $per_page;
+        $params_with_limit = array_merge($params, [$per_page, $offset]);
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT r.invitee_id, r.level, r.first_order_status, r.created_at, r.channel_code,
+                    u.user_registered
+             FROM {$table} r
+             LEFT JOIN {$users_table} u ON u.ID = r.invitee_id
+             {$where_sql}
+             ORDER BY r.created_at DESC
+             LIMIT %d OFFSET %d",
+            ...$params_with_limit
+        ));
+
+        $downlines = [];
+        foreach ($rows as $row) {
+            $invitee_id = (int) $row->invitee_id;
+            $phone = get_user_meta($invitee_id, 'billing_phone', true);
+            if (!$phone) {
+                $phone = get_user_meta($invitee_id, 'phone', true);
+            }
+
+            $orders_info = self::get_user_order_stats($invitee_id);
+
+            $downlines[] = [
+                'user_id'            => $invitee_id,
+                'phone'              => self::mask_phone($phone),
+                'registered_at'      => $row->user_registered ?: null,
+                'level'              => (int) $row->level,
+                'first_order_status' => $row->first_order_status,
+                'total_orders'       => $orders_info['count'],
+                'lifetime_value'     => $orders_info['lifetime_value'],
+                'channel_code'       => $row->channel_code ?: null
+            ];
+        }
+
+        $level1_count = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE inviter_id = %d AND level = 1",
+            $user_id
+        ));
+        $level2_count = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE inviter_id = %d AND level = 2",
+            $user_id
+        ));
+        $first_order_completed = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE inviter_id = %d AND first_order_status = 'completed'",
+            $user_id
+        ));
+
+        return rest_ensure_response([
+            'downlines' => $downlines,
+            'summary' => [
+                'level1_count' => $level1_count,
+                'level2_count' => $level2_count,
+                'first_order_completed' => $first_order_completed
+            ],
+            'pagination' => [
+                'page'        => $page,
+                'per_page'    => $per_page,
+                'total'       => $total,
+                'total_pages' => $per_page ? (int) ceil($total / $per_page) : 1
             ]
         ]);
     }
@@ -181,12 +290,52 @@ class Referral_Controller {
         ]);
     }
 
-    private static function ensure_referral_code($user_id) {
+    public static function ensure_referral_code($user_id) {
         $code = get_user_meta($user_id, 'myshop_referral_code', true);
         if (!$code) {
             $code = 'U' . $user_id . strtoupper(wp_generate_password(4, false));
             update_user_meta($user_id, 'myshop_referral_code', $code);
         }
         return $code;
+    }
+
+    private static function mask_phone($phone) {
+        if (!is_string($phone) || $phone === '') {
+            return null;
+        }
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (strlen($digits) < 7) {
+            return $phone;
+        }
+        return substr($digits, 0, 3) . '****' . substr($digits, -4);
+    }
+
+    private static function get_user_order_stats($user_id) {
+        if (!function_exists('wc_get_orders')) {
+            return [
+                'count' => 0,
+                'lifetime_value' => '0.00'
+            ];
+        }
+
+        $orders = wc_get_orders([
+            'customer_id' => $user_id,
+            'status'      => ['processing', 'completed', 'on-hold', 'pending'],
+            'limit'       => -1,
+            'return'      => 'ids'
+        ]);
+
+        $total = 0.0;
+        foreach ($orders as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $total += (float) $order->get_total();
+            }
+        }
+
+        return [
+            'count' => count($orders),
+            'lifetime_value' => number_format($total, 2, '.', '')
+        ];
     }
 }

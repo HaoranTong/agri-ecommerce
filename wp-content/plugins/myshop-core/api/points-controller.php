@@ -52,6 +52,36 @@ class Points_Controller {
             'callback' => [self::class, 'get_rules'],
             'permission_callback' => '__return_true'
         ]);
+
+        register_rest_route('myshop/v1', '/points/missions', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_missions'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+
+        register_rest_route('myshop/v1', '/points/missions/(?P<mission_id>[A-Za-z0-9_-]+)/claim', [
+            'methods'  => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'claim_mission'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'mission_id' => ['required' => true, 'type' => 'string']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/points/redeem/options', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_redeem_options'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+
+        register_rest_route('myshop/v1', '/points/redeem', [
+            'methods'  => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'redeem'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'option_id' => ['required' => true, 'type' => 'string']
+            ]
+        ]);
     }
 
     public static function get_balance($request) {
@@ -225,6 +255,309 @@ class Points_Controller {
             'data' => [
                 'new_balance' => $balance_after,
                 'deducted'    => $points
+            ]
+        ]);
+    }
+
+    public static function get_missions($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $missions = get_option('myshop_points_missions', []);
+        if (!is_array($missions)) {
+            $missions = [];
+        }
+
+        $claimed = get_user_meta($user->ID, '_myshop_points_missions_claimed', true);
+        if (!is_array($claimed)) {
+            $claimed = [];
+        }
+
+        $now = current_time('timestamp');
+        $result = [];
+
+        foreach ($missions as $mission) {
+            if (!is_array($mission)) {
+                continue;
+            }
+
+            $mission_id = $mission['mission_id'] ?? ($mission['id'] ?? null);
+            if (!$mission_id) {
+                continue;
+            }
+
+            $expires_at = $mission['expires_at'] ?? null;
+            $is_expired = false;
+            if ($expires_at) {
+                $expires_ts = strtotime($expires_at);
+                $is_expired = $expires_ts && $expires_ts < $now;
+            }
+
+            $is_claimed = isset($claimed[$mission_id]);
+            $status = $is_claimed ? 'completed' : ($is_expired ? 'expired' : ($mission['status'] ?? 'available'));
+            $completed_at = $is_claimed ? ($claimed[$mission_id]['completed_at'] ?? null) : null;
+
+            $result[] = [
+                'mission_id' => $mission_id,
+                'title' => $mission['title'] ?? '',
+                'description' => $mission['description'] ?? '',
+                'reward_points' => (int) ($mission['reward_points'] ?? 0),
+                'status' => $status,
+                'progress' => (int) ($mission['progress'] ?? 0),
+                'goal' => (int) ($mission['goal'] ?? 1),
+                'expires_at' => $expires_at,
+                'completed_at' => $completed_at
+            ];
+        }
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => $result
+        ]);
+    }
+
+    public static function claim_mission($request) {
+        global $wpdb;
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $mission_id = sanitize_text_field($request->get_param('mission_id'));
+        if (!$mission_id) {
+            return new WP_Error('missing_mission_id', '缺少任务 ID', ['status' => 400]);
+        }
+
+        $missions = get_option('myshop_points_missions', []);
+        if (!is_array($missions)) {
+            $missions = [];
+        }
+
+        $mission = null;
+        foreach ($missions as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $item_id = $item['mission_id'] ?? ($item['id'] ?? null);
+            if ($item_id === $mission_id) {
+                $mission = $item;
+                break;
+            }
+        }
+
+        if (!$mission) {
+            return new WP_Error('mission_not_found', '任务不存在', ['status' => 404]);
+        }
+
+        if (isset($mission['status']) && $mission['status'] === 'disabled') {
+            return new WP_Error('mission_unavailable', '任务暂不可领取', ['status' => 409]);
+        }
+
+        $expires_at = $mission['expires_at'] ?? null;
+        if ($expires_at && strtotime($expires_at) < current_time('timestamp')) {
+            return new WP_Error('mission_expired', '任务已过期', ['status' => 410]);
+        }
+
+        $claimed = get_user_meta($user->ID, '_myshop_points_missions_claimed', true);
+        if (!is_array($claimed)) {
+            $claimed = [];
+        }
+
+        if (isset($claimed[$mission_id])) {
+            return new WP_Error('mission_already_claimed', '任务奖励已领取', ['status' => 409]);
+        }
+
+        $points = (int) ($mission['reward_points'] ?? 0);
+        if ($points <= 0) {
+            return new WP_Error('invalid_reward_points', '奖励积分无效', ['status' => 400]);
+        }
+
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $available = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+            $user->ID
+        ));
+
+        $balance_after = $available + $points;
+        $inserted = $wpdb->insert(
+            $table,
+            [
+                'user_id'       => $user->ID,
+                'type'          => 'earn',
+                'delta'         => $points,
+                'balance_after' => $balance_after,
+                'status'        => 'confirmed',
+                'channel'       => 'mission_reward',
+                'reservation_id'=> $mission_id,
+                'created_at'    => current_time('mysql'),
+                'updated_at'    => current_time('mysql')
+            ],
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s']
+        );
+
+        if ($inserted === false) {
+            return new WP_Error('mission_claim_failed', '任务奖励发放失败', ['status' => 500]);
+        }
+
+        $claimed[$mission_id] = [
+            'completed_at' => current_time('mysql')
+        ];
+        update_user_meta($user->ID, '_myshop_points_missions_claimed', $claimed);
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'mission_id' => $mission_id,
+                'awarded_points' => $points,
+                'new_balance' => $balance_after
+            ]
+        ]);
+    }
+
+    public static function get_redeem_options($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $options = get_option('myshop_points_redeem_options', []);
+        if (!is_array($options)) {
+            $options = [];
+        }
+
+        $result = [];
+        foreach ($options as $option) {
+            if (!is_array($option)) {
+                continue;
+            }
+            $option_id = $option['option_id'] ?? ($option['id'] ?? null);
+            if (!$option_id) {
+                continue;
+            }
+
+            $result[] = [
+                'option_id' => $option_id,
+                'type' => $option['type'] ?? 'coupon',
+                'title' => $option['title'] ?? '',
+                'cost_points' => (int) ($option['cost_points'] ?? 0),
+                'stock' => isset($option['stock']) ? (int) $option['stock'] : null,
+                'description' => $option['description'] ?? '',
+                'status' => $option['status'] ?? 'active'
+            ];
+        }
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => $result
+        ]);
+    }
+
+    public static function redeem($request) {
+        global $wpdb;
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $params = $request->get_json_params();
+        $option_id = isset($params['option_id']) ? sanitize_text_field($params['option_id']) : '';
+        if ($option_id === '') {
+            return new WP_Error('missing_option_id', '缺少兑换项 ID', ['status' => 400]);
+        }
+
+        $options = get_option('myshop_points_redeem_options', []);
+        if (!is_array($options)) {
+            $options = [];
+        }
+
+        $option_index = null;
+        $option = null;
+        foreach ($options as $index => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $item_id = $item['option_id'] ?? ($item['id'] ?? null);
+            if ($item_id === $option_id) {
+                $option = $item;
+                $option_index = $index;
+                break;
+            }
+        }
+
+        if (!$option) {
+            return new WP_Error('option_not_found', '兑换项不存在', ['status' => 404]);
+        }
+
+        if (isset($option['status']) && $option['status'] !== 'active') {
+            return new WP_Error('option_unavailable', '兑换项不可用', ['status' => 409]);
+        }
+
+        $cost_points = (int) ($option['cost_points'] ?? 0);
+        if ($cost_points <= 0) {
+            return new WP_Error('invalid_cost_points', '兑换积分无效', ['status' => 400]);
+        }
+
+        if (isset($option['stock'])) {
+            $stock = (int) $option['stock'];
+            if ($stock <= 0) {
+                return new WP_Error('option_out_of_stock', '库存不足', ['status' => 409]);
+            }
+        }
+
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $available = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+            $user->ID
+        ));
+
+        if ($available < $cost_points) {
+            return new WP_Error('insufficient_points', '积分不足', ['status' => 409]);
+        }
+
+        $balance_after = $available - $cost_points;
+        $inserted = $wpdb->insert(
+            $table,
+            [
+                'user_id'       => $user->ID,
+                'type'          => 'spend',
+                'delta'         => -$cost_points,
+                'balance_after' => $balance_after,
+                'status'        => 'confirmed',
+                'channel'       => 'redeem',
+                'reservation_id'=> $option_id,
+                'created_at'    => current_time('mysql'),
+                'updated_at'    => current_time('mysql')
+            ],
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s']
+        );
+
+        if ($inserted === false) {
+            return new WP_Error('redeem_failed', '积分扣减失败', ['status' => 500]);
+        }
+
+        if (isset($option['stock']) && $option_index !== null) {
+            $options[$option_index]['stock'] = max(0, (int) $option['stock'] - 1);
+            update_option('myshop_points_redeem_options', $options);
+        }
+
+        $awarded_coupon_code = null;
+        if (($option['type'] ?? '') === 'coupon') {
+            $awarded_coupon_code = $option['coupon_code'] ?? null;
+        }
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'option_id' => $option_id,
+                'awarded_coupon_code' => $awarded_coupon_code,
+                // 兼容前端字段命名
+                'coupon_code' => $awarded_coupon_code,
+                'cost_points' => $cost_points,
+                'new_balance' => $balance_after
             ]
         ]);
     }

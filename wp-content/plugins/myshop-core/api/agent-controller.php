@@ -10,6 +10,12 @@ class Agent_Controller {
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
 
+        register_rest_route('myshop/v1', '/agents/me', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_me'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+
         register_rest_route('myshop/v1', '/agents/apply', [
             'methods'  => \WP_REST_Server::CREATABLE,
             'callback' => [self::class, 'apply'],
@@ -29,6 +35,28 @@ class Agent_Controller {
             'permission_callback' => ['MyShop_Auth', 'check_permission'],
             'args' => [
                 'agent_code' => ['required' => false, 'type' => 'string']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/agents/downlines', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'list_downlines'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'page'     => ['type' => 'integer', 'default' => 1],
+                'per_page' => ['type' => 'integer', 'default' => 20],
+                'agent_code' => ['required' => false, 'type' => 'string']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/agents/commissions', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'list_commissions'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'page'     => ['type' => 'integer', 'default' => 1],
+                'per_page' => ['type' => 'integer', 'default' => 20],
+                'status'   => ['type' => 'string', 'required' => false]
             ]
         ]);
     }
@@ -92,6 +120,61 @@ class Agent_Controller {
                 'parent_agent_id'  => $primary_agent->parent_agent_id ? (int) $primary_agent->parent_agent_id : null,
                 'assignments'      => $assignments
             ]
+        ]);
+    }
+
+    public static function get_me($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        self::sync_agent_active_flags();
+
+        $agent_data = self::get_primary_agent_data($user->ID);
+        if (!$agent_data) {
+            return new WP_Error('agent_not_found', '您还不是代理商', ['status' => 404]);
+        }
+
+        $primary_agent = $agent_data['primary_agent'];
+        $assignments = $agent_data['assignments'];
+
+        $descendants = self::collect_descendant_agents($primary_agent->id);
+        $total_downline = count($descendants);
+
+        $team_stats = self::calculate_team_order_stats($descendants);
+
+        $commission_table = $GLOBALS['wpdb']->prefix . 'myshop_commissions';
+        $pending_commission = (float) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare(
+            "SELECT COALESCE(SUM(amount), 0) FROM {$commission_table}
+             WHERE commission_type = 'agent' AND (earner_id = %d OR agent_id = %d) AND status = 'pending'",
+            $user->ID,
+            $user->ID
+        ));
+
+        return rest_ensure_response([
+            'is_agent' => true,
+            'agent_code' => $primary_agent->agent_code,
+            'is_active' => (bool) $primary_agent->is_active,
+            'active_until' => $primary_agent->active_until,
+            'level' => (int) $primary_agent->level,
+            'parent_agent_id' => $primary_agent->parent_agent_id ? (int) $primary_agent->parent_agent_id : null,
+            'region_zone' => $primary_agent->region_zone,
+            'region_province' => $primary_agent->region_province,
+            'region_city' => $primary_agent->region_city,
+            'region_label' => self::combine_region($primary_agent->region_zone, $primary_agent->region_province, $primary_agent->region_city),
+            'status' => $primary_agent->status,
+            'joined_at' => $primary_agent->joined_at,
+            'total_downline_agents' => $total_downline,
+            'team_sales_amount' => $team_stats['amount'],
+            // 兼容前端字段命名
+            'total_sales_amount' => $team_stats['amount'],
+            'team_order_count' => $team_stats['count'],
+            'pending_commission_total' => number_format($pending_commission, 2, '.', ''),
+            'monthly_growth_rate' => '0%',
+            'targets' => $primary_agent->team_target ? json_decode($primary_agent->team_target, true) : null,
+            'recent_highlights' => [],
+            'assignments' => $assignments
         ]);
     }
 
@@ -296,6 +379,179 @@ class Agent_Controller {
         ]);
     }
 
+    public static function list_downlines($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        self::sync_agent_active_flags();
+
+        $agent_data = self::get_primary_agent_data($user->ID, $request->get_param('agent_code'));
+        if (!$agent_data) {
+            return new WP_Error('agent_not_found', '您还不是代理商', ['status' => 404]);
+        }
+
+        $primary_agent = $agent_data['primary_agent'];
+        $descendants = self::collect_descendant_agents($primary_agent->id);
+
+        $page = max(1, absint($request->get_param('page') ?: 1));
+        $per_page = absint($request->get_param('per_page') ?: 20);
+        if ($per_page > 100) {
+            $per_page = 100;
+        } elseif ($per_page < 1) {
+            $per_page = 20;
+        }
+
+        $total = count($descendants);
+        $offset = ($page - 1) * $per_page;
+        $paged = array_slice($descendants, $offset, $per_page);
+
+        $downlines = [];
+        foreach ($paged as $row) {
+            $member_user = get_userdata($row->agent_user_id);
+            $downlines[] = [
+                'agent_user_id' => (int) $row->agent_user_id,
+                'agent_code' => self::resolve_agent_code((int) $row->id),
+                'registered_at' => $member_user ? $member_user->user_registered : null,
+                'level' => (int) $row->level,
+                'status' => self::resolve_agent_status((int) $row->id),
+                'region_zone' => self::resolve_agent_field((int) $row->id, 'region_zone'),
+                'region_province' => self::resolve_agent_field((int) $row->id, 'region_province'),
+                'region_city' => self::resolve_agent_field((int) $row->id, 'region_city'),
+                'region_label' => self::combine_region(
+                    self::resolve_agent_field((int) $row->id, 'region_zone'),
+                    self::resolve_agent_field((int) $row->id, 'region_province'),
+                    self::resolve_agent_field((int) $row->id, 'region_city')
+                ),
+                'sales_amount' => '0.00',
+                'team_sales_amount' => '0.00',
+                'active_clients' => 0,
+                'last_active_at' => null,
+                'channel_code' => null
+            ];
+        }
+
+        $level1 = 0;
+        $level2 = 0;
+        foreach ($descendants as $row) {
+            if ((int) $row->depth === 1) {
+                $level1++;
+            } elseif ((int) $row->depth === 2) {
+                $level2++;
+            }
+        }
+
+        return rest_ensure_response([
+            'downlines' => $downlines,
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $per_page,
+                'total_pages' => $per_page ? (int) ceil($total / $per_page) : 1
+            ],
+            'summary' => [
+                'level1_count' => $level1,
+                'level2_count' => $level2,
+                'team_sales_amount' => '0.00'
+            ]
+        ]);
+    }
+
+    public static function list_commissions($request) {
+        global $wpdb;
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $table = $wpdb->prefix . 'myshop_commissions';
+        $page = max(1, absint($request->get_param('page') ?: 1));
+        $per_page = absint($request->get_param('per_page') ?: 20);
+        if ($per_page > 100) {
+            $per_page = 100;
+        } elseif ($per_page < 1) {
+            $per_page = 20;
+        }
+
+        $where = ["commission_type = 'agent'", '(earner_id = %d OR agent_id = %d)'];
+        $params = [$user->ID, $user->ID];
+
+        $status_param = $request->get_param('status');
+        if ($status_param) {
+            $status = sanitize_text_field($status_param);
+            $where[] = 'status = %s';
+            $params[] = $status;
+        }
+
+        $where_sql = 'WHERE ' . implode(' AND ', $where);
+        $total = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} {$where_sql}",
+            ...$params
+        ));
+
+        $offset = ($page - 1) * $per_page;
+        $params_with_limit = array_merge($params, [$per_page, $offset]);
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, order_id, amount, commission_type, status, settlement_batch, note, created_at
+             FROM {$table}
+             {$where_sql}
+             ORDER BY created_at DESC
+             LIMIT %d OFFSET %d",
+            ...$params_with_limit
+        ));
+
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) $row->id,
+                'order_id' => (int) $row->order_id,
+                'amount' => number_format((float) $row->amount, 2, '.', ''),
+                'commission_type' => $row->commission_type,
+                'status' => $row->status,
+                'created_at' => $row->created_at,
+                'settlement_batch' => $row->settlement_batch,
+                'note' => $row->note
+            ];
+        }
+
+        $summary_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT status, SUM(amount) AS total
+             FROM {$table}
+             WHERE commission_type = 'agent' AND (earner_id = %d OR agent_id = %d)
+             GROUP BY status",
+            $user->ID,
+            $user->ID
+        ));
+
+        $summary = [
+            'pending_total' => '0.00',
+            'approved_total' => '0.00',
+            'paid_total' => '0.00'
+        ];
+        foreach ($summary_rows as $row) {
+            if ($row->status === 'pending') {
+                $summary['pending_total'] = number_format((float) $row->total, 2, '.', '');
+            }
+            if ($row->status === 'approved') {
+                $summary['approved_total'] = number_format((float) $row->total, 2, '.', '');
+            }
+            if ($row->status === 'paid') {
+                $summary['paid_total'] = number_format((float) $row->total, 2, '.', '');
+            }
+        }
+
+        return rest_ensure_response([
+            'commissions' => $items,
+            'summary' => $summary,
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $per_page,
+                'total_pages' => $per_page ? (int) ceil($total / $per_page) : 1
+            ]
+        ]);
+    }
+
     private static function generate_unique_agent_code() {
         global $wpdb;
         $agent_table = $wpdb->prefix . 'myshop_agents';
@@ -309,6 +565,118 @@ class Agent_Controller {
         } while ($exists);
 
         return $code;
+    }
+
+    private static function get_primary_agent_data($user_id, $agent_code = '') {
+        global $wpdb;
+        $agent_table = $wpdb->prefix . 'myshop_agents';
+
+        if ($agent_code) {
+            $primary_agent = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$agent_table} WHERE agent_user_id = %d AND agent_code = %s LIMIT 1",
+                $user_id,
+                $agent_code
+            ));
+        } else {
+            $primary_agent = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$agent_table} WHERE agent_user_id = %d ORDER BY level DESC, joined_at DESC LIMIT 1",
+                $user_id
+            ));
+        }
+
+        if (!$primary_agent) {
+            return null;
+        }
+
+        $agents = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$agent_table} WHERE agent_user_id = %d ORDER BY level DESC, joined_at DESC",
+            $user_id
+        ));
+
+        $assignments = array_map(static function ($record) {
+            return [
+                'agent_code'      => $record->agent_code,
+                'level'           => (int) $record->level,
+                'region_zone'     => $record->region_zone,
+                'region_province' => $record->region_province,
+                'region_city'     => $record->region_city,
+                'status'          => $record->status,
+                'is_active'       => (bool) $record->is_active,
+                'active_until'    => $record->active_until,
+                'joined_at'       => $record->joined_at
+            ];
+        }, $agents ?: []);
+
+        return [
+            'primary_agent' => $primary_agent,
+            'assignments' => $assignments
+        ];
+    }
+
+    private static function calculate_team_order_stats($descendants) {
+        if (!function_exists('wc_get_orders')) {
+            return ['count' => 0, 'amount' => '0.00'];
+        }
+
+        $user_ids = array_map(static function ($row) {
+            return (int) $row->agent_user_id;
+        }, $descendants);
+
+        if (empty($user_ids)) {
+            return ['count' => 0, 'amount' => '0.00'];
+        }
+
+        $orders = wc_get_orders([
+            'customer_id' => $user_ids,
+            'status'      => ['processing', 'completed', 'on-hold', 'pending'],
+            'limit'       => -1,
+            'return'      => 'ids'
+        ]);
+
+        $total = 0.0;
+        foreach ($orders as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $total += (float) $order->get_total();
+            }
+        }
+
+        return [
+            'count' => count($orders),
+            'amount' => number_format($total, 2, '.', '')
+        ];
+    }
+
+    private static function resolve_agent_code($agent_id) {
+        global $wpdb;
+        $agent_table = $wpdb->prefix . 'myshop_agents';
+        return $wpdb->get_var($wpdb->prepare(
+            "SELECT agent_code FROM {$agent_table} WHERE id = %d",
+            $agent_id
+        ));
+    }
+
+    private static function resolve_agent_status($agent_id) {
+        global $wpdb;
+        $agent_table = $wpdb->prefix . 'myshop_agents';
+        return $wpdb->get_var($wpdb->prepare(
+            "SELECT status FROM {$agent_table} WHERE id = %d",
+            $agent_id
+        ));
+    }
+
+    private static function resolve_agent_field($agent_id, $field) {
+        global $wpdb;
+        $agent_table = $wpdb->prefix . 'myshop_agents';
+        $allowed = ['region_zone', 'region_province', 'region_city'];
+        if (!in_array($field, $allowed, true)) {
+            return null;
+        }
+
+        return $wpdb->get_var($wpdb->prepare(
+            "SELECT {$field} FROM {$agent_table} WHERE id = %d",
+            $agent_id
+        ));
     }
 
     private static function log_agent_action($agent_user_id, $action, $reason, $operator_id, $payload = []) {

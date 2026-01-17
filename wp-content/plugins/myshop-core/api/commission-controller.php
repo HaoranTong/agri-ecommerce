@@ -96,6 +96,8 @@ class Commission_Controller {
         return rest_ensure_response([
             'success' => true,
             'data' => $items,
+            // 兼容前端旧结构：直接返回 commissions 列表
+            'commissions' => $items,
             'pagination' => [
                 'page'        => $page,
                 'per_page'    => $per_page,
