@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-01-17T02:34:33+00:00",
+  "generated_at": "2026-01-17T04:11:35+00:00",
   "core_version": "6.9",
   "plugins": [
     {
@@ -67,7 +67,7 @@
     },
     {
       "stylesheet": "astra",
-      "version": "4.11.15",
+      "version": "4.12.0",
       "status": "required"
     }
   ],
