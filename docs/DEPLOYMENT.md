@@ -207,3 +207,24 @@ ps -ef | egrep "mysqld|mariadb" | grep -v grep || true
 
 确保 `wp-config.php` 的 `DB_HOST` 与宝塔 MySQL socket 一致（例如 `localhost:/tmp/mysql.sock`），且不要重复定义。
 
+下面这份就是 staging vs prod hooks 脚本差异点核对清单（≤10 行），你直接粘到部署操作手册末尾即可：
+
+DEPLOY_ENV：staging=staging；prod=prod
+
+GIT_DIR：staging=/www/git/agri-ecommerce-staging；prod=/www/git/agri-ecommerce-prod
+
+SITE_DIR：staging=/www/wwwroot/staging.fanbaoer.com；prod=/www/wwwroot/fanbaoer.com
+
+BACKUP_DIR：staging=/www/backup/fanbaoer_backups_staging；prod=/www/backup/fanbaoer_backups_prod
+
+TARGET_BRANCH：staging=trial；prod=master
+
+HEALTH_CHECK_HOST：staging=staging.fanbaoer.com；prod=fanbaoer.com
+
+STATE_FILE：由 DEPLOY_ENV + TARGET_BRANCH 自动区分（不用手改，但要确认路径格式一致）
+
+并发锁 LOCK_DIR：建议分别命名（staging 用 staging.lockdir；prod 用 prod.lockdir）
+
+其他配置应保持一致：REPO_URL / NGINX_RELOAD_CMD / 白名单(ALLOW_*) / WP_CLI / WP-Lock 路径(ops/wp_lock/...)
+
+一致性验收：日志必须同时出现 ✅ 发布完成（白名单） + ✅ WP-Lock 对齐完成 + ✅ 健康检查通过
