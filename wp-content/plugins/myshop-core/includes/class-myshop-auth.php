@@ -99,17 +99,20 @@ class MyShop_Auth {
 
         $response = wp_remote_get($url, ['timeout' => 15]);
         if (is_wp_error($response)) {
+            error_log('[MyShop Auth] wechat login request failed: ' . $response->get_error_message());
             return new WP_Error('wechat_login_failed', '微信登录失败', ['status' => 502]);
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         if (!is_array($data)) {
+            error_log('[MyShop Auth] wechat login invalid response: ' . substr($body, 0, 200));
             return new WP_Error('wechat_login_failed', '微信登录失败', ['status' => 502]);
         }
 
         if (!empty($data['errcode'])) {
             $message = $data['errmsg'] ?? '微信登录失败';
+            error_log('[MyShop Auth] wechat login error: ' . $data['errcode'] . ' ' . $message);
             return new WP_Error('wechat_login_failed', $message, ['status' => 401]);
         }
 
