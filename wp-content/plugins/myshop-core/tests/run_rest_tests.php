@@ -70,6 +70,14 @@ $auth_header = ['Authorization' => 'Bearer ' . $token];
 $user = MyShop_Auth::validate_token($token);
 assert_true($user instanceof WP_User, 'user from token');
 
+$payment_order_id = null;
+if (function_exists('wc_create_order')) {
+    $order = wc_create_order(['customer_id' => $user->ID]);
+    $order->set_status('pending');
+    $order->save();
+    $payment_order_id = $order->get_id();
+}
+
 $mission_id = 'test_mission_' . time();
 $redeem_option_id = 'test_option_' . time();
 
@@ -244,6 +252,30 @@ assert_true($resp->get_status() === 200, 'promo/poster status');
 $poster_payload = $resp->get_data();
 assert_true(isset($poster_payload['poster_url']), 'promo/poster poster_url');
 
+$order_id = 0;
+if (function_exists('wc_create_order')) {
+    $order = wc_create_order();
+    $order->set_customer_id($user->ID);
+    $order->set_status('pending');
+    $order->set_total(0);
+    $order->save();
+    $order_id = $order->get_id();
+}
+
+if ($order_id) {
+    $resp = call_api('POST', '/myshop/v1/payments/create', ['order_id' => $order_id, 'provider' => 'offline'], $auth_header);
+    assert_true($resp->get_status() === 200, 'payments/create offline status');
+    $payment_payload = $resp->get_data();
+    assert_true(isset($payment_payload['payment_qr_url']), 'payments/create payment_qr_url');
+
+    $resp = call_api('GET', '/myshop/v1/payments/status', ['order_id' => $order_id], $auth_header);
+    assert_true($resp->get_status() === 200, 'payments/status status');
+    $status_payload = $resp->get_data();
+    assert_true(isset($status_payload['data']['status']), 'payments/status data.status');
+
+    wp_delete_post($order_id, true);
+}
+
 $resp = call_api('GET', '/myshop/v1/points/settings', null, $auth_header);
 assert_true($resp->get_status() === 200, 'points/settings status');
 $points_settings_payload = $resp->get_data();
@@ -253,6 +285,23 @@ $resp = call_api('GET', '/myshop/v1/gift-cards/share-styles', null, $auth_header
 assert_true($resp->get_status() === 200, 'gift-cards/share-styles status');
 $share_styles_payload = $resp->get_data();
 assert_true(isset($share_styles_payload['data']), 'gift-cards/share-styles data');
+
+if ($payment_order_id) {
+    $resp = call_api('POST', '/myshop/v1/payments/create', [
+        'order_id' => $payment_order_id,
+        'provider' => 'offline'
+    ], $auth_header);
+    assert_true($resp->get_status() === 200, 'payments/create status');
+    $payment_payload = $resp->get_data();
+    assert_true(isset($payment_payload['provider']), 'payments/create provider');
+
+    $resp = call_api('GET', '/myshop/v1/payments/status', ['order_id' => $payment_order_id], $auth_header);
+    assert_true($resp->get_status() === 200, 'payments/status status');
+    $payment_status_payload = $resp->get_data();
+    assert_true(isset($payment_status_payload['data']['status']), 'payments/status status field');
+
+    wp_delete_post($payment_order_id, true);
+}
 
 if (class_exists('WC_Coupon')) {
     $coupon = new WC_Coupon();

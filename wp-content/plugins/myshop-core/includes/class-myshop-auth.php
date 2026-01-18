@@ -46,6 +46,83 @@ class MyShop_Auth {
         $hash = substr(hash('sha256', $normalized), 0, 18);
         return 'oMockUser' . $hash;
     }
+
+    public static function get_wechat_login_result($code) {
+        if (!is_string($code) || $code === '') {
+            return new WP_Error('missing_code', '缺少登录码', ['status' => 400]);
+        }
+
+        $allow_test = defined('MYSHOP_ALLOW_TEST_LOGIN') && MYSHOP_ALLOW_TEST_LOGIN;
+        if ($allow_test) {
+            $test_users = self::get_test_users();
+            if (isset($test_users[$code])) {
+                return [
+                    'openid' => $test_users[$code]['openid'],
+                    'session_key' => null,
+                    'unionid' => null
+                ];
+            }
+            if ($code === 'test') {
+                return [
+                    'openid' => 'oMockUser1234567890ab',
+                    'session_key' => null,
+                    'unionid' => null
+                ];
+            }
+        }
+
+        $app_id = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : (defined('MYSHOP_WECHAT_APP_ID') ? MYSHOP_WECHAT_APP_ID : '');
+        $secret = defined('MYSHOP_MINIAPP_APP_SECRET') ? MYSHOP_MINIAPP_APP_SECRET : '';
+
+        if ($app_id === '' || $secret === '') {
+            if ($allow_test) {
+                $openid = self::mock_wechat_openid($code);
+                if (!$openid) {
+                    return new WP_Error('invalid_code', '无效的登录码', ['status' => 401]);
+                }
+                return [
+                    'openid' => $openid,
+                    'session_key' => null,
+                    'unionid' => null
+                ];
+            }
+
+            return new WP_Error('wechat_not_configured', '微信登录未配置', ['status' => 500]);
+        }
+
+        $url = add_query_arg([
+            'appid' => $app_id,
+            'secret' => $secret,
+            'js_code' => $code,
+            'grant_type' => 'authorization_code'
+        ], 'https://api.weixin.qq.com/sns/jscode2session');
+
+        $response = wp_remote_get($url, ['timeout' => 15]);
+        if (is_wp_error($response)) {
+            return new WP_Error('wechat_login_failed', '微信登录失败', ['status' => 502]);
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        if (!is_array($data)) {
+            return new WP_Error('wechat_login_failed', '微信登录失败', ['status' => 502]);
+        }
+
+        if (!empty($data['errcode'])) {
+            $message = $data['errmsg'] ?? '微信登录失败';
+            return new WP_Error('wechat_login_failed', $message, ['status' => 401]);
+        }
+
+        if (empty($data['openid'])) {
+            return new WP_Error('wechat_login_failed', '微信登录失败', ['status' => 401]);
+        }
+
+        return [
+            'openid' => $data['openid'],
+            'session_key' => $data['session_key'] ?? null,
+            'unionid' => $data['unionid'] ?? null
+        ];
+    }
     
     /**
      * 获取测试用户列表
