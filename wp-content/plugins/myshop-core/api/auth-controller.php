@@ -14,7 +14,9 @@ class Auth_Controller {
 
         $login_result = MyShop_Auth::get_wechat_login_result($code);
         if (is_wp_error($login_result)) {
-            error_log('[MyShop Auth] login failed: ' . $login_result->get_error_message());
+            MyShop_Auth::log_debug('login failed', [
+                'error' => $login_result->get_error_message()
+            ]);
             return $login_result;
         }
 

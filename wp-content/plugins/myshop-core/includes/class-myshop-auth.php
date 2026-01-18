@@ -87,6 +87,10 @@ class MyShop_Auth {
                 ];
             }
 
+            self::log_debug('wechat login not configured', [
+                'app_id' => $app_id ? 'set' : 'missing',
+                'secret' => $secret ? 'set' : 'missing'
+            ]);
             return new WP_Error('wechat_not_configured', '微信登录未配置', ['status' => 500]);
         }
 
@@ -99,20 +103,27 @@ class MyShop_Auth {
 
         $response = wp_remote_get($url, ['timeout' => 15]);
         if (is_wp_error($response)) {
-            error_log('[MyShop Auth] wechat login request failed: ' . $response->get_error_message());
+            self::log_debug('wechat login request failed', [
+                'message' => $response->get_error_message()
+            ]);
             return new WP_Error('wechat_login_failed', '微信登录失败', ['status' => 502]);
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         if (!is_array($data)) {
-            error_log('[MyShop Auth] wechat login invalid response: ' . substr($body, 0, 200));
+            self::log_debug('wechat login invalid response', [
+                'body' => substr((string) $body, 0, 200)
+            ]);
             return new WP_Error('wechat_login_failed', '微信登录失败', ['status' => 502]);
         }
 
         if (!empty($data['errcode'])) {
             $message = $data['errmsg'] ?? '微信登录失败';
-            error_log('[MyShop Auth] wechat login error: ' . $data['errcode'] . ' ' . $message);
+            self::log_debug('wechat login error', [
+                'errcode' => $data['errcode'],
+                'errmsg' => $message
+            ]);
             return new WP_Error('wechat_login_failed', $message, ['status' => 401]);
         }
 
@@ -125,6 +136,25 @@ class MyShop_Auth {
             'session_key' => $data['session_key'] ?? null,
             'unionid' => $data['unionid'] ?? null
         ];
+    }
+
+    public static function log_debug($message, $context = null) {
+        if (defined('MYSHOP_AUTH_DEBUG') && !MYSHOP_AUTH_DEBUG) {
+            return;
+        }
+
+        $prefix = '[' . date('c') . '] MyShop Auth: ';
+        $line = $prefix . $message;
+        if ($context !== null) {
+            $line .= ' ' . wp_json_encode($context);
+        }
+        $line .= PHP_EOL;
+
+        $log_file = defined('WP_CONTENT_DIR')
+            ? WP_CONTENT_DIR . '/myshop-auth.log'
+            : __DIR__ . '/myshop-auth.log';
+
+        @file_put_contents($log_file, $line, FILE_APPEND);
     }
     
     /**
