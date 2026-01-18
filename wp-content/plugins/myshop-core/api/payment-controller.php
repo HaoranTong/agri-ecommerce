@@ -265,8 +265,9 @@ class Payment_Controller {
         $order->save();
 
         $notify_url = home_url('/wp-json/myshop/v1/payments/notify/wechat');
+        $pay_appid = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : MYSHOP_WECHAT_APP_ID;
         $payload = [
-            'appid' => MYSHOP_WECHAT_APP_ID,
+            'appid' => $pay_appid,
             'mchid' => MYSHOP_WECHAT_MCH_ID,
             'description' => sprintf('MyShop Order #%s', $order->get_order_number()),
             'out_trade_no' => $out_trade_no,
@@ -294,7 +295,7 @@ class Payment_Controller {
         $nonce_str = wp_generate_password(16, false);
         $timestamp = (string) time();
         $package = 'prepay_id=' . $prepay_id;
-        $pay_sign = self::sign_wechatpay(sprintf("%s\n%s\n%s\n%s\n", MYSHOP_WECHAT_APP_ID, $timestamp, $nonce_str, $package));
+        $pay_sign = self::sign_wechatpay(sprintf("%s\n%s\n%s\n%s\n", $pay_appid, $timestamp, $nonce_str, $package));
 
         if (!$pay_sign) {
             return new WP_Error('wechatpay_sign_failed', '微信支付签名失败', ['status' => 500]);
@@ -307,7 +308,7 @@ class Payment_Controller {
             'success' => true,
             'provider' => 'wechat',
             'payment_payload' => [
-                'appId' => MYSHOP_WECHAT_APP_ID,
+                'appId' => $pay_appid,
                 'timeStamp' => $timestamp,
                 'nonceStr' => $nonce_str,
                 'package' => $package,
