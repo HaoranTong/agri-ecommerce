@@ -253,7 +253,12 @@ class Payment_Controller {
             $order->update_meta_data('_myshop_payment_intent_id', $intent_id);
         }
 
-        $out_trade_no = sprintf('myshop_%d_%s', $order->get_id(), preg_replace('/[^A-Za-z0-9]/', '', $intent_id));
+        $out_trade_no = sprintf(
+            'MS%010d%08d%06d',
+            $order->get_id(),
+            time() % 100000000,
+            wp_rand(100000, 999999)
+        );
         $order->update_meta_data('_myshop_wechat_out_trade_no', $out_trade_no);
         $order->update_meta_data('_myshop_payment_provider', 'wechat');
         $order->update_meta_data('_myshop_payment_status', 'pending');
