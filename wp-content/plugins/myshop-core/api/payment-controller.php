@@ -239,6 +239,10 @@ class Payment_Controller {
     private static function create_wechat_payment($order, $user) {
         $openid = get_user_meta($user->ID, '_wechat_openid', true);
         if (!$openid) {
+            self::log_debug('wechat pay missing openid', [
+                'order_id' => $order->get_id(),
+                'user_id' => $user->ID
+            ]);
             return new WP_Error('missing_openid', '未找到微信 OpenID', ['status' => 400]);
         }
 
@@ -266,6 +270,18 @@ class Payment_Controller {
 
         $notify_url = home_url('/wp-json/myshop/v1/payments/notify/wechat');
         $pay_appid = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : MYSHOP_WECHAT_APP_ID;
+        self::log_debug('wechat pay create start', [
+            'order_id' => $order->get_id(),
+            'user_id' => $user->ID,
+            'appid' => $pay_appid,
+            'mchid' => MYSHOP_WECHAT_MCH_ID,
+            'openid' => substr($openid, 0, 6) . '***' . substr($openid, -4),
+            'amount' => $amount,
+            'out_trade_no' => $out_trade_no,
+            'notify_url' => $notify_url,
+            'home_url' => home_url(),
+            'site_url' => site_url()
+        ]);
         $payload = [
             'appid' => $pay_appid,
             'mchid' => MYSHOP_WECHAT_MCH_ID,
@@ -284,11 +300,22 @@ class Payment_Controller {
         $endpoint = '/v3/pay/transactions/jsapi';
         $response = self::wechat_request('POST', $endpoint, $payload);
         if (is_wp_error($response)) {
+            self::log_debug('wechat pay create failed', [
+                'order_id' => $order->get_id(),
+                'out_trade_no' => $out_trade_no,
+                'error' => $response->get_error_message(),
+                'data' => $response->get_error_data()
+            ]);
             return $response;
         }
 
         $prepay_id = $response['prepay_id'] ?? '';
         if (!$prepay_id) {
+            self::log_debug('wechat pay create missing prepay_id', [
+                'order_id' => $order->get_id(),
+                'out_trade_no' => $out_trade_no,
+                'response' => $response
+            ]);
             return new WP_Error('wechatpay_prepay_failed', '微信支付下单失败', ['status' => 500]);
         }
 
@@ -303,6 +330,11 @@ class Payment_Controller {
 
         $order->update_meta_data('_myshop_wechat_prepay_id', $prepay_id);
         $order->save();
+        self::log_debug('wechat pay create success', [
+            'order_id' => $order->get_id(),
+            'out_trade_no' => $out_trade_no,
+            'prepay_id' => $prepay_id
+        ]);
 
         return rest_ensure_response([
             'success' => true,
@@ -536,5 +568,20 @@ class Payment_Controller {
             && defined('MYSHOP_WECHAT_API_V3_KEY')
             && $has_platform_key
             && defined('MYSHOP_WECHAT_PLATFORM_SERIAL');
+    }
+
+    private static function log_debug($message, $context = []) {
+        if (defined('MYSHOP_AUTH_DEBUG') && MYSHOP_AUTH_DEBUG) {
+            $log_file = WP_CONTENT_DIR . '/myshop-payment.log';
+            $timestamp = current_time('mysql');
+            $payload = is_array($context) ? $context : ['context' => $context];
+            $log_message = sprintf(
+                "[%s] MyShop Payment: %s %s\n",
+                $timestamp,
+                $message,
+                json_encode($payload, JSON_UNESCAPED_UNICODE)
+            );
+            file_put_contents($log_file, $log_message, FILE_APPEND);
+        }
     }
 }
