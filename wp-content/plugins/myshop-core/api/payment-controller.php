@@ -30,17 +30,42 @@ class Payment_Controller {
             'callback' => [self::class, 'notify_wechat'],
             'permission_callback' => '__return_true'
         ]);
+
+        register_rest_route('myshop/v1', '/payments/diagnose', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'diagnose'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
     }
 
     public static function create($request) {
         $user = MyShop_Auth::get_user_from_request($request);
         if (is_wp_error($user)) {
+            self::log_debug_always('payment create auth failed', [
+                'error' => $user->get_error_message(),
+                'data' => $user->get_error_data(),
+                'host' => $_SERVER['HTTP_HOST'] ?? '',
+                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
+                'home_url' => home_url(),
+                'site_url' => site_url()
+            ]);
             return $user;
         }
 
         $params = $request->get_json_params();
         $order_id = isset($params['order_id']) ? absint($params['order_id']) : 0;
         $provider = isset($params['provider']) ? sanitize_key($params['provider']) : 'offline';
+        self::log_debug_always('payment create called', [
+            'order_id' => $order_id,
+            'provider' => $provider,
+            'user_id' => $user->ID,
+            'host' => $_SERVER['HTTP_HOST'] ?? '',
+            'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
+            'home_url' => home_url(),
+            'site_url' => site_url(),
+            'wp_content_dir' => defined('WP_CONTENT_DIR') ? WP_CONTENT_DIR : '',
+            'temp_dir' => sys_get_temp_dir()
+        ]);
 
         if (!$order_id) {
             return new WP_Error('missing_order_id', '缺少订单 ID', ['status' => 400]);
@@ -51,8 +76,8 @@ class Payment_Controller {
         }
 
         if (!in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
-            return new WP_Error('payment_method_not_supported', '不支持的支付方式', ['status' => 400]);
-        }
+        return new WP_Error('payment_method_not_supported', '不支持的支付方式', ['status' => 400]);
+    }
 
         $order = wc_get_order($order_id);
         if (!$order) {
@@ -72,23 +97,28 @@ class Payment_Controller {
         $order->update_meta_data('_myshop_payment_status', 'pending');
         $order->save();
 
+        $force_debug = self::debug_enabled() || self::debug_requested($request);
         if ($provider === 'offline') {
             $offline_payload = self::build_offline_payload();
-            return rest_ensure_response([
-                'success' => true,
+            $response_payload = [
+            'success' => true,
                 'provider' => 'offline',
                 'payment_intent_id' => $intent_id,
                 'payment_qr_url' => $offline_payload['payment_qr_url'],
                 'customer_service_qr' => $offline_payload['customer_service_qr'],
                 'message' => $offline_payload['message']
-            ]);
+            ];
+            if ($force_debug) {
+                $response_payload['debug'] = self::debug_payload();
+            }
+            return rest_ensure_response($response_payload);
         }
 
         if (!self::wechat_ready()) {
             return new WP_Error('wechat_not_configured', '微信支付未配置', ['status' => 400]);
         }
 
-        return self::create_wechat_payment($order, $user);
+        return self::create_wechat_payment($order, $user, $force_debug);
     }
 
     public static function status($request) {
@@ -127,6 +157,33 @@ class Payment_Controller {
                 'provider' => $provider ?: null,
                 'status' => $status,
                 'paid_at' => $paid_at
+            ]
+        ]);
+    }
+
+    public static function diagnose($request) {
+        $app_id = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : (defined('MYSHOP_WECHAT_APP_ID') ? MYSHOP_WECHAT_APP_ID : '');
+        $secret = defined('MYSHOP_MINIAPP_APP_SECRET') ? MYSHOP_MINIAPP_APP_SECRET : '';
+        $private_key = self::load_private_key();
+        $platform_key = self::load_platform_public_key();
+        $api_v3_key = defined('MYSHOP_WECHAT_API_V3_KEY') ? MYSHOP_WECHAT_API_V3_KEY : '';
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'app_id_set' => $app_id !== '',
+                'app_secret_set' => $secret !== '',
+                'mch_id_set' => defined('MYSHOP_WECHAT_MCH_ID'),
+                'serial_no_set' => defined('MYSHOP_WECHAT_SERIAL_NO'),
+                'platform_serial_set' => defined('MYSHOP_WECHAT_PLATFORM_SERIAL'),
+                'api_v3_key_length' => is_string($api_v3_key) ? strlen($api_v3_key) : 0,
+                'private_key_loaded' => $private_key ? true : false,
+                'platform_key_loaded' => $platform_key ? true : false,
+                'openssl_available' => function_exists('openssl_pkey_get_private'),
+                'notify_url' => home_url('/wp-json/myshop/v1/payments/notify/wechat'),
+                'home_url' => home_url(),
+                'site_url' => site_url(),
+                'plugin_file' => __FILE__
             ]
         ]);
     }
@@ -236,10 +293,14 @@ class Payment_Controller {
         return 'pending';
     }
 
-    private static function create_wechat_payment($order, $user) {
+    private static function create_wechat_payment($order, $user, $force_debug = false) {
         $openid = get_user_meta($user->ID, '_wechat_openid', true);
         if (!$openid) {
             self::log_debug('wechat pay missing openid', [
+                'order_id' => $order->get_id(),
+                'user_id' => $user->ID
+            ]);
+            self::log_debug_always('wechat pay missing openid', [
                 'order_id' => $order->get_id(),
                 'user_id' => $user->ID
             ]);
@@ -270,7 +331,7 @@ class Payment_Controller {
 
         $notify_url = home_url('/wp-json/myshop/v1/payments/notify/wechat');
         $pay_appid = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : MYSHOP_WECHAT_APP_ID;
-        self::log_debug('wechat pay create start', [
+        $debug_context = [
             'order_id' => $order->get_id(),
             'user_id' => $user->ID,
             'appid' => $pay_appid,
@@ -281,7 +342,9 @@ class Payment_Controller {
             'notify_url' => $notify_url,
             'home_url' => home_url(),
             'site_url' => site_url()
-        ]);
+        ];
+        self::log_debug('wechat pay create start', $debug_context);
+        self::log_debug_always('wechat pay create start', $debug_context);
         $payload = [
             'appid' => $pay_appid,
             'mchid' => MYSHOP_WECHAT_MCH_ID,
@@ -300,22 +363,26 @@ class Payment_Controller {
         $endpoint = '/v3/pay/transactions/jsapi';
         $response = self::wechat_request('POST', $endpoint, $payload);
         if (is_wp_error($response)) {
-            self::log_debug('wechat pay create failed', [
+            $fail_context = [
                 'order_id' => $order->get_id(),
                 'out_trade_no' => $out_trade_no,
                 'error' => $response->get_error_message(),
                 'data' => $response->get_error_data()
-            ]);
+            ];
+            self::log_debug('wechat pay create failed', $fail_context);
+            self::log_debug_always('wechat pay create failed', $fail_context);
             return $response;
         }
 
         $prepay_id = $response['prepay_id'] ?? '';
         if (!$prepay_id) {
-            self::log_debug('wechat pay create missing prepay_id', [
+            $missing_context = [
                 'order_id' => $order->get_id(),
                 'out_trade_no' => $out_trade_no,
                 'response' => $response
-            ]);
+            ];
+            self::log_debug('wechat pay create missing prepay_id', $missing_context);
+            self::log_debug_always('wechat pay create missing prepay_id', $missing_context);
             return new WP_Error('wechatpay_prepay_failed', '微信支付下单失败', ['status' => 500]);
         }
 
@@ -330,13 +397,15 @@ class Payment_Controller {
 
         $order->update_meta_data('_myshop_wechat_prepay_id', $prepay_id);
         $order->save();
-        self::log_debug('wechat pay create success', [
+        $success_context = [
             'order_id' => $order->get_id(),
             'out_trade_no' => $out_trade_no,
             'prepay_id' => $prepay_id
-        ]);
+        ];
+        self::log_debug('wechat pay create success', $success_context);
+        self::log_debug_always('wechat pay create success', $success_context);
 
-        return rest_ensure_response([
+        $response_payload = [
             'success' => true,
             'provider' => 'wechat',
             'payment_payload' => [
@@ -347,7 +416,18 @@ class Payment_Controller {
                 'signType' => 'RSA',
                 'paySign' => $pay_sign
             ]
-        ]);
+        ];
+        if ($force_debug) {
+            $response_payload['debug'] = self::debug_payload();
+            $response_payload['debug_payment'] = [
+                'appid' => $pay_appid,
+                'mchid' => MYSHOP_WECHAT_MCH_ID,
+                'openid_masked' => substr($openid, 0, 6) . '***' . substr($openid, -4),
+                'out_trade_no' => $out_trade_no,
+                'notify_url' => $notify_url
+            ];
+        }
+        return rest_ensure_response($response_payload);
     }
 
     private static function build_offline_payload() {
@@ -583,5 +663,58 @@ class Payment_Controller {
             );
             file_put_contents($log_file, $log_message, FILE_APPEND);
         }
+    }
+
+    private static function log_debug_always($message, $context = []) {
+        $log_files = [];
+        if (defined('WP_CONTENT_DIR') && WP_CONTENT_DIR) {
+            $log_files[] = rtrim(WP_CONTENT_DIR, '/\\') . '/debug.log';
+        }
+        if (defined('ABSPATH') && ABSPATH) {
+            $log_files[] = rtrim(ABSPATH, '/\\') . '/wp-content/debug.log';
+        }
+        $log_files[] = rtrim(sys_get_temp_dir(), '/\\') . '/myshop-payment.log';
+        $timestamp = current_time('mysql');
+        $payload = is_array($context) ? $context : ['context' => $context];
+        $log_message = sprintf(
+            "[%s] MyShop Payment: %s %s\n",
+            $timestamp,
+            $message,
+            json_encode($payload, JSON_UNESCAPED_UNICODE)
+        );
+        foreach ($log_files as $file) {
+            if (!$file) {
+                continue;
+            }
+            @file_put_contents($file, $log_message, FILE_APPEND);
+        }
+        error_log('MyShop Payment: ' . $message);
+    }
+
+    private static function debug_enabled() {
+        return defined('MYSHOP_AUTH_DEBUG') && MYSHOP_AUTH_DEBUG;
+    }
+
+    private static function debug_requested($request) {
+        if (!$request) {
+            return false;
+        }
+        $param = $request->get_param('debug');
+        if ($param === null) {
+            $params = $request->get_json_params();
+            $param = $params['debug'] ?? null;
+        }
+        return $param === 1 || $param === '1' || $param === true || $param === 'true';
+    }
+
+    private static function debug_payload() {
+        return [
+            'host' => $_SERVER['HTTP_HOST'] ?? '',
+            'server_name' => $_SERVER['SERVER_NAME'] ?? '',
+            'home_url' => home_url(),
+            'site_url' => site_url(),
+            'wp_content_dir' => defined('WP_CONTENT_DIR') ? WP_CONTENT_DIR : '',
+            'plugin_file' => __FILE__
+        ];
     }
 }
