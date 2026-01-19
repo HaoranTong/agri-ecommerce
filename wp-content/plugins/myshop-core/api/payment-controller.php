@@ -423,8 +423,10 @@ class Payment_Controller {
                 'appid' => $pay_appid,
                 'mchid' => MYSHOP_WECHAT_MCH_ID,
                 'openid_masked' => substr($openid, 0, 6) . '***' . substr($openid, -4),
+                'order_id' => $order->get_id(),
                 'out_trade_no' => $out_trade_no,
-                'notify_url' => $notify_url
+                'notify_url' => $notify_url,
+                'prepay_id' => $prepay_id
             ];
         }
         return rest_ensure_response($response_payload);
