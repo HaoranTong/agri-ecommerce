@@ -567,7 +567,7 @@ class Payment_Controller {
 
         if ($plain === false) {
             return new WP_Error('wechatpay_decrypt_failed', '回调解密失败', ['status' => 400]);
-        }
+    }
 
         $data = json_decode($plain, true);
         if (!is_array($data)) {
@@ -650,7 +650,7 @@ class Payment_Controller {
             && defined('MYSHOP_WECHAT_API_V3_KEY')
             && $has_platform_key
             && defined('MYSHOP_WECHAT_PLATFORM_SERIAL');
-    }
+        }
 
     private static function log_debug($message, $context = []) {
         if (defined('MYSHOP_AUTH_DEBUG') && MYSHOP_AUTH_DEBUG) {

@@ -46,7 +46,7 @@ class MyShop_Auth {
         $hash = substr(hash('sha256', $normalized), 0, 18);
         return 'oMockUser' . $hash;
     }
-
+    
     public static function get_wechat_login_result($code) {
         if (!is_string($code) || $code === '') {
             return new WP_Error('missing_code', '缺少登录码', ['status' => 400]);
