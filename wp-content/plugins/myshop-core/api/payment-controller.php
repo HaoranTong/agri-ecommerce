@@ -1,7 +1,8 @@
 <?php
 
 class Payment_Controller {
-    private const SUPPORTED_PROVIDERS = ['wechat', 'offline'];
+    // ✅ 仅支持微信支付，已移除 offline 扫码支付
+    private const SUPPORTED_PROVIDERS = ['wechat'];
     private const WECHAT_API_BASE = 'https://api.mch.weixin.qq.com';
 
     public static function register_routes() {
@@ -54,7 +55,8 @@ class Payment_Controller {
 
         $params = $request->get_json_params();
         $order_id = isset($params['order_id']) ? absint($params['order_id']) : 0;
-        $provider = isset($params['provider']) ? sanitize_key($params['provider']) : 'offline';
+        // ✅ 默认使用微信支付
+        $provider = isset($params['provider']) ? sanitize_key($params['provider']) : 'wechat';
         self::log_debug_always('payment create called', [
             'order_id' => $order_id,
             'provider' => $provider,
@@ -71,13 +73,14 @@ class Payment_Controller {
             return new WP_Error('missing_order_id', '缺少订单 ID', ['status' => 400]);
         }
 
-        if ($provider === '') {
-            $provider = 'offline';
+        // ✅ 强制使用微信支付
+        if ($provider === '' || $provider === 'offline') {
+            $provider = 'wechat';
         }
 
         if (!in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
-        return new WP_Error('payment_method_not_supported', '不支持的支付方式', ['status' => 400]);
-    }
+            return new WP_Error('payment_method_not_supported', '仅支持微信支付', ['status' => 400]);
+        }
 
         $order = wc_get_order($order_id);
         if (!$order) {
@@ -98,22 +101,8 @@ class Payment_Controller {
         $order->save();
 
         $force_debug = self::debug_enabled() || self::debug_requested($request);
-        if ($provider === 'offline') {
-            $offline_payload = self::build_offline_payload();
-            $response_payload = [
-            'success' => true,
-                'provider' => 'offline',
-                'payment_intent_id' => $intent_id,
-                'payment_qr_url' => $offline_payload['payment_qr_url'],
-                'customer_service_qr' => $offline_payload['customer_service_qr'],
-                'message' => $offline_payload['message']
-            ];
-            if ($force_debug) {
-                $response_payload['debug'] = self::debug_payload();
-            }
-            return rest_ensure_response($response_payload);
-        }
-
+        
+        // ✅ 已移除offline扫码支付逻辑，仅支持微信支付
         if (!self::wechat_ready()) {
             return new WP_Error('wechat_not_configured', '微信支付未配置', ['status' => 400]);
         }

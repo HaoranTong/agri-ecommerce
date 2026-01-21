@@ -28,14 +28,15 @@ class Order_Controller {
             ]
         ]);
 
-        register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)/upload-payment-proof', [
-            'methods' => \WP_REST_Server::CREATABLE,
-            'callback' => [self::class, 'upload_payment_proof'],
-            'permission_callback' => ['MyShop_Auth', 'check_permission'],
-            'args' => [
-                'order_id' => ['required' => true, 'type' => 'integer']
-            ]
-        ]);
+        // ✅ 已移除上传支付凭证接口，仅支持微信支付
+        // register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)/upload-payment-proof', [
+        //     'methods' => \WP_REST_Server::CREATABLE,
+        //     'callback' => [self::class, 'upload_payment_proof'],
+        //     'permission_callback' => ['MyShop_Auth', 'check_permission'],
+        //     'args' => [
+        //         'order_id' => ['required' => true, 'type' => 'integer']
+        //     ]
+        // ]);
 
         register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)/apply-gift-card', [
             'methods' => \WP_REST_Server::CREATABLE,
@@ -163,32 +164,11 @@ class Order_Controller {
             self::deduct_points_for_order($order_id);
         }
 
-        // ✅ 从 WooCommerce 货到付款描述中提取二维码 URL
-        $payment_qr_url = '';
-        $customer_service_qr = '';
-
-        $gateways = WC()->payment_gateways->payment_gateways();
-        if (isset($gateways['cod']) && $gateways['cod']->enabled === 'yes') {
-            $description = $gateways['cod']->description;
-            preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $description, $matches);
-            $image_urls = $matches[1] ?? [];
-
-            if (!empty($image_urls)) {
-                $payment_qr_url = esc_url_raw($image_urls[0]); // 第一张：收款码
-                $customer_service_qr = count($image_urls) > 1 ? esc_url_raw($image_urls[1]) : $payment_qr_url; // 第二张：客服码
-            }
-        }
-
-        // 如果没提取到，使用默认占位图（可选）
-        if (!$payment_qr_url) {
-            $upload_dir = wp_upload_dir();
-            $payment_qr_url = $upload_dir['baseurl'] . '/default-pay-qr.jpg';
-            $customer_service_qr = $upload_dir['baseurl'] . '/default-service-qr.jpg';
-        }
+        // ✅ 已移除扫码支付二维码逻辑，前端仅使用微信支付
 
         return rest_ensure_response([
             'order_id' => $order->get_id(),
-            'order_number' => $order->get_order_number(), // ← 新增 order_number 字段
+            'order_number' => $order->get_order_number(),
             'total' => $order->get_total(),
             'status' => $order->get_status(),
             'items' => [[
@@ -196,10 +176,8 @@ class Order_Controller {
                 'variation_id' => $variation_id,
                 'quantity' => $quantity,
                 'price' => $variation->get_price()
-            ]],
-            'payment_qr_url' => $payment_qr_url,
-            'customer_service_qr' => $customer_service_qr, // ← 字段名修正
-            'message' => '请扫码向客服付款，并添加企业微信发送付款截图，我们将尽快为您发货。'
+            ]]
+            // ✅ 已移除 payment_qr_url, customer_service_qr, message 字段
         ]);
     }
 
@@ -329,28 +307,7 @@ class Order_Controller {
             ];
         }
 
-        // ✅ 从 WooCommerce 货到付款描述中提取二维码（与创建订单时保持一致）
-        $payment_qr_url = '';
-        $customer_service_qr = '';
-
-        $gateways = WC()->payment_gateways->payment_gateways();
-        if (isset($gateways['cod']) && $gateways['cod']->enabled === 'yes') {
-            $description = $gateways['cod']->description;
-            preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $description, $matches);
-            $image_urls = $matches[1] ?? [];
-
-            if (!empty($image_urls)) {
-                $payment_qr_url = esc_url_raw($image_urls[0]); // 第一张：收款码
-                $customer_service_qr = count($image_urls) > 1 ? esc_url_raw($image_urls[1]) : $payment_qr_url; // 第二张：客服码
-            }
-        }
-
-        // 如果没提取到，尝试从 myshop_public_config 读取（向后兼容）
-        if (!$payment_qr_url) {
-            $config = get_option('myshop_public_config', []);
-            $payment_qr_url = $config['payment_qr_url'] ?? '';
-            $customer_service_qr = $config['customer_service_qr'] ?? '';
-        }
+        // ✅ 已移除扫码支付二维码提取逻辑（payment_qr_url, customer_service_qr）
 
         // 获取收货地址信息
         $shipping_address = [
@@ -363,14 +320,8 @@ class Order_Controller {
             'postcode'       => $order->get_shipping_postcode()
         ];
 
-        // 获取支付凭证状态（兼容新旧两种存储方式）
-        $payment_proof_url = get_post_meta($order->get_id(), '_myshop_payment_proof_url', true);
-        if (!$payment_proof_url) {
-            // 兼容旧版本：从媒体库读取
-            $payment_proof_id = get_post_meta($order->get_id(), '_myshop_payment_proof', true);
-            $payment_proof_url = $payment_proof_id ? wp_get_attachment_url($payment_proof_id) : '';
-        }
-        $payment_proof_submitted_at = get_post_meta($order->get_id(), '_myshop_payment_proof_submitted_at', true);
+        // ✅ 已移除支付凭证相关逻辑（payment_proof_url, has_payment_proof）
+        // ✅ 已移除扫码支付相关逻辑（payment_qr_url, customer_service_qr）
         
         // 获取物流信息
         $tracking_number = get_post_meta($order->get_id(), '_myshop_tracking_number', true) ?: '';
@@ -412,6 +363,13 @@ class Order_Controller {
         $points_used = (int) $order->get_meta('_points_used', true);
         $points_discount_amount = (float) $order->get_meta('_points_discount_amount', true);
 
+        // ✅ 计算积分奖励（支付页显示用）
+        $points_reward = 0;
+        if ($order->get_status() === 'pending' || $order->get_status() === 'on-hold') {
+            // 未支付订单：按实际应付金额计算积分（1:1）
+            $points_reward = (int) floor($payable_total);
+        }
+
         return rest_ensure_response([
             'order_id'            => $order->get_id(),
             'order_number'        => $order->get_order_number(),
@@ -423,14 +381,16 @@ class Order_Controller {
                 'points_used'      => $points_used,
                 'discount_amount'  => number_format($points_discount_amount, 2, '.', '')
             ] : null,
+            // ✅ 积分奖励字段（兼容多种命名）
+            'points_reward'       => $points_reward,
+            'points_earned'       => $points_reward,
+            'reward_points'       => $points_reward,
+            'earned_points'       => $points_reward,
             'created_at'          => $order->get_date_created() ? $order->get_date_created()->format('Y-m-d H:i:s') : null,
             'items'               => $items,
-            'payment_qr_url'      => $payment_qr_url,
-            'customer_service_qr' => $customer_service_qr,
+            // ✅ 已移除 payment_qr_url 和 customer_service_qr
             'shipping_address'    => $shipping_address,
-            'payment_proof_url'   => $payment_proof_url,
-            'payment_proof_submitted_at' => $payment_proof_submitted_at,
-            'has_payment_proof'   => !empty($payment_proof_url),
+            // ✅ 已移除 payment_proof_url, payment_proof_submitted_at, has_payment_proof
             'tracking_number'     => $tracking_number,
             'tracking_company'    => $tracking_company,
             'shipped_at'          => $shipped_at,
@@ -441,6 +401,8 @@ class Order_Controller {
         ]);
     }
 
+    // ✅ 已弃用：上传支付凭证接口（仅支持微信支付，无需上传凭证）
+    /*
     public static function upload_payment_proof($request) {
         $auth = MyShop_Auth::check_permission($request);
         if (is_wp_error($auth)) {
@@ -519,6 +481,7 @@ class Order_Controller {
             'message'              => '付款凭证已提交，请勿重复支付'
         ]);
     }
+    */
 
     private static function sanitize_giftcard_payload($payload) {
         if (is_string($payload)) {
