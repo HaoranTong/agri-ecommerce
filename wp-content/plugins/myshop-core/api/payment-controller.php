@@ -378,10 +378,21 @@ class Payment_Controller {
         ];
         self::log_debug('wechat pay create start', $debug_context);
         self::log_debug_always('wechat pay create start', $debug_context);
+        
+        // 获取订单商品信息用于 description
+        $items = $order->get_items();
+        $item_names = [];
+        foreach ($items as $item) {
+            $item_names[] = $item->get_name();
+        }
+        $description = !empty($item_names) 
+            ? mb_substr(implode('、', $item_names), 0, 127) 
+            : sprintf('订单 #%s', $order->get_order_number());
+        
         $payload = [
             'appid' => $pay_appid,
             'mchid' => MYSHOP_WECHAT_MCH_ID,
-            'description' => sprintf('MyShop Order #%s', $order->get_order_number()),
+            'description' => $description,
             'out_trade_no' => $out_trade_no,
             'notify_url' => $notify_url,
             'amount' => [
