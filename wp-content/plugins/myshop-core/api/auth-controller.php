@@ -48,6 +48,20 @@ class Auth_Controller {
             }
         }
 
+        // 保存微信昵称和头像（如果前端提供）
+        $json_params = $request->get_json_params();
+        if (!empty($json_params['nickname'])) {
+            update_user_meta($user_id, '_wechat_nickname', sanitize_text_field($json_params['nickname']));
+            // 同时更新 WordPress 显示名称
+            wp_update_user([
+                'ID' => $user_id,
+                'display_name' => sanitize_text_field($json_params['nickname'])
+            ]);
+        }
+        if (!empty($json_params['avatar'])) {
+            update_user_meta($user_id, '_wechat_avatar', esc_url_raw($json_params['avatar']));
+        }
+
         $token = MyShop_Auth::generate_token($user_id, $openid);
         return rest_ensure_response([
             'success' => true,

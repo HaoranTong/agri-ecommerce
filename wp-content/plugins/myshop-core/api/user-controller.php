@@ -48,6 +48,10 @@ class User_Controller {
             $user->ID
         ));
 
+        // 优先使用微信头像，其次使用 WordPress 默认头像
+        $wechat_avatar = get_user_meta($user->ID, '_wechat_avatar', true);
+        $avatar = !empty($wechat_avatar) ? $wechat_avatar : get_avatar_url($user->ID);
+
         return rest_ensure_response([
             'success' => true,
             'data' => [
@@ -58,7 +62,7 @@ class User_Controller {
                 'last_name' => $user->last_name,
                 'email' => $user->user_email,
                 'phone' => get_user_meta($user->ID, 'billing_phone', true),
-                'avatar' => get_avatar_url($user->ID),
+                'avatar' => $avatar,
                 'openid' => $openid,
                 'referral_code' => $referral_code,
                 'points_balance' => intval($points_balance),
