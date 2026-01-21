@@ -105,6 +105,23 @@ class User_Controller {
             update_user_meta($user->ID, 'phone', $phone);
         }
         
+        // 更新微信头像和性别
+        if (isset($params['avatar'])) {
+            $avatar = esc_url_raw($params['avatar']);
+            update_user_meta($user->ID, '_wechat_avatar', $avatar);
+        }
+        if (isset($params['gender'])) {
+            $gender = intval($params['gender']);
+            update_user_meta($user->ID, '_wechat_gender', $gender);
+        }
+        
+        error_log('User profile updated: ' . json_encode([
+            'user_id' => $user->ID,
+            'nickname' => $params['nickname'] ?? null,
+            'avatar' => isset($params['avatar']) ? 'YES' : 'NO',
+            'gender' => $params['gender'] ?? null
+        ]));
+        
         // 返回更新后的资料
         return self::get_profile($request);
     }

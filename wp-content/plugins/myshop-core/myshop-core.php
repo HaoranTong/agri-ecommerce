@@ -23,7 +23,8 @@ require_once MYSHOP_PLUGIN_DIR . 'includes/class-myshop-loader.php';
 // 引入后台管理页面
 if (is_admin()) {
     require_once MYSHOP_PLUGIN_DIR . 'admin/config-page.php';
-    require_once MYSHOP_PLUGIN_DIR . 'admin/payment-proof-manager.php';
+    // ✅ 已禁用：付款凭证管理（仅支持微信支付，无需上传凭证）
+    // require_once MYSHOP_PLUGIN_DIR . 'admin/payment-proof-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/order-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/points-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/test-users-manager.php';

@@ -178,6 +178,18 @@ class Payment_Controller {
     }
 
     public static function notify_wechat($request) {
+        // 记录所有回调请求，方便调试
+        self::log_debug_always('wechat notify received', [
+            'headers' => [
+                'signature' => $request->get_header('wechatpay-signature'),
+                'timestamp' => $request->get_header('wechatpay-timestamp'),
+                'nonce' => $request->get_header('wechatpay-nonce'),
+                'serial' => $request->get_header('wechatpay-serial')
+            ],
+            'body_length' => strlen($request->get_body()),
+            'remote_addr' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+        ]);
+        
         if (!self::wechat_ready()) {
             return new WP_Error('wechat_not_configured', '微信支付未配置', ['status' => 400]);
         }
@@ -196,30 +208,46 @@ class Payment_Controller {
 
         foreach (['wechatpay-signature', 'wechatpay-timestamp', 'wechatpay-nonce'] as $required) {
             if (empty($headers[$required])) {
+                self::log_debug_always('wechat notify missing header', ['missing' => $required]);
                 return new WP_Error('wechatpay_missing_header', '缺少微信支付回调头', ['status' => 400]);
             }
         }
 
         if (defined('MYSHOP_WECHAT_PLATFORM_SERIAL') && $headers['wechatpay-serial']) {
             if ($headers['wechatpay-serial'] !== MYSHOP_WECHAT_PLATFORM_SERIAL) {
+                self::log_debug_always('wechat notify serial mismatch', [
+                    'expected' => MYSHOP_WECHAT_PLATFORM_SERIAL,
+                    'received' => $headers['wechatpay-serial']
+                ]);
                 return new WP_Error('wechatpay_invalid_serial', '微信支付平台证书序列号不匹配', ['status' => 400]);
             }
         }
 
         if (!self::verify_wechat_signature($headers['wechatpay-timestamp'], $headers['wechatpay-nonce'], $body, $headers['wechatpay-signature'])) {
+            self::log_debug_always('wechat notify signature verify failed');
             return new WP_Error('wechatpay_invalid_signature', '微信支付验签失败', ['status' => 400]);
         }
 
+        self::log_debug_always('wechat notify signature verified');
+
         $payload = json_decode($body, true);
         if (!is_array($payload) || empty($payload['resource'])) {
+            self::log_debug_always('wechat notify invalid payload', ['payload_empty' => empty($payload)]);
             return new WP_Error('wechatpay_invalid_payload', '微信支付回调格式错误', ['status' => 400]);
         }
 
         $resource = $payload['resource'];
         $decrypted = self::decrypt_wechat_resource($resource);
         if (is_wp_error($decrypted)) {
+            self::log_debug_always('wechat notify decrypt failed', ['error' => $decrypted->get_error_message()]);
             return $decrypted;
         }
+
+        self::log_debug_always('wechat notify decrypted', [
+            'out_trade_no' => $decrypted['out_trade_no'] ?? '',
+            'trade_state' => $decrypted['trade_state'] ?? '',
+            'transaction_id' => $decrypted['transaction_id'] ?? ''
+        ]);
 
         $out_trade_no = $decrypted['out_trade_no'] ?? '';
         $trade_state = $decrypted['trade_state'] ?? '';
@@ -228,31 +256,47 @@ class Payment_Controller {
 
         $order = self::find_order_by_out_trade_no($out_trade_no);
         if (!$order) {
+            self::log_debug_always('wechat notify order not found', ['out_trade_no' => $out_trade_no]);
             return new WP_Error('order_not_found', '订单不存在', ['status' => 404]);
         }
 
         if ($total !== null) {
             $expected = (int) round((float) $order->get_total() * 100);
             if ($expected !== $total) {
+                self::log_debug_always('wechat notify amount mismatch', ['expected' => $expected, 'received' => $total]);
                 return new WP_Error('wechatpay_amount_mismatch', '支付金额不一致', ['status' => 400]);
             }
         }
 
+        self::log_debug_always('wechat notify processing payment', [
+            'order_id' => $order->get_id(),
+            'trade_state' => $trade_state
+        ]);
+
         if ($trade_state === 'SUCCESS') {
             if (!$order->get_date_paid()) {
-                $order->payment_complete($transaction_id ?: '');
+                // 只在有有效transaction_id时才传递，否则传递空字符串
+                $order->payment_complete($transaction_id ? $transaction_id : '');
+                self::log_debug_always('wechat notify payment completed', ['order_id' => $order->get_id()]);
+            } else {
+                self::log_debug_always('wechat notify already paid', ['order_id' => $order->get_id()]);
             }
             $order->update_meta_data('_myshop_payment_status', 'paid');
         } elseif (in_array($trade_state, ['CLOSED', 'REVOKED', 'PAYERROR'], true)) {
             $order->update_meta_data('_myshop_payment_status', 'failed');
+            self::log_debug_always('wechat notify payment failed', ['order_id' => $order->get_id(), 'state' => $trade_state]);
         } else {
             $order->update_meta_data('_myshop_payment_status', 'pending');
+            self::log_debug_always('wechat notify payment pending', ['order_id' => $order->get_id(), 'state' => $trade_state]);
         }
 
-        if ($transaction_id) {
+        // 只在transaction_id有效且不为空时才保存
+        if ($transaction_id && $transaction_id !== '') {
             $order->update_meta_data('_myshop_wechat_transaction_id', $transaction_id);
         }
         $order->save();
+
+        self::log_debug_always('wechat notify success', ['order_id' => $order->get_id()]);
 
         return rest_ensure_response([
             'code' => 'SUCCESS',
@@ -396,6 +440,7 @@ class Payment_Controller {
 
         $response_payload = [
             'success' => true,
+            'order_id' => $order->get_id(),  // ✅ 返回订单ID
             'provider' => 'wechat',
             'payment_payload' => [
                 'appId' => $pay_appid,
@@ -529,23 +574,52 @@ class Payment_Controller {
     }
 
     private static function decrypt_wechat_resource($resource) {
+        // 记录原始resource结构
+        self::log_debug_always('wechat notify decrypt resource', [
+            'has_ciphertext' => isset($resource['ciphertext']),
+            'has_nonce' => isset($resource['nonce']),
+            'has_associated_data' => isset($resource['associated_data']),
+            'has_algorithm' => isset($resource['algorithm']),
+            'keys' => array_keys($resource)
+        ]);
+        
         $ciphertext = $resource['ciphertext'] ?? '';
         $nonce = $resource['nonce'] ?? '';
         $associated_data = $resource['associated_data'] ?? '';
-        $tag = $resource['tag'] ?? '';
 
-        if ($ciphertext === '' || $nonce === '' || $tag === '') {
+        if ($ciphertext === '' || $nonce === '') {
+            self::log_debug_always('wechat notify decrypt missing fields', [
+                'ciphertext_empty' => $ciphertext === '',
+                'nonce_empty' => $nonce === ''
+            ]);
             return new WP_Error('wechatpay_invalid_resource', '回调数据不完整', ['status' => 400]);
         }
 
         $key = MYSHOP_WECHAT_API_V3_KEY;
         if (!is_string($key) || strlen($key) !== 32) {
+            self::log_debug_always('wechat notify api key invalid', ['key_length' => is_string($key) ? strlen($key) : 'not_string']);
             return new WP_Error('wechatpay_invalid_key', 'APIv3 密钥无效', ['status' => 500]);
         }
 
+        // 微信支付V3: ciphertext是base64编码的，解码后包含密文+tag(16字节)
         $ciphertext_raw = base64_decode($ciphertext);
+        if ($ciphertext_raw === false || strlen($ciphertext_raw) < 16) {
+            self::log_debug_always('wechat notify ciphertext decode failed');
+            return new WP_Error('wechatpay_invalid_ciphertext', '密文格式错误', ['status' => 400]);
+        }
+
+        // 提取tag(最后16字节)和实际密文
+        $tag = substr($ciphertext_raw, -16);
+        $ciphertext_data = substr($ciphertext_raw, 0, -16);
+
+        self::log_debug_always('wechat notify decrypt attempt', [
+            'ciphertext_len' => strlen($ciphertext_data),
+            'tag_len' => strlen($tag),
+            'nonce_len' => strlen($nonce)
+        ]);
+
         $plain = openssl_decrypt(
-            $ciphertext_raw,
+            $ciphertext_data,
             'aes-256-gcm',
             $key,
             OPENSSL_RAW_DATA,
@@ -555,11 +629,16 @@ class Payment_Controller {
         );
 
         if ($plain === false) {
+            $error = openssl_error_string();
+            self::log_debug_always('wechat notify decrypt openssl failed', ['openssl_error' => $error]);
             return new WP_Error('wechatpay_decrypt_failed', '回调解密失败', ['status' => 400]);
-    }
+        }
+
+        self::log_debug_always('wechat notify decrypt success', ['plain_length' => strlen($plain)]);
 
         $data = json_decode($plain, true);
         if (!is_array($data)) {
+            self::log_debug_always('wechat notify decrypt json invalid');
             return new WP_Error('wechatpay_invalid_decrypted', '回调解密结果异常', ['status' => 400]);
         }
 
