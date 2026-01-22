@@ -49,6 +49,28 @@ function myshop_config_page() {
         $config['last_updated_at'] = current_time('c');
         
         update_option('myshop_public_config', $config);
+
+        // 保存快递公司映射
+        $express_raw = sanitize_textarea_field($_POST['express_map'] ?? '');
+        $express_map = [];
+        if (!empty($express_raw)) {
+            $lines = preg_split('/\r\n|\r|\n/', $express_raw);
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '' || strpos($line, '#') === 0) {
+                    continue;
+                }
+                $parts = preg_split('/\s*[=:]\s*/', $line);
+                if (count($parts) >= 2) {
+                    $key = sanitize_text_field($parts[0]);
+                    $val = strtoupper(sanitize_text_field($parts[1]));
+                    if ($key && $val) {
+                        $express_map[$key] = $val;
+                    }
+                }
+            }
+        }
+        update_option('myshop_wechat_express_map', $express_map);
         
         echo '<div class="notice notice-success is-dismissible"><p><strong>✓ 配置已保存！</strong></p></div>';
     }
@@ -58,6 +80,13 @@ function myshop_config_page() {
     $home_slider = $config['home_slider'] ?? [];
     $payment_qr_url = $config['payment_qr_url'] ?? '';
     $customer_service_qr = $config['customer_service_qr'] ?? '';
+    $express_map = get_option('myshop_wechat_express_map', []);
+    $express_map_lines = '';
+    if (is_array($express_map)) {
+        foreach ($express_map as $k => $v) {
+            $express_map_lines .= $k . '=' . $v . "\n";
+        }
+    }
     
     // 如果轮播图为空，添加一个空行
     if (empty($home_slider)) {
@@ -190,6 +219,28 @@ function myshop_config_page() {
                                    class="regular-text" 
                                    placeholder="https://...">
                             <p class="description">小程序客服入口的企业微信二维码</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 微信快递公司编码映射 -->
+            <div style="background: #fff; padding: 20px; margin-bottom: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04);">
+                <h2 style="margin-top: 0;">
+                    <span class="dashicons dashicons-location" style="color: #2271b1;"></span>
+                    微信快递公司编码映射
+                </h2>
+                <p class="description">
+                    用于微信订单发货接口的快递公司编码映射。每行一条，格式：<code>顺丰=SF</code> 或 <code>圆通:YTO</code>。
+                </p>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="express_map">映射规则</label>
+                        </th>
+                        <td>
+                            <textarea id="express_map" name="express_map" rows="8" class="large-text code" placeholder="顺丰=SF\n申通=STO\n圆通=YTO\n中通=ZTO\n韵达=YUNDA\n京东=JD\n邮政=EMS"><?php echo esc_textarea($express_map_lines); ?></textarea>
+                            <p class="description">若后台物流插件返回公司名称与微信编码不一致，请在此补充关键字映射。</p>
                         </td>
                     </tr>
                 </table>

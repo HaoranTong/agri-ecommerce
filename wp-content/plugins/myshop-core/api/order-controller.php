@@ -2,6 +2,12 @@
 
 class Order_Controller {
 
+    public static function boot() {
+        add_action('updated_post_meta', [self::class, 'handle_tracking_meta_update'], 10, 4);
+        add_action('added_post_meta', [self::class, 'handle_tracking_meta_update'], 10, 4);
+        add_action('woocommerce_order_status_changed', [self::class, 'handle_order_status_changed'], 10, 4);
+    }
+
     public static function register_routes() {
         register_rest_route('myshop/v1', '/orders', [
             'methods' => \WP_REST_Server::CREATABLE,
@@ -46,6 +52,42 @@ class Order_Controller {
                 'order_id' => ['required' => true, 'type' => 'integer']
             ]
         ]);
+    }
+
+    public static function handle_tracking_meta_update($meta_id, $post_id, $meta_key, $meta_value) {
+        if (get_post_type($post_id) !== 'shop_order') {
+            return;
+        }
+
+        $watch_keys = [
+            '_myshop_tracking_number',
+            '_myshop_tracking_company',
+            '_myshop_shipped_at',
+            '_tracking_number',
+            '_tracking_provider',
+            '_wc_shipment_tracking_items',
+            'tracking_number',
+            'tracking_company',
+            'date_shipped'
+        ];
+
+        if (!in_array($meta_key, $watch_keys, true)) {
+            return;
+        }
+
+        self::maybe_sync_wechat_shipping($post_id);
+    }
+
+    public static function handle_order_status_changed($order_id, $from, $to, $order) {
+        if (!$order_id) {
+            return;
+        }
+
+        if (!in_array($to, ['processing', 'completed'], true)) {
+            return;
+        }
+
+        self::maybe_sync_wechat_shipping($order_id);
     }
 
     public static function create($request) {
@@ -215,10 +257,11 @@ class Order_Controller {
                 ];
             }
 
-            // 获取快递信息
-            $tracking_number = get_post_meta($order->get_id(), '_myshop_tracking_number', true) ?: '';
-            $tracking_company = get_post_meta($order->get_id(), '_myshop_tracking_company', true) ?: '';
-            $shipped_at = get_post_meta($order->get_id(), '_myshop_shipped_at', true) ?: '';
+            // 获取快递信息（兼容 WooCommerce 运单插件）
+            $tracking_meta = self::resolve_tracking_meta($order->get_id());
+            $tracking_number = $tracking_meta['tracking_number'];
+            $tracking_company = $tracking_meta['tracking_company'];
+            $shipped_at = $tracking_meta['shipped_at'];
             
             $is_gift_card_order = $order->get_meta('_myshop_is_gift_card_order', true) === 'yes';
             $giftcard_mode = $order->get_meta('_myshop_giftcard_mode', true);
@@ -323,10 +366,11 @@ class Order_Controller {
         // ✅ 已移除支付凭证相关逻辑（payment_proof_url, has_payment_proof）
         // ✅ 已移除扫码支付相关逻辑（payment_qr_url, customer_service_qr）
         
-        // 获取物流信息
-        $tracking_number = get_post_meta($order->get_id(), '_myshop_tracking_number', true) ?: '';
-        $tracking_company = get_post_meta($order->get_id(), '_myshop_tracking_company', true) ?: '';
-        $shipped_at = get_post_meta($order->get_id(), '_myshop_shipped_at', true) ?: '';
+        // 获取物流信息（兼容 WooCommerce 运单插件）
+        $tracking_meta = self::resolve_tracking_meta($order->get_id());
+        $tracking_number = $tracking_meta['tracking_number'];
+        $tracking_company = $tracking_meta['tracking_company'];
+        $shipped_at = $tracking_meta['shipped_at'];
 
         // 获取优惠券使用信息
         $applied_coupon_code = $order->get_meta('_applied_coupon_code', true);
@@ -508,6 +552,174 @@ class Order_Controller {
         }
 
         return $sanitized;
+    }
+
+    private static function resolve_tracking_meta($order_id) {
+        $tracking_number = get_post_meta($order_id, '_myshop_tracking_number', true) ?: '';
+        $tracking_company = get_post_meta($order_id, '_myshop_tracking_company', true) ?: '';
+        $shipped_at = get_post_meta($order_id, '_myshop_shipped_at', true) ?: '';
+
+        if (!$tracking_number) {
+            $tracking_number = get_post_meta($order_id, '_tracking_number', true) ?: '';
+            if (!$tracking_number) {
+                $tracking_number = get_post_meta($order_id, 'tracking_number', true) ?: '';
+            }
+        }
+
+        if (!$tracking_company) {
+            $tracking_company = get_post_meta($order_id, '_tracking_provider', true) ?: '';
+            if (!$tracking_company) {
+                $tracking_company = get_post_meta($order_id, '_tracking_company', true) ?: '';
+            }
+            if (!$tracking_company) {
+                $tracking_company = get_post_meta($order_id, 'tracking_company', true) ?: '';
+            }
+        }
+
+        if (!$shipped_at) {
+            $shipped_at = get_post_meta($order_id, '_date_shipped', true) ?: '';
+            if (!$shipped_at) {
+                $shipped_at = get_post_meta($order_id, 'date_shipped', true) ?: '';
+            }
+        }
+
+        $tracking_items = get_post_meta($order_id, '_wc_shipment_tracking_items', true);
+        if (is_string($tracking_items)) {
+            $tracking_items = maybe_unserialize($tracking_items);
+        }
+
+        if (is_array($tracking_items) && !empty($tracking_items)) {
+            $first = $tracking_items[0];
+            if (!$tracking_number && !empty($first['tracking_number'])) {
+                $tracking_number = $first['tracking_number'];
+            }
+            if (!$tracking_company) {
+                if (!empty($first['tracking_provider'])) {
+                    $tracking_company = $first['tracking_provider'];
+                } elseif (!empty($first['custom_tracking_provider'])) {
+                    $tracking_company = $first['custom_tracking_provider'];
+                }
+            }
+            if (!$shipped_at && !empty($first['date_shipped'])) {
+                $timestamp = (int) $first['date_shipped'];
+                if ($timestamp > 0) {
+                    $shipped_at = date('Y-m-d H:i:s', $timestamp);
+                }
+            }
+        }
+
+        return [
+            'tracking_number' => (string) $tracking_number,
+            'tracking_company' => (string) $tracking_company,
+            'shipped_at' => (string) $shipped_at
+        ];
+    }
+
+    private static function maybe_sync_wechat_shipping($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        $tracking_meta = self::resolve_tracking_meta($order_id);
+        if (empty($tracking_meta['tracking_number']) || empty($tracking_meta['tracking_company'])) {
+            return;
+        }
+
+        $out_trade_no = $order->get_meta('_myshop_wechat_out_trade_no', true);
+        if (!$out_trade_no) {
+            return;
+        }
+
+        $sync_key = $tracking_meta['tracking_number'] . '|' . $tracking_meta['tracking_company'];
+        $synced_key = get_post_meta($order_id, '_myshop_wechat_shipping_synced_key', true);
+        if ($synced_key === $sync_key) {
+            return;
+        }
+
+        $openid = '';
+        $user_id = $order->get_customer_id();
+        if ($user_id) {
+            $openid = get_user_meta($user_id, '_wechat_openid', true) ?: '';
+        }
+
+        $express_company = self::normalize_express_company($tracking_meta['tracking_company']);
+        if (!$express_company) {
+            return;
+        }
+
+        $payload = [
+            'order_key' => [
+                'order_number_type' => 2,
+                'out_trade_no' => $out_trade_no
+            ],
+            'logistics_type' => 1,
+            'delivery_mode' => 1,
+            'shipping_list' => [
+                [
+                    'tracking_no' => $tracking_meta['tracking_number'],
+                    'express_company' => $express_company
+                ]
+            ]
+        ];
+
+        if ($openid) {
+            $payload['payer'] = ['openid' => $openid];
+        }
+
+        $response = MyShop_Wechat::upload_shipping_info($payload);
+        if (is_wp_error($response)) {
+            error_log('[MyShop Core] WeChat shipping sync failed: ' . $response->get_error_message());
+            return;
+        }
+
+        update_post_meta($order_id, '_myshop_wechat_shipping_synced_key', $sync_key);
+        update_post_meta($order_id, '_myshop_wechat_shipping_synced_at', current_time('mysql'));
+    }
+
+    private static function normalize_express_company($raw) {
+        if (!$raw) {
+            return '';
+        }
+
+        $raw = trim(wp_strip_all_tags((string) $raw));
+        if ($raw === '') {
+            return '';
+        }
+
+        $upper = strtoupper($raw);
+        $known_codes = ['SF', 'STO', 'YTO', 'ZTO', 'YUNDA', 'JD', 'EMS'];
+        if (in_array($upper, $known_codes, true)) {
+            return $upper;
+        }
+
+        $map = [
+            '顺丰' => 'SF',
+            '申通' => 'STO',
+            '圆通' => 'YTO',
+            '中通' => 'ZTO',
+            '韵达' => 'YUNDA',
+            '京东' => 'JD',
+            '邮政' => 'EMS',
+            'EMS' => 'EMS'
+        ];
+
+        foreach ($map as $keyword => $code) {
+            if (stripos($raw, $keyword) !== false) {
+                return $code;
+            }
+        }
+
+        $custom_map = get_option('myshop_wechat_express_map', []);
+        if (is_array($custom_map) && !empty($custom_map)) {
+            foreach ($custom_map as $keyword => $code) {
+                if ($keyword && stripos($raw, (string) $keyword) !== false) {
+                    return strtoupper((string) $code);
+                }
+            }
+        }
+
+        return $raw;
     }
 
     private static function normalize_shipping_address($addr, $strict = true) {

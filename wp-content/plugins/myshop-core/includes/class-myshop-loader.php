@@ -3,6 +3,7 @@ class MyShop_Loader {
     public static function init() {
         $includes = [
             'includes/class-myshop-auth.php',
+            'includes/class-myshop-wechat.php',
             'api/auth-controller.php',
             'api/user-controller.php',
             'api/product-controller.php',
@@ -35,6 +36,10 @@ class MyShop_Loader {
 
         if (class_exists('Gift_Card_Controller') && method_exists('Gift_Card_Controller', 'boot')) {
             Gift_Card_Controller::boot();
+        }
+
+        if (class_exists('Order_Controller') && method_exists('Order_Controller', 'boot')) {
+            Order_Controller::boot();
         }
     }
 
