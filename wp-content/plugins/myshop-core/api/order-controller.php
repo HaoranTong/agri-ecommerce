@@ -34,6 +34,16 @@ class Order_Controller {
             ]
         ]);
 
+        register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)/return-request', [
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'request_return'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'order_id' => ['required' => true, 'type' => 'integer'],
+                'reason' => ['required' => false, 'type' => 'string']
+            ]
+        ]);
+
         // ✅ 已移除上传支付凭证接口，仅支持微信支付
         // register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)/upload-payment-proof', [
         //     'methods' => \WP_REST_Server::CREATABLE,
@@ -66,6 +76,7 @@ class Order_Controller {
             '_tracking_number',
             '_tracking_provider',
             '_wc_shipment_tracking_items',
+            '_woo_shipment_tracking_items',
             'tracking_number',
             'tracking_company',
             'date_shipped'
@@ -407,6 +418,9 @@ class Order_Controller {
         $points_used = (int) $order->get_meta('_points_used', true);
         $points_discount_amount = (float) $order->get_meta('_points_discount_amount', true);
 
+        $return_requested_at = $order->get_meta('_myshop_return_requested_at', true);
+        $return_status = $return_requested_at ? 'requested' : 'none';
+
         // ✅ 计算积分奖励（支付页显示用）
         $points_reward = 0;
         if ($order->get_status() === 'pending' || $order->get_status() === 'on-hold') {
@@ -438,10 +452,70 @@ class Order_Controller {
             'tracking_number'     => $tracking_number,
             'tracking_company'    => $tracking_company,
             'shipped_at'          => $shipped_at,
+            'return_status'       => $return_status,
+            'return_requested_at' => $return_requested_at ?: null,
             'coupon_info'         => $coupon_info,
             'gift_card_info'      => $gift_card_info,
             'is_gift_card_order'  => $order->get_meta('_myshop_is_gift_card_order', true) === 'yes',
             'giftcard_mode'       => ($order->get_meta('_myshop_giftcard_mode', true) ?: null)
+        ]);
+    }
+
+    public static function request_return($request) {
+        $auth = MyShop_Auth::check_permission($request);
+        if (is_wp_error($auth)) {
+            return $auth;
+        }
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $order_id = absint($request->get_param('order_id'));
+        if (!$order_id) {
+            return new WP_Error('invalid_order_id', '无效的订单ID', ['status' => 400]);
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return new WP_Error('order_not_found', '订单不存在', ['status' => 404]);
+        }
+
+        if ($order->get_customer_id() !== $user->ID) {
+            return new WP_Error('unauthorized', '无权操作此订单', ['status' => 403]);
+        }
+
+        $status = $order->get_status();
+        if (!in_array($status, ['processing', 'completed'], true)) {
+            return new WP_Error('invalid_order_status', '当前订单状态不允许申请退货', ['status' => 400]);
+        }
+
+        if ($order->get_meta('_myshop_return_requested_at', true)) {
+            return rest_ensure_response([
+                'success' => true,
+                'data' => [
+                    'return_status' => 'requested',
+                    'return_requested_at' => $order->get_meta('_myshop_return_requested_at', true)
+                ]
+            ]);
+        }
+
+        $params = $request->get_json_params();
+        $reason = isset($params['reason']) ? sanitize_text_field($params['reason']) : '用户申请退货';
+
+        $requested_at = current_time('mysql');
+        $order->update_meta_data('_myshop_return_requested_at', $requested_at);
+        $order->update_meta_data('_myshop_return_reason', $reason);
+        $order->add_order_note('用户申请退货/售后：' . $reason);
+        $order->save();
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'return_status' => 'requested',
+                'return_requested_at' => $requested_at
+            ]
         ]);
     }
 
@@ -584,6 +658,9 @@ class Order_Controller {
         }
 
         $tracking_items = get_post_meta($order_id, '_wc_shipment_tracking_items', true);
+        if (empty($tracking_items)) {
+            $tracking_items = get_post_meta($order_id, '_woo_shipment_tracking_items', true);
+        }
         if (is_string($tracking_items)) {
             $tracking_items = maybe_unserialize($tracking_items);
         }
@@ -626,8 +703,17 @@ class Order_Controller {
             return;
         }
 
-        $out_trade_no = $order->get_meta('_myshop_wechat_out_trade_no', true);
-        if (!$out_trade_no) {
+        $order_number_type = 2;
+        $order_number_value = $order->get_meta('_myshop_wechat_out_trade_no', true);
+        if (!$order_number_value) {
+            $transaction_id = $order->get_transaction_id();
+            if ($transaction_id) {
+                $order_number_type = 1;
+                $order_number_value = $transaction_id;
+            }
+        }
+        if (!$order_number_value) {
+            self::note_wechat_sync_error($order, '缺少商户单号/微信交易号，无法同步');
             return;
         }
 
@@ -650,8 +736,8 @@ class Order_Controller {
 
         $payload = [
             'order_key' => [
-                'order_number_type' => 2,
-                'out_trade_no' => $out_trade_no
+                'order_number_type' => $order_number_type,
+                ($order_number_type === 1 ? 'transaction_id' : 'out_trade_no') => $order_number_value
             ],
             'logistics_type' => 1,
             'delivery_mode' => 1,
@@ -669,12 +755,31 @@ class Order_Controller {
 
         $response = MyShop_Wechat::upload_shipping_info($payload);
         if (is_wp_error($response)) {
-            error_log('[MyShop Core] WeChat shipping sync failed: ' . $response->get_error_message());
+            $message = $response->get_error_message();
+            error_log('[MyShop Core] WeChat shipping sync failed: ' . $message);
+            self::note_wechat_sync_error($order, '微信订单中心同步失败：' . $message, $sync_key);
             return;
         }
 
         update_post_meta($order_id, '_myshop_wechat_shipping_synced_key', $sync_key);
         update_post_meta($order_id, '_myshop_wechat_shipping_synced_at', current_time('mysql'));
+        $order->add_order_note('已同步微信订单中心发货信息');
+    }
+
+    private static function note_wechat_sync_error($order, $message, $sync_key = '') {
+        if (!$order) {
+            return;
+        }
+
+        $last_error = $order->get_meta('_myshop_wechat_shipping_last_error', true);
+        $error_key = $sync_key ? $sync_key . '|' . $message : $message;
+        if ($last_error === $error_key) {
+            return;
+        }
+
+        $order->add_order_note($message);
+        $order->update_meta_data('_myshop_wechat_shipping_last_error', $error_key);
+        $order->save();
     }
 
     private static function normalize_express_company($raw) {
