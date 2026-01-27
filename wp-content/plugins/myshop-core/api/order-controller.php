@@ -519,23 +519,6 @@ class Order_Controller {
         $order->add_order_note($note);
         $order->save();
 
-        $admin_email = get_option('admin_email');
-        if ($admin_email) {
-            $subject = sprintf('[%s] 有新的退货申请', get_bloginfo('name'));
-            $order_link = admin_url('post.php?post=' . $order_id . '&action=edit');
-            $message_lines = [
-                '订单号：' . $order->get_order_number(),
-                '订单ID：' . $order_id,
-                '申请时间：' . $requested_at,
-                '退货原因：' . $reason
-            ];
-            if (!empty($contact)) {
-                $message_lines[] = '联系方式：' . $contact;
-            }
-            $message_lines[] = '订单详情：' . $order_link;
-            wp_mail($admin_email, $subject, implode("\n", $message_lines));
-        }
-
         return rest_ensure_response([
             'success' => true,
             'data' => [
