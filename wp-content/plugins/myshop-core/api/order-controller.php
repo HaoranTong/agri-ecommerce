@@ -157,7 +157,7 @@ class Order_Controller {
                 $order->add_item($fee);
                 
                 // 保存使用的积分数
-                $order->update_meta_data('_points_used', $points_to_use);
+                $order->update_meta_data('_points_used', $points_discount['points_used']);
                 $order->update_meta_data('_points_discount_amount', $points_discount['discount_amount']);
                 $points_discount_result = $points_discount; // 保存结果
             }
@@ -1070,7 +1070,11 @@ class Order_Controller {
         $discount_amount = $points_to_use / $settings['redeem_rate'];
         
         // 检查最大抵扣比例
-        $max_discount = $order_total * ($settings['max_discount_percent'] / 100);
+        $max_discount_percent = (float) $settings['max_discount_percent'];
+        if ($max_discount_percent <= 1) {
+            $max_discount_percent = 100;
+        }
+        $max_discount = $order_total * ($max_discount_percent / 100);
         if ($discount_amount > $max_discount) {
             $discount_amount = $max_discount;
             $points_to_use = floor($max_discount * $settings['redeem_rate']);
