@@ -40,7 +40,8 @@ class Order_Controller {
             'permission_callback' => ['MyShop_Auth', 'check_permission'],
             'args' => [
                 'order_id' => ['required' => true, 'type' => 'integer'],
-                'reason' => ['required' => false, 'type' => 'string']
+                'reason' => ['required' => false, 'type' => 'string'],
+                'contact' => ['required' => false, 'type' => 'string']
             ]
         ]);
 
@@ -503,12 +504,37 @@ class Order_Controller {
 
         $params = $request->get_json_params();
         $reason = isset($params['reason']) ? sanitize_text_field($params['reason']) : '用户申请退货';
+        $contact = isset($params['contact']) ? sanitize_text_field($params['contact']) : '';
 
         $requested_at = current_time('mysql');
         $order->update_meta_data('_myshop_return_requested_at', $requested_at);
         $order->update_meta_data('_myshop_return_reason', $reason);
-        $order->add_order_note('用户申请退货/售后：' . $reason);
+        if (!empty($contact)) {
+            $order->update_meta_data('_myshop_return_contact', $contact);
+        }
+        $note = '用户申请退货/售后：' . $reason;
+        if (!empty($contact)) {
+            $note .= '（联系方式：' . $contact . '）';
+        }
+        $order->add_order_note($note);
         $order->save();
+
+        $admin_email = get_option('admin_email');
+        if ($admin_email) {
+            $subject = sprintf('[%s] 有新的退货申请', get_bloginfo('name'));
+            $order_link = admin_url('post.php?post=' . $order_id . '&action=edit');
+            $message_lines = [
+                '订单号：' . $order->get_order_number(),
+                '订单ID：' . $order_id,
+                '申请时间：' . $requested_at,
+                '退货原因：' . $reason
+            ];
+            if (!empty($contact)) {
+                $message_lines[] = '联系方式：' . $contact;
+            }
+            $message_lines[] = '订单详情：' . $order_link;
+            wp_mail($admin_email, $subject, implode("\n", $message_lines));
+        }
 
         return rest_ensure_response([
             'success' => true,
