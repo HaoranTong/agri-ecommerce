@@ -50,6 +50,10 @@ class Auth_Controller {
 
         // 保存微信昵称和头像（如果前端提供）
         $json_params = $request->get_json_params();
+        MyShop_Auth::log_debug('login profile payload', [
+            'has_nickname' => !empty($json_params['nickname']),
+            'has_avatar' => !empty($json_params['avatar'])
+        ]);
         if (!empty($json_params['nickname'])) {
             update_user_meta($user_id, '_wechat_nickname', sanitize_text_field($json_params['nickname']));
             // 同时更新 WordPress 显示名称
@@ -74,68 +78,73 @@ class Auth_Controller {
      * 支持新版 phone_code 和旧版 encryptedData+iv 两种方式
      */
     public static function bind_phone($request) {
-        $user = MyShop_Auth::get_user_from_request($request);
-        if (is_wp_error($user)) {
-            return $user;
-        }
-
-        $params = $request->get_json_params();
-        $code = $params['code'] ?? '';
-        $phone_code = $params['phone_code'] ?? '';
-        $encrypted_data = $params['encrypted_data'] ?? '';
-        $iv = $params['iv'] ?? '';
-
-        error_log('=== BIND_PHONE REQUEST ===');
-        error_log('User ID: ' . $user->ID);
-        error_log('Has code: ' . (!empty($code) ? 'YES' : 'NO'));
-        error_log('Has phone_code: ' . (!empty($phone_code) ? 'YES' : 'NO'));
-        error_log('Has encrypted_data: ' . (!empty($encrypted_data) ? 'YES' : 'NO'));
-        error_log('Has iv: ' . (!empty($iv) ? 'YES' : 'NO'));
-
-        if (!$code) {
-            return new WP_Error('missing_code', '缺少登录码', ['status' => 400]);
-        }
-
-        $phone = null;
-
-        // 优先使用新版 phone_code（微信小程序基础库 2.21.2+）
-        if ($phone_code) {
-            error_log('Using NEW phone_code API, code: ' . substr($phone_code, 0, 15) . '...');
-            $phone = self::get_phone_from_code($phone_code);
-        }
-        // 兼容旧版 encryptedData + iv
-        elseif ($encrypted_data && $iv) {
-            $session_key = get_user_meta($user->ID, '_wechat_session_key', true);
-            error_log('Using LEGACY decrypt, has_session_key: ' . (!empty($session_key) ? 'YES' : 'NO'));
-            if ($session_key) {
-                $phone = self::decrypt_phone_data($encrypted_data, $iv, $session_key);
+        try {
+            $user = MyShop_Auth::get_user_from_request($request);
+            if (is_wp_error($user)) {
+                return $user;
             }
-        } else {
-            error_log('ERROR: No phone_code, encrypted_data or iv provided!');
+
+            $params = $request->get_json_params();
+            $code = $params['code'] ?? '';
+            $phone_code = $params['phone_code'] ?? '';
+            $encrypted_data = $params['encrypted_data'] ?? '';
+            $iv = $params['iv'] ?? '';
+
+            error_log('=== BIND_PHONE REQUEST ===');
+            error_log('User ID: ' . $user->ID);
+            error_log('Has code: ' . (!empty($code) ? 'YES' : 'NO'));
+            error_log('Has phone_code: ' . (!empty($phone_code) ? 'YES' : 'NO'));
+            error_log('Has encrypted_data: ' . (!empty($encrypted_data) ? 'YES' : 'NO'));
+            error_log('Has iv: ' . (!empty($iv) ? 'YES' : 'NO'));
+
+            if (!$code) {
+                return new WP_Error('missing_code', '缺少登录码', ['status' => 400]);
+            }
+
+            $phone = null;
+
+            // 优先使用新版 phone_code（微信小程序基础库 2.21.2+）
+            if ($phone_code) {
+                error_log('Using NEW phone_code API, code: ' . substr($phone_code, 0, 15) . '...');
+                $phone = self::get_phone_from_code($phone_code);
+            }
+            // 兼容旧版 encryptedData + iv
+            elseif ($encrypted_data && $iv) {
+                $session_key = get_user_meta($user->ID, '_wechat_session_key', true);
+                error_log('Using LEGACY decrypt, has_session_key: ' . (!empty($session_key) ? 'YES' : 'NO'));
+                if ($session_key) {
+                    $phone = self::decrypt_phone_data($encrypted_data, $iv, $session_key);
+                }
+            } else {
+                error_log('ERROR: No phone_code, encrypted_data or iv provided!');
+            }
+
+            if (is_wp_error($phone)) {
+                error_log('Phone result is WP_Error: ' . $phone->get_error_message());
+                return $phone;
+            }
+
+            if (!$phone) {
+                error_log('Phone is NULL - decryption failed');
+                return new WP_Error('phone_decrypt_failed', '手机号解密失败', ['status' => 400]);
+            }
+
+            // 保存手机号到用户元数据
+            update_user_meta($user->ID, '_wechat_phone', $phone);
+            update_user_meta($user->ID, 'billing_phone', $phone);
+
+            error_log('BIND_PHONE SUCCESS: ' . $phone);
+
+            return rest_ensure_response([
+                'success' => true,
+                'data' => [
+                    'phone' => $phone
+                ]
+            ]);
+        } catch (Throwable $e) {
+            error_log('[MyShop Core] bind_phone exception: ' . $e->getMessage());
+            return new WP_Error('bind_phone_exception', '手机号绑定失败，请稍后再试', ['status' => 500]);
         }
-
-        if (is_wp_error($phone)) {
-            error_log('Phone result is WP_Error: ' . $phone->get_error_message());
-            return $phone;
-        }
-
-        if (!$phone) {
-            error_log('Phone is NULL - decryption failed');
-            return new WP_Error('phone_decrypt_failed', '手机号解密失败', ['status' => 400]);
-        }
-
-        // 保存手机号到用户元数据
-        update_user_meta($user->ID, '_wechat_phone', $phone);
-        update_user_meta($user->ID, 'billing_phone', $phone);
-
-        error_log('BIND_PHONE SUCCESS: ' . $phone);
-
-        return rest_ensure_response([
-            'success' => true,
-            'data' => [
-                'phone' => $phone
-            ]
-        ]);
     }
 
     /**
@@ -153,6 +162,14 @@ class Auth_Controller {
         }
 
         $access_token = self::get_access_token();
+        if (is_wp_error($access_token)) {
+            error_log('get_phone_from_code: access_token error ' . $access_token->get_error_message());
+            return $access_token;
+        }
+        if (!$access_token) {
+            error_log('get_phone_from_code: access_token is empty');
+            return new WP_Error('wechat_access_token_empty', '微信 access_token 为空', ['status' => 500]);
+        }
         error_log('get_phone_from_code: access_token=' . substr($access_token, 0, 20) . '...');
 
         $url = sprintf(
@@ -251,7 +268,7 @@ class Auth_Controller {
         $response = wp_remote_get($url, ['timeout' => 10]);
         
         if (is_wp_error($response)) {
-            return '';
+            return $response;
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
@@ -262,6 +279,6 @@ class Auth_Controller {
             return $body['access_token'];
         }
 
-        return '';
+        return new WP_Error('wechat_token_failed', '获取微信 access_token 失败', ['response' => $body]);
     }
 }

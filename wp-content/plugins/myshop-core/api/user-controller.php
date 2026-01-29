@@ -20,6 +20,13 @@ class User_Controller {
             'callback' => [self::class, 'update_profile'],
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
+
+        // 上传头像
+        register_rest_route('myshop/v1', '/user/avatar', [
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'upload_avatar'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
         
         // 获取用户地址列表（包含默认地址）
         register_rest_route('myshop/v1', '/user/addresses', [
@@ -127,6 +134,57 @@ class User_Controller {
         ]));
         
         // 返回更新后的资料
+        return self::get_profile($request);
+    }
+
+    public static function upload_avatar($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        if (empty($_FILES['avatar'])) {
+            error_log('[MyShop Core] upload_avatar: missing file');
+            return new WP_Error('upload_failed', '请上传头像', ['status' => 422]);
+        }
+
+        $file = $_FILES['avatar'];
+        $allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+        if (!in_array($file['type'], $allowed, true)) {
+            error_log('[MyShop Core] upload_avatar: invalid mime ' . $file['type']);
+            return new WP_Error('upload_failed', '仅支持 JPG/PNG 图片', ['status' => 422]);
+        }
+
+        if ($file['size'] > 2 * MB_IN_BYTES) {
+            error_log('[MyShop Core] upload_avatar: file too large ' . $file['size']);
+            return new WP_Error('upload_failed', '图片大小超出 2MB 限制', ['status' => 422]);
+        }
+
+        $upload_dir = wp_upload_dir();
+        $avatar_dir = $upload_dir['basedir'] . '/avatars/' . date('Y/m');
+        $avatar_url_base = $upload_dir['baseurl'] . '/avatars/' . date('Y/m');
+
+        if (!file_exists($avatar_dir)) {
+            wp_mkdir_p($avatar_dir);
+            @file_put_contents($avatar_dir . '/.htaccess', 'Options -Indexes');
+        }
+
+        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = sprintf('avatar-%d-%s.%s', $user->ID, uniqid(), $ext);
+        $filepath = $avatar_dir . '/' . $filename;
+        $file_url = $avatar_url_base . '/' . $filename;
+        $file_url = set_url_scheme($file_url, 'https');
+
+        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+            error_log('[MyShop Core] upload_avatar: move_uploaded_file failed');
+            return new WP_Error('upload_failed', '文件保存失败', ['status' => 500]);
+        }
+
+        @chmod($filepath, 0644);
+        update_user_meta($user->ID, '_wechat_avatar', $file_url);
+
+        error_log('[MyShop Core] upload_avatar: success ' . $file_url);
+
         return self::get_profile($request);
     }
     

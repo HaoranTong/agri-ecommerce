@@ -1,6 +1,21 @@
 <?php
 
 class MyShop_Wechat {
+    private static function log_shipping($stage, $context = null) {
+        if (!defined('WP_CONTENT_DIR')) {
+            return;
+        }
+
+        $log_file = rtrim(WP_CONTENT_DIR, '/\\') . '/myshop-payment.log';
+        $line = sprintf(
+            "[%s] [wechat_shipping:%s] %s\n",
+            date('Y-m-d H:i:s'),
+            $stage,
+            $context ? wp_json_encode($context, JSON_UNESCAPED_UNICODE) : ''
+        );
+        @file_put_contents($log_file, $line, FILE_APPEND);
+    }
+
     public static function get_access_token() {
         $app_id = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : (defined('MYSHOP_WECHAT_APP_ID') ? MYSHOP_WECHAT_APP_ID : '');
         $secret = defined('MYSHOP_MINIAPP_APP_SECRET') ? MYSHOP_MINIAPP_APP_SECRET : '';
@@ -43,8 +58,11 @@ class MyShop_Wechat {
     public static function upload_shipping_info($payload) {
         $token = self::get_access_token();
         if (is_wp_error($token)) {
+            self::log_shipping('token_error', ['error' => $token->get_error_message()]);
             return $token;
         }
+
+        self::log_shipping('request', $payload);
 
         $url = add_query_arg([
             'access_token' => $token
@@ -62,11 +80,13 @@ class MyShop_Wechat {
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
+        self::log_shipping('response', $data ?: $body);
         if (!is_array($data) || !isset($data['errcode'])) {
             return new WP_Error('wechat_shipping_failed', '微信发货接口返回异常', ['response' => $body]);
         }
 
         if ((int) $data['errcode'] !== 0) {
+            self::log_shipping('error', $data);
             return new WP_Error('wechat_shipping_failed', $data['errmsg'] ?? '微信发货接口失败', ['response' => $data]);
         }
 

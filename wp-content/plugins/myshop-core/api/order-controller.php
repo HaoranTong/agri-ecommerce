@@ -2,6 +2,21 @@
 
 class Order_Controller {
 
+    private static function log_wechat_shipping($stage, $context = null) {
+        if (!defined('WP_CONTENT_DIR')) {
+            return;
+        }
+
+        $log_file = rtrim(WP_CONTENT_DIR, '/\\') . '/myshop-payment.log';
+        $line = sprintf(
+            "[%s] [wechat_shipping_sync:%s] %s\n",
+            date('Y-m-d H:i:s'),
+            $stage,
+            $context ? wp_json_encode($context, JSON_UNESCAPED_UNICODE) : ''
+        );
+        @file_put_contents($log_file, $line, FILE_APPEND);
+    }
+
     public static function boot() {
         add_action('updated_post_meta', [self::class, 'handle_tracking_meta_update'], 10, 4);
         add_action('added_post_meta', [self::class, 'handle_tracking_meta_update'], 10, 4);
@@ -309,12 +324,31 @@ class Order_Controller {
         }
         $user_id = $user->ID;
 
-        $order_id = absint($request->get_param('order_id'));
-        if (!$order_id) {
-            return new WP_Error('invalid_order_id', '无效的订单ID', ['status' => 400]);
+        $order_param = $request->get_param('order_id');
+        $order_id = absint($order_param);
+        $order = $order_id ? wc_get_order($order_id) : null;
+
+        if (!$order && $order_param) {
+            $order_key = sanitize_text_field((string) $order_param);
+            $candidates = wc_get_orders([
+                'limit' => 1,
+                'meta_key' => '_myshop_wechat_out_trade_no',
+                'meta_value' => $order_key
+            ]);
+            if (!empty($candidates)) {
+                $order = $candidates[0];
+            } else {
+                $tx_candidates = wc_get_orders([
+                    'limit' => 1,
+                    'meta_key' => '_myshop_wechat_transaction_id',
+                    'meta_value' => $order_key
+                ]);
+                if (!empty($tx_candidates)) {
+                    $order = $tx_candidates[0];
+                }
+            }
         }
 
-        $order = wc_get_order($order_id);
         if (!$order) {
             return new WP_Error('order_not_found', '订单不存在', ['status' => 404]);
         }
@@ -638,37 +672,54 @@ class Order_Controller {
     }
 
     private static function resolve_tracking_meta($order_id) {
-        $tracking_number = get_post_meta($order_id, '_myshop_tracking_number', true) ?: '';
-        $tracking_company = get_post_meta($order_id, '_myshop_tracking_company', true) ?: '';
-        $shipped_at = get_post_meta($order_id, '_myshop_shipped_at', true) ?: '';
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return [
+                'tracking_number' => '',
+                'tracking_company' => '',
+                'shipped_at' => ''
+            ];
+        }
+
+        $get_meta = static function ($key) use ($order, $order_id) {
+            $value = $order->get_meta($key, true);
+            if ($value === '' || $value === null) {
+                $value = get_post_meta($order_id, $key, true);
+            }
+            return $value;
+        };
+
+        $tracking_number = $get_meta('_myshop_tracking_number') ?: '';
+        $tracking_company = $get_meta('_myshop_tracking_company') ?: '';
+        $shipped_at = $get_meta('_myshop_shipped_at') ?: '';
 
         if (!$tracking_number) {
-            $tracking_number = get_post_meta($order_id, '_tracking_number', true) ?: '';
+            $tracking_number = $get_meta('_tracking_number') ?: '';
             if (!$tracking_number) {
-                $tracking_number = get_post_meta($order_id, 'tracking_number', true) ?: '';
+                $tracking_number = $get_meta('tracking_number') ?: '';
             }
         }
 
         if (!$tracking_company) {
-            $tracking_company = get_post_meta($order_id, '_tracking_provider', true) ?: '';
+            $tracking_company = $get_meta('_tracking_provider') ?: '';
             if (!$tracking_company) {
-                $tracking_company = get_post_meta($order_id, '_tracking_company', true) ?: '';
+                $tracking_company = $get_meta('_tracking_company') ?: '';
             }
             if (!$tracking_company) {
-                $tracking_company = get_post_meta($order_id, 'tracking_company', true) ?: '';
+                $tracking_company = $get_meta('tracking_company') ?: '';
             }
         }
 
         if (!$shipped_at) {
-            $shipped_at = get_post_meta($order_id, '_date_shipped', true) ?: '';
+            $shipped_at = $get_meta('_date_shipped') ?: '';
             if (!$shipped_at) {
-                $shipped_at = get_post_meta($order_id, 'date_shipped', true) ?: '';
+                $shipped_at = $get_meta('date_shipped') ?: '';
             }
         }
 
-        $tracking_items = get_post_meta($order_id, '_wc_shipment_tracking_items', true);
+        $tracking_items = $get_meta('_wc_shipment_tracking_items');
         if (empty($tracking_items)) {
-            $tracking_items = get_post_meta($order_id, '_woo_shipment_tracking_items', true);
+            $tracking_items = $get_meta('_woo_shipment_tracking_items');
         }
         if (is_string($tracking_items)) {
             $tracking_items = maybe_unserialize($tracking_items);
@@ -707,21 +758,42 @@ class Order_Controller {
             return;
         }
 
+        self::log_wechat_shipping('start', ['order_id' => $order_id]);
+
         $tracking_meta = self::resolve_tracking_meta($order_id);
         if (empty($tracking_meta['tracking_number']) || empty($tracking_meta['tracking_company'])) {
+            self::log_wechat_shipping('skip_missing_tracking', [
+                'order_id' => $order_id,
+                'tracking_number' => $tracking_meta['tracking_number'] ?? '',
+                'tracking_company' => $tracking_meta['tracking_company'] ?? ''
+            ]);
             return;
         }
 
-        $order_number_type = 2;
-        $order_number_value = $order->get_meta('_myshop_wechat_out_trade_no', true);
-        if (!$order_number_value) {
+        $out_trade_no = $order->get_meta('_myshop_wechat_out_trade_no', true);
+        $transaction_id = $order->get_meta('_myshop_wechat_transaction_id', true);
+        if (!$transaction_id) {
             $transaction_id = $order->get_transaction_id();
-            if ($transaction_id) {
-                $order_number_type = 1;
-                $order_number_value = $transaction_id;
-            }
         }
+
+        $order_number_type = 0;
+        $order_number_value = '';
+
+        if ($transaction_id) {
+            $order_number_type = 1;
+            $order_number_value = $transaction_id;
+        } elseif ($out_trade_no) {
+            // 微信订单中心发货要求 transaction_id，缺失时直接阻止同步并提示
+            self::log_wechat_shipping('skip_missing_transaction_id', [
+                'order_id' => $order_id,
+                'out_trade_no' => $out_trade_no
+            ]);
+            self::note_wechat_sync_error($order, '缺少微信交易号 transaction_id，无法同步到微信订单中心');
+            return;
+        }
+
         if (!$order_number_value) {
+            self::log_wechat_shipping('skip_missing_order_number', ['order_id' => $order_id]);
             self::note_wechat_sync_error($order, '缺少商户单号/微信交易号，无法同步');
             return;
         }
@@ -729,6 +801,7 @@ class Order_Controller {
         $sync_key = $tracking_meta['tracking_number'] . '|' . $tracking_meta['tracking_company'];
         $synced_key = get_post_meta($order_id, '_myshop_wechat_shipping_synced_key', true);
         if ($synced_key === $sync_key) {
+            self::log_wechat_shipping('skip_already_synced', ['order_id' => $order_id, 'sync_key' => $sync_key]);
             return;
         }
 
@@ -740,13 +813,22 @@ class Order_Controller {
 
         $express_company = self::normalize_express_company($tracking_meta['tracking_company']);
         if (!$express_company) {
+            self::log_wechat_shipping('skip_invalid_express', [
+                'order_id' => $order_id,
+                'tracking_company' => $tracking_meta['tracking_company']
+            ]);
+            self::note_wechat_sync_error(
+                $order,
+                '快递公司无法识别，请使用标准快递公司名称（顺丰/中通/圆通/申通/韵达/京东/EMS）',
+                $sync_key
+            );
             return;
         }
 
         $payload = [
             'order_key' => [
                 'order_number_type' => $order_number_type,
-                ($order_number_type === 1 ? 'transaction_id' : 'out_trade_no') => $order_number_value
+                'transaction_id' => $transaction_id
             ],
             'logistics_type' => 1,
             'delivery_mode' => 1,
@@ -765,6 +847,10 @@ class Order_Controller {
         $response = MyShop_Wechat::upload_shipping_info($payload);
         if (is_wp_error($response)) {
             $message = $response->get_error_message();
+            self::log_wechat_shipping('wechat_error', [
+                'order_id' => $order_id,
+                'message' => $message
+            ]);
             error_log('[MyShop Core] WeChat shipping sync failed: ' . $message);
             self::note_wechat_sync_error($order, '微信订单中心同步失败：' . $message, $sync_key);
             return;
@@ -773,6 +859,7 @@ class Order_Controller {
         update_post_meta($order_id, '_myshop_wechat_shipping_synced_key', $sync_key);
         update_post_meta($order_id, '_myshop_wechat_shipping_synced_at', current_time('mysql'));
         $order->add_order_note('已同步微信订单中心发货信息');
+        self::log_wechat_shipping('success', ['order_id' => $order_id]);
     }
 
     private static function note_wechat_sync_error($order, $message, $sync_key = '') {
@@ -809,12 +896,20 @@ class Order_Controller {
 
         $map = [
             '顺丰' => 'SF',
+            '顺丰速运' => 'SF',
             '申通' => 'STO',
+            '申通快递' => 'STO',
             '圆通' => 'YTO',
+            '圆通速递' => 'YTO',
             '中通' => 'ZTO',
+            '中通快递' => 'ZTO',
             '韵达' => 'YUNDA',
+            '韵达快递' => 'YUNDA',
             '京东' => 'JD',
+            '京东物流' => 'JD',
             '邮政' => 'EMS',
+            '中国邮政' => 'EMS',
+            '邮政EMS' => 'EMS',
             'EMS' => 'EMS'
         ];
 

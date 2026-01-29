@@ -282,6 +282,16 @@ class Payment_Controller {
                 self::log_debug_always('wechat notify already paid', ['order_id' => $order->get_id()]);
             }
             $order->update_meta_data('_myshop_payment_status', 'paid');
+
+            // 若订单需要发货，强制进入“处理中(待发货)”状态，避免自动变为已完成
+            $has_shipping = $order->needs_shipping_address()
+                || $order->get_shipping_address_1()
+                || $order->get_shipping_city()
+                || $order->get_shipping_state();
+
+            if ($has_shipping && $order->get_status() !== 'processing') {
+                $order->update_status('processing');
+            }
         } elseif (in_array($trade_state, ['CLOSED', 'REVOKED', 'PAYERROR'], true)) {
             $order->update_meta_data('_myshop_payment_status', 'failed');
             self::log_debug_always('wechat notify payment failed', ['order_id' => $order->get_id(), 'state' => $trade_state]);
