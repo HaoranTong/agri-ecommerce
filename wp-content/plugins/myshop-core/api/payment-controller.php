@@ -290,6 +290,12 @@ class Payment_Controller {
             }
             $order->update_meta_data('_myshop_payment_status', 'paid');
 
+            // ✅ 兜底：若 payment_complete 未更新状态，强制推进到 processing
+            // 说明：个别环境下 WooCommerce 未触发网关状态切换，导致后台仍显示“待付款”。
+            if ($order->get_status() === 'pending') {
+                $order->update_status('processing', '微信支付成功，自动更新订单状态');
+            }
+
             // 订单完成状态由 WooCommerce payment_complete 规则与过滤器统一处理
         } elseif (in_array($trade_state, ['CLOSED', 'REVOKED', 'PAYERROR'], true)) {
             $order->update_meta_data('_myshop_payment_status', 'failed');

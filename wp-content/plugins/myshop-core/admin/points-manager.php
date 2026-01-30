@@ -15,6 +15,8 @@ class MyShop_Points_Manager {
         add_action('edit_user_profile', [self::class, 'render_user_points_profile']);
         
         // 订单完成时自动发放积分
+        // ✅ 支付成功后订单进入 processing 即发放积分，避免等待 completed
+        add_action('woocommerce_order_status_processing', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
         add_action('woocommerce_order_status_completed', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
         
         // 订单状态变为processing时扣除积分
