@@ -36,7 +36,10 @@ class Auth_Controller {
         $openid = is_array($login_result) ? ($login_result['openid'] ?? '') : $login_result;
         if (!$openid) return new WP_Error('invalid_code', '无效的登录码', ['status' => 401]);
 
-        $user_id = MyShop_Auth::get_or_create_user_by_openid($openid);
+        $existing_user_id = MyShop_Auth::find_user_id_by_openid($openid);
+        $is_new_user = !$existing_user_id;
+
+        $user_id = $existing_user_id ?: MyShop_Auth::get_or_create_user_by_openid($openid);
         if (!$user_id) return new WP_Error('user_creation_failed', '用户创建失败', ['status' => 500]);
 
         if (is_array($login_result)) {
@@ -66,10 +69,35 @@ class Auth_Controller {
             update_user_meta($user_id, '_wechat_avatar', esc_url_raw($json_params['avatar']));
         }
 
+        $wechat_nickname = get_user_meta($user_id, '_wechat_nickname', true);
+        $wechat_avatar = get_user_meta($user_id, '_wechat_avatar', true);
+        $phone = get_user_meta($user_id, '_wechat_phone', true);
+        if (!$phone) {
+            $phone = get_user_meta($user_id, 'billing_phone', true);
+        }
+
+        $user = get_userdata($user_id);
+        $display_name = $user ? $user->display_name : '';
+        $has_profile = !empty($wechat_nickname) || !empty($wechat_avatar) || ($display_name && $display_name !== '微信用户');
+        $has_realname = $user ? !empty($user->first_name) : false;
+        $has_phone = !empty($phone);
+
         $token = MyShop_Auth::generate_token($user_id, $openid);
         return rest_ensure_response([
             'success' => true,
-            'data' => compact('user_id', 'token', 'openid')
+            'data' => [
+                'user_id' => $user_id,
+                'token' => $token,
+                'openid' => $openid,
+                'is_new_user' => $is_new_user,
+                'is_new' => $is_new_user,
+                'has_profile' => $has_profile,
+                'has_realname' => $has_realname,
+                'has_phone' => $has_phone,
+                'wechat_nickname' => $wechat_nickname ?: null,
+                'wechat_avatar' => $wechat_avatar ?: null,
+                'phone' => $phone ?: null
+            ]
         ]);
     }
 

@@ -287,6 +287,18 @@ class MyShop_Auth {
         
         return $user_id;
     }
+
+    public static function find_user_id_by_openid($openid) {
+        if (!is_string($openid) || $openid === '') {
+            return null;
+        }
+        global $wpdb;
+        $user_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = '_wechat_openid' AND meta_value = %s",
+            $openid
+        ));
+        return $user_id ? (int) $user_id : null;
+    }
     public static function check_permission($request) {
         $user = self::get_user_from_request($request);
         if (is_wp_error($user)) {

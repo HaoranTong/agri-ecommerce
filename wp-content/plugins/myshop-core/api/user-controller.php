@@ -44,6 +44,12 @@ class User_Controller {
 
         $openid = get_user_meta($user->ID, '_wechat_openid', true);
         $referral_code = 'REF' . str_pad($user->ID, 6, '0', STR_PAD_LEFT);
+        $wechat_nickname = get_user_meta($user->ID, '_wechat_nickname', true);
+        $wechat_avatar = get_user_meta($user->ID, '_wechat_avatar', true);
+        $phone = get_user_meta($user->ID, 'billing_phone', true);
+        if (!$phone) {
+            $phone = get_user_meta($user->ID, '_wechat_phone', true);
+        }
         
         // 获取积分余额
         global $wpdb;
@@ -56,8 +62,10 @@ class User_Controller {
         ));
 
         // 优先使用微信头像，其次使用 WordPress 默认头像
-        $wechat_avatar = get_user_meta($user->ID, '_wechat_avatar', true);
         $avatar = !empty($wechat_avatar) ? $wechat_avatar : get_avatar_url($user->ID);
+        $has_profile = !empty($wechat_nickname) || !empty($wechat_avatar) || ($user->display_name && $user->display_name !== '微信用户');
+        $has_realname = !empty($user->first_name);
+        $has_phone = !empty($phone);
 
         return rest_ensure_response([
             'success' => true,
@@ -68,13 +76,18 @@ class User_Controller {
                 'first_name' => $user->first_name,
                 'last_name' => $user->last_name,
                 'email' => $user->user_email,
-                'phone' => get_user_meta($user->ID, 'billing_phone', true),
+                'phone' => $phone,
                 'avatar' => $avatar,
                 'openid' => $openid,
                 'referral_code' => $referral_code,
                 'points_balance' => intval($points_balance),
                 'is_test_user' => get_user_meta($user->ID, '_is_test_user', true) === '1',
-                'test_code' => get_user_meta($user->ID, '_test_user_code', true)
+                'test_code' => get_user_meta($user->ID, '_test_user_code', true),
+                'wechat_nickname' => $wechat_nickname ?: null,
+                'wechat_avatar' => $wechat_avatar ?: null,
+                'has_profile' => $has_profile,
+                'has_realname' => $has_realname,
+                'has_phone' => $has_phone
             ]
         ]);
     }
