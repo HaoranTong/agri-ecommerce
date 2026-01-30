@@ -32,6 +32,12 @@ class Payment_Controller {
             'permission_callback' => '__return_true'
         ]);
 
+        register_rest_route('myshop/v1', '/payments/notify/wechat-refund', [
+            'methods'  => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'notify_wechat_refund'],
+            'permission_callback' => '__return_true'
+        ]);
+
         register_rest_route('myshop/v1', '/payments/diagnose', [
             'methods'  => \WP_REST_Server::READABLE,
             'callback' => [self::class, 'diagnose'],
@@ -253,6 +259,7 @@ class Payment_Controller {
         $trade_state = $decrypted['trade_state'] ?? '';
         $transaction_id = $decrypted['transaction_id'] ?? '';
         $total = isset($decrypted['amount']['total']) ? (int) $decrypted['amount']['total'] : null;
+        $payer_openid = $decrypted['payer']['openid'] ?? '';
 
         $order = self::find_order_by_out_trade_no($out_trade_no);
         if (!$order) {
@@ -283,15 +290,7 @@ class Payment_Controller {
             }
             $order->update_meta_data('_myshop_payment_status', 'paid');
 
-            // 若订单需要发货，强制进入“处理中(待发货)”状态，避免自动变为已完成
-            $has_shipping = $order->needs_shipping_address()
-                || $order->get_shipping_address_1()
-                || $order->get_shipping_city()
-                || $order->get_shipping_state();
-
-            if ($has_shipping && $order->get_status() !== 'processing') {
-                $order->update_status('processing');
-            }
+            // 订单完成状态由 WooCommerce payment_complete 规则与过滤器统一处理
         } elseif (in_array($trade_state, ['CLOSED', 'REVOKED', 'PAYERROR'], true)) {
             $order->update_meta_data('_myshop_payment_status', 'failed');
             self::log_debug_always('wechat notify payment failed', ['order_id' => $order->get_id(), 'state' => $trade_state]);
@@ -304,6 +303,9 @@ class Payment_Controller {
         if ($transaction_id && $transaction_id !== '') {
             $order->update_meta_data('_myshop_wechat_transaction_id', $transaction_id);
         }
+        if ($payer_openid) {
+            $order->update_meta_data('_myshop_wechat_payer_openid', $payer_openid);
+        }
         $order->save();
 
         self::log_debug_always('wechat notify success', ['order_id' => $order->get_id()]);
@@ -312,6 +314,150 @@ class Payment_Controller {
             'code' => 'SUCCESS',
             'message' => 'OK'
         ]);
+    }
+
+    public static function notify_wechat_refund($request) {
+        if (!self::wechat_ready()) {
+            return new WP_Error('wechat_not_configured', '微信支付未配置', ['status' => 400]);
+        }
+
+        $body = $request->get_body();
+        if ($body === '') {
+            return new WP_Error('invalid_payload', '回调体为空', ['status' => 400]);
+        }
+
+        $headers = [
+            'wechatpay-signature' => $request->get_header('wechatpay-signature'),
+            'wechatpay-timestamp' => $request->get_header('wechatpay-timestamp'),
+            'wechatpay-nonce' => $request->get_header('wechatpay-nonce'),
+            'wechatpay-serial' => $request->get_header('wechatpay-serial')
+        ];
+
+        foreach (['wechatpay-signature', 'wechatpay-timestamp', 'wechatpay-nonce'] as $required) {
+            if (empty($headers[$required])) {
+                return new WP_Error('wechatpay_missing_header', '缺少微信支付回调头', ['status' => 400]);
+            }
+        }
+
+        if (defined('MYSHOP_WECHAT_PLATFORM_SERIAL') && $headers['wechatpay-serial']) {
+            if ($headers['wechatpay-serial'] !== MYSHOP_WECHAT_PLATFORM_SERIAL) {
+                return new WP_Error('wechatpay_invalid_serial', '微信支付平台证书序列号不匹配', ['status' => 400]);
+            }
+        }
+
+        if (!self::verify_wechat_signature($headers['wechatpay-timestamp'], $headers['wechatpay-nonce'], $body, $headers['wechatpay-signature'])) {
+            return new WP_Error('wechatpay_invalid_signature', '微信支付验签失败', ['status' => 400]);
+        }
+
+        $payload = json_decode($body, true);
+        if (!is_array($payload) || empty($payload['resource'])) {
+            return new WP_Error('wechatpay_invalid_payload', '微信支付回调格式错误', ['status' => 400]);
+        }
+
+        $resource = $payload['resource'];
+        $decrypted = self::decrypt_wechat_resource($resource);
+        if (is_wp_error($decrypted)) {
+            return $decrypted;
+        }
+
+        $out_refund_no = $decrypted['out_refund_no'] ?? '';
+        $refund_status = $decrypted['refund_status'] ?? '';
+
+        if ($out_refund_no === '') {
+            return new WP_Error('wechatpay_invalid_payload', '退款回调缺少 out_refund_no', ['status' => 400]);
+        }
+
+        $order = self::find_order_by_refund_no($out_refund_no);
+        if (!$order) {
+            return new WP_Error('order_not_found', '订单不存在', ['status' => 404]);
+        }
+
+        if ($refund_status === 'SUCCESS') {
+            $order->update_meta_data('_myshop_wechat_refund_status', 'success');
+            $order->update_meta_data('_myshop_return_status', 'refunded');
+            if ($order->get_status() !== 'refunded') {
+                $order->update_status('refunded', '微信退款成功');
+            }
+            $order->add_order_note('微信退款成功');
+            $order->save();
+        } elseif ($refund_status === 'PROCESSING') {
+            $order->update_meta_data('_myshop_wechat_refund_status', 'processing');
+            $order->add_order_note('微信退款处理中');
+            $order->save();
+        } elseif ($refund_status === 'CLOSED' || $refund_status === 'ABNORMAL') {
+            $order->update_meta_data('_myshop_wechat_refund_status', strtolower($refund_status));
+            $order->add_order_note('微信退款失败：' . $refund_status);
+            $order->save();
+        }
+
+        return rest_ensure_response([
+            'code' => 'SUCCESS',
+            'message' => 'OK'
+        ]);
+    }
+
+    public static function refund_wechat_order($order, $reason = '') {
+        if (!$order instanceof WC_Order) {
+            return new WP_Error('invalid_order', '订单无效');
+        }
+
+        if (!self::wechat_ready()) {
+            return new WP_Error('wechat_not_configured', '微信支付未配置');
+        }
+
+        $transaction_id = $order->get_meta('_myshop_wechat_transaction_id', true);
+        if (!$transaction_id) {
+            $transaction_id = $order->get_transaction_id();
+        }
+        $out_trade_no = $order->get_meta('_myshop_wechat_out_trade_no', true);
+
+        if (!$transaction_id && !$out_trade_no) {
+            return new WP_Error('missing_trade_no', '缺少 transaction_id 或 out_trade_no');
+        }
+
+        $total = (int) round((float) $order->get_total() * 100);
+        if ($total < 1) {
+            return new WP_Error('invalid_amount', '退款金额无效');
+        }
+
+        $out_refund_no = 'RF' . $order->get_id() . gmdate('YmdHis') . wp_rand(1000, 9999);
+        $notify_url = home_url('/wp-json/myshop/v1/payments/notify/wechat-refund');
+
+        $payload = [
+            'out_refund_no' => $out_refund_no,
+            'amount' => [
+                'refund' => $total,
+                'total' => $total,
+                'currency' => 'CNY'
+            ],
+            'notify_url' => $notify_url
+        ];
+
+        if ($transaction_id) {
+            $payload['transaction_id'] = $transaction_id;
+        } else {
+            $payload['out_trade_no'] = $out_trade_no;
+        }
+
+        if ($reason) {
+            $payload['reason'] = $reason;
+        }
+
+        $response = self::wechat_request('POST', '/v3/refund/domestic/refunds', $payload);
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $order->update_meta_data('_myshop_wechat_refund_no', $out_refund_no);
+        if (!empty($response['refund_id'])) {
+            $order->update_meta_data('_myshop_wechat_refund_id', $response['refund_id']);
+        }
+        if (!empty($response['status'])) {
+            $order->update_meta_data('_myshop_wechat_refund_status', strtolower($response['status']));
+        }
+        $order->save();
+
+        return $response;
     }
 
     private static function resolve_payment_status($order) {
@@ -368,6 +514,7 @@ class Payment_Controller {
             wp_rand(100000, 999999)
         );
         $order->update_meta_data('_myshop_wechat_out_trade_no', $out_trade_no);
+        $order->update_meta_data('_myshop_wechat_payer_openid', $openid);
         $order->update_meta_data('_myshop_payment_provider', 'wechat');
         $order->update_meta_data('_myshop_payment_status', 'pending');
         $order->save();
@@ -664,6 +811,21 @@ class Payment_Controller {
         }
 
         return $data;
+    }
+
+    private static function find_order_by_refund_no($refund_no) {
+        $refund_no = sanitize_text_field($refund_no);
+        if ($refund_no === '') {
+            return null;
+        }
+
+        $orders = wc_get_orders([
+            'limit' => 1,
+            'meta_key' => '_myshop_wechat_refund_no',
+            'meta_value' => $refund_no
+        ]);
+
+        return !empty($orders) ? $orders[0] : null;
     }
 
     private static function find_order_by_out_trade_no($out_trade_no) {

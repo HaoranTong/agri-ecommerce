@@ -97,7 +97,7 @@ class Auth_Controller {
             error_log('Has encrypted_data: ' . (!empty($encrypted_data) ? 'YES' : 'NO'));
             error_log('Has iv: ' . (!empty($iv) ? 'YES' : 'NO'));
 
-            if (!$code) {
+            if (!$code && !$phone_code && !($encrypted_data && $iv)) {
                 return new WP_Error('missing_code', '缺少登录码', ['status' => 400]);
             }
 
@@ -166,8 +166,11 @@ class Auth_Controller {
             error_log('get_phone_from_code: access_token error ' . $access_token->get_error_message());
             return $access_token;
         }
-        if (!$access_token) {
-            error_log('get_phone_from_code: access_token is empty');
+        if (is_array($access_token) && !empty($access_token['token'])) {
+            $access_token = $access_token['token'];
+        }
+        if (!$access_token || !is_string($access_token)) {
+            error_log('get_phone_from_code: access_token is empty or invalid');
             return new WP_Error('wechat_access_token_empty', '微信 access_token 为空', ['status' => 500]);
         }
         error_log('get_phone_from_code: access_token=' . substr($access_token, 0, 20) . '...');
@@ -249,11 +252,16 @@ class Auth_Controller {
      * 获取微信 access_token
      */
     private static function get_access_token() {
-        $cache_key = 'myshop_wechat_access_token';
+        $cache_key = 'myshop_wechat_access_token_phone';
         $cached = get_transient($cache_key);
         
         if ($cached) {
-            return $cached;
+            if (is_array($cached) && !empty($cached['token'])) {
+                return $cached['token'];
+            }
+            if (is_string($cached)) {
+                return $cached;
+            }
         }
 
         $app_id = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : '';

@@ -8,19 +8,28 @@ class Order_Controller {
         }
 
         $log_file = rtrim(WP_CONTENT_DIR, '/\\') . '/myshop-payment.log';
+        $timestamp = current_time('timestamp');
         $line = sprintf(
             "[%s] [wechat_shipping_sync:%s] %s\n",
-            date('Y-m-d H:i:s'),
+            wp_date('Y-m-d H:i:s', $timestamp),
             $stage,
             $context ? wp_json_encode($context, JSON_UNESCAPED_UNICODE) : ''
         );
-        @file_put_contents($log_file, $line, FILE_APPEND);
+        $written = @file_put_contents($log_file, $line, FILE_APPEND);
+        if ($written === false) {
+            error_log('[MyShop Core] ' . trim($line));
+        }
     }
 
     public static function boot() {
         add_action('updated_post_meta', [self::class, 'handle_tracking_meta_update'], 10, 4);
         add_action('added_post_meta', [self::class, 'handle_tracking_meta_update'], 10, 4);
         add_action('woocommerce_order_status_changed', [self::class, 'handle_order_status_changed'], 10, 4);
+        add_action('myshop_sync_wechat_shipping', [self::class, 'run_wechat_shipping_sync'], 10, 1);
+    }
+
+    public static function run_wechat_shipping_sync($order_id) {
+        self::maybe_sync_wechat_shipping($order_id);
     }
 
     public static function register_routes() {
@@ -57,6 +66,15 @@ class Order_Controller {
                 'order_id' => ['required' => true, 'type' => 'integer'],
                 'reason' => ['required' => false, 'type' => 'string'],
                 'contact' => ['required' => false, 'type' => 'string']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/orders/(?P<order_id>\d+)/return-request/upload', [
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'upload_return_image'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'order_id' => ['required' => true, 'type' => 'integer']
             ]
         ]);
 
@@ -235,6 +253,8 @@ class Order_Controller {
 
         // ✅ 已移除扫码支付二维码逻辑，前端仅使用微信支付
 
+        self::notify_wechat_admin('order', $order);
+
         return rest_ensure_response([
             'order_id' => $order->get_id(),
             'order_number' => $order->get_order_number(),
@@ -248,6 +268,63 @@ class Order_Controller {
             ]]
             // ✅ 已移除 payment_qr_url, customer_service_qr, message 字段
         ]);
+    }
+
+    private static function notify_wechat_admin($type, $order, $context = []) {
+        if (!($order instanceof WC_Order)) {
+            return;
+        }
+
+        $config = get_option('myshop_public_config', []);
+        $enabled = !empty($config['notify_admin_enabled']);
+        if (!$enabled) {
+            return;
+        }
+
+        $openids_raw = $config['notify_admin_openids'] ?? '';
+        if (!$openids_raw) {
+            return;
+        }
+
+        $notify_order = !empty($config['notify_admin_order']);
+        $notify_return = !empty($config['notify_admin_return']);
+
+        if ($type === 'order' && !$notify_order) {
+            return;
+        }
+        if ($type === 'return' && !$notify_return) {
+            return;
+        }
+
+        $openids = array_filter(array_map('trim', preg_split('/[\r\n,]+/', (string) $openids_raw)));
+        if (empty($openids)) {
+            return;
+        }
+
+        $order_no = $order->get_order_number();
+        $total = $order->get_total();
+        $created = $order->get_date_created() ? $order->get_date_created()->format('Y-m-d H:i') : current_time('Y-m-d H:i');
+
+        if ($type === 'return') {
+            $reason = isset($context['reason']) ? $context['reason'] : '';
+            $contact = isset($context['contact']) ? $context['contact'] : '';
+            $content = "【退货申请】\n订单号：{$order_no}\n金额：{$total}\n时间：{$created}";
+            if ($reason) {
+                $content .= "\n原因：{$reason}";
+            }
+            if ($contact) {
+                $content .= "\n联系方式：{$contact}";
+            }
+        } else {
+            $content = "【新订单】\n订单号：{$order_no}\n金额：{$total}\n时间：{$created}";
+        }
+
+        foreach ($openids as $openid) {
+            $result = MyShop_Wechat::send_custom_message($openid, $content);
+            if (is_wp_error($result)) {
+                error_log('[MyShop Core] WeChat notify failed: ' . $result->get_error_message());
+            }
+        }
     }
 
     // ✅ 获取当前用户的订单列表
@@ -289,6 +366,12 @@ class Order_Controller {
             $tracking_number = $tracking_meta['tracking_number'];
             $tracking_company = $tracking_meta['tracking_company'];
             $shipped_at = $tracking_meta['shipped_at'];
+
+            $return_requested_at = $order->get_meta('_myshop_return_requested_at', true);
+            $return_status = $order->get_meta('_myshop_return_status', true);
+            if (!$return_status) {
+                $return_status = $return_requested_at ? 'requested' : 'none';
+            }
             
             $is_gift_card_order = $order->get_meta('_myshop_is_gift_card_order', true) === 'yes';
             $giftcard_mode = $order->get_meta('_myshop_giftcard_mode', true);
@@ -303,6 +386,8 @@ class Order_Controller {
                 'tracking_number'  => $tracking_number,
                 'tracking_company' => $tracking_company,
                 'shipped_at'       => $shipped_at,
+                'return_status'    => $return_status,
+                'return_requested_at' => $return_requested_at ?: null,
                 'is_gift_card_order' => $is_gift_card_order,
                 'giftcard_mode'      => $giftcard_mode ?: null
             ];
@@ -454,7 +539,15 @@ class Order_Controller {
         $points_discount_amount = (float) $order->get_meta('_points_discount_amount', true);
 
         $return_requested_at = $order->get_meta('_myshop_return_requested_at', true);
-        $return_status = $return_requested_at ? 'requested' : 'none';
+        $return_status = $order->get_meta('_myshop_return_status', true);
+        if (!$return_status) {
+            $return_status = $return_requested_at ? 'requested' : 'none';
+        }
+        $return_images = $order->get_meta('_myshop_return_images', true);
+        if (is_string($return_images)) {
+            $decoded = json_decode($return_images, true);
+            $return_images = is_array($decoded) ? $decoded : [];
+        }
 
         // ✅ 计算积分奖励（支付页显示用）
         $points_reward = 0;
@@ -489,6 +582,7 @@ class Order_Controller {
             'shipped_at'          => $shipped_at,
             'return_status'       => $return_status,
             'return_requested_at' => $return_requested_at ?: null,
+            'return_images'       => is_array($return_images) ? $return_images : [],
             'coupon_info'         => $coupon_info,
             'gift_card_info'      => $gift_card_info,
             'is_gift_card_order'  => $order->get_meta('_myshop_is_gift_card_order', true) === 'yes',
@@ -539,25 +633,110 @@ class Order_Controller {
         $params = $request->get_json_params();
         $reason = isset($params['reason']) ? sanitize_text_field($params['reason']) : '用户申请退货';
         $contact = isset($params['contact']) ? sanitize_text_field($params['contact']) : '';
+        $images = isset($params['images']) && is_array($params['images']) ? $params['images'] : [];
+        $clean_images = [];
+        foreach ($images as $img) {
+            $url = esc_url_raw((string) $img);
+            if ($url) {
+                $clean_images[] = $url;
+            }
+        }
+        $clean_images = array_values(array_unique($clean_images));
 
         $requested_at = current_time('mysql');
+        $order->update_meta_data('_myshop_return_prev_status', $order->get_status());
         $order->update_meta_data('_myshop_return_requested_at', $requested_at);
+        $order->update_meta_data('_myshop_return_status', 'requested');
         $order->update_meta_data('_myshop_return_reason', $reason);
         if (!empty($contact)) {
             $order->update_meta_data('_myshop_return_contact', $contact);
+        }
+        if (!empty($clean_images)) {
+            $order->update_meta_data('_myshop_return_images', wp_json_encode($clean_images, JSON_UNESCAPED_SLASHES));
         }
         $note = '用户申请退货/售后：' . $reason;
         if (!empty($contact)) {
             $note .= '（联系方式：' . $contact . '）';
         }
+        if (!empty($clean_images)) {
+            $note .= '（已上传图片：' . count($clean_images) . '张）';
+        }
         $order->add_order_note($note);
+        if ($order->get_status() !== 'return-requested') {
+            $order->update_status('return-requested', '用户申请退货');
+        }
         $order->save();
+
+        self::notify_wechat_admin('return', $order, [
+            'reason' => $reason,
+            'contact' => $contact,
+            'images' => $clean_images
+        ]);
 
         return rest_ensure_response([
             'success' => true,
             'data' => [
                 'return_status' => 'requested',
                 'return_requested_at' => $requested_at
+            ]
+        ]);
+    }
+
+    public static function upload_return_image($request) {
+        $auth = MyShop_Auth::check_permission($request);
+        if (is_wp_error($auth)) {
+            return $auth;
+        }
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $order_id = absint($request->get_param('order_id'));
+        if (!$order_id) {
+            return new WP_Error('invalid_order_id', '无效的订单ID', ['status' => 400]);
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order || (int) $order->get_customer_id() !== (int) $user->ID) {
+            return new WP_Error('order_not_found', '订单不存在或无权访问', ['status' => 404]);
+        }
+
+        if (empty($_FILES['image'])) {
+            return new WP_Error('upload_failed', '请上传图片', ['status' => 422]);
+        }
+
+        $file = $_FILES['image'];
+        $allowed = ['image/jpeg', 'image/png'];
+        if (!in_array($file['type'], $allowed, true)) {
+            return new WP_Error('upload_failed', '仅支持 JPG/PNG 图片', ['status' => 422]);
+        }
+
+        if ($file['size'] > 5 * MB_IN_BYTES) {
+            return new WP_Error('upload_failed', '图片大小超出 5MB 限制', ['status' => 422]);
+        }
+
+        $upload_dir = wp_upload_dir();
+        $return_dir = $upload_dir['basedir'] . '/return-requests/' . date('Y/m');
+        $return_url_base = $upload_dir['baseurl'] . '/return-requests/' . date('Y/m');
+        if (!file_exists($return_dir)) {
+            wp_mkdir_p($return_dir);
+            @file_put_contents($return_dir . '/.htaccess', 'Options -Indexes');
+        }
+
+        $filename = wp_unique_filename($return_dir, $file['name']);
+        $target = $return_dir . '/' . $filename;
+        if (!move_uploaded_file($file['tmp_name'], $target)) {
+            return new WP_Error('upload_failed', '图片保存失败', ['status' => 500]);
+        }
+
+        $url = $return_url_base . '/' . $filename;
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'url' => $url
             ]
         ]);
     }
@@ -758,6 +937,28 @@ class Order_Controller {
             return;
         }
 
+        if (!defined('DOING_CRON') || !DOING_CRON) {
+            $queue_key = 'myshop_wechat_shipping_queued_' . $order_id;
+            if (get_transient($queue_key)) {
+                self::log_wechat_shipping('skip_queued', ['order_id' => $order_id]);
+                return;
+            }
+
+            set_transient($queue_key, 1, 120);
+            wp_schedule_single_event(time() + 5, 'myshop_sync_wechat_shipping', [$order_id]);
+            self::log_wechat_shipping('queued', ['order_id' => $order_id]);
+            return;
+        }
+
+        delete_transient('myshop_wechat_shipping_queued_' . $order_id);
+
+        $lock_key = 'myshop_wechat_shipping_syncing_' . $order_id;
+        if (get_transient($lock_key)) {
+            self::log_wechat_shipping('skip_locked', ['order_id' => $order_id]);
+            return;
+        }
+        set_transient($lock_key, 1, 60);
+
         self::log_wechat_shipping('start', ['order_id' => $order_id]);
 
         $tracking_meta = self::resolve_tracking_meta($order_id);
@@ -767,6 +968,7 @@ class Order_Controller {
                 'tracking_number' => $tracking_meta['tracking_number'] ?? '',
                 'tracking_company' => $tracking_meta['tracking_company'] ?? ''
             ]);
+            delete_transient($lock_key);
             return;
         }
 
@@ -780,21 +982,17 @@ class Order_Controller {
         $order_number_value = '';
 
         if ($transaction_id) {
-            $order_number_type = 1;
+            $order_number_type = 2; // 微信支付单号
             $order_number_value = $transaction_id;
         } elseif ($out_trade_no) {
-            // 微信订单中心发货要求 transaction_id，缺失时直接阻止同步并提示
-            self::log_wechat_shipping('skip_missing_transaction_id', [
-                'order_id' => $order_id,
-                'out_trade_no' => $out_trade_no
-            ]);
-            self::note_wechat_sync_error($order, '缺少微信交易号 transaction_id，无法同步到微信订单中心');
-            return;
+            $order_number_type = 1; // 商户侧单号
+            $order_number_value = $out_trade_no;
         }
 
         if (!$order_number_value) {
             self::log_wechat_shipping('skip_missing_order_number', ['order_id' => $order_id]);
             self::note_wechat_sync_error($order, '缺少商户单号/微信交易号，无法同步');
+            delete_transient($lock_key);
             return;
         }
 
@@ -802,14 +1000,11 @@ class Order_Controller {
         $synced_key = get_post_meta($order_id, '_myshop_wechat_shipping_synced_key', true);
         if ($synced_key === $sync_key) {
             self::log_wechat_shipping('skip_already_synced', ['order_id' => $order_id, 'sync_key' => $sync_key]);
+            delete_transient($lock_key);
             return;
         }
 
-        $openid = '';
-        $user_id = $order->get_customer_id();
-        if ($user_id) {
-            $openid = get_user_meta($user_id, '_wechat_openid', true) ?: '';
-        }
+        $openid = $order->get_meta('_myshop_wechat_payer_openid', true) ?: '';
 
         $express_company = self::normalize_express_company($tracking_meta['tracking_company']);
         if (!$express_company) {
@@ -822,20 +1017,36 @@ class Order_Controller {
                 '快递公司无法识别，请使用标准快递公司名称（顺丰/中通/圆通/申通/韵达/京东/EMS）',
                 $sync_key
             );
+            delete_transient($lock_key);
             return;
         }
 
+        $order_key = [
+            'order_number_type' => $order_number_type
+        ];
+
+        if ($order_number_type === 1) {
+            if (defined('MYSHOP_WECHAT_MCH_ID')) {
+                $order_key['mchid'] = MYSHOP_WECHAT_MCH_ID;
+            }
+            $order_key['out_trade_no'] = $out_trade_no;
+        } else {
+            $order_key['transaction_id'] = $transaction_id;
+        }
+
+        // 使用当前时间，按 RFC3339 UTC（含毫秒）格式化
+        $upload_time = self::build_upload_time_rfc3339();
+
         $payload = [
-            'order_key' => [
-                'order_number_type' => $order_number_type,
-                'transaction_id' => $transaction_id
-            ],
+            'order_key' => $order_key,
+            'upload_time' => $upload_time,
             'logistics_type' => 1,
             'delivery_mode' => 1,
             'shipping_list' => [
                 [
                     'tracking_no' => $tracking_meta['tracking_number'],
-                    'express_company' => $express_company
+                    'express_company' => $express_company,
+                    'item_desc' => self::build_goods_desc($order)
                 ]
             ]
         ];
@@ -853,13 +1064,18 @@ class Order_Controller {
             ]);
             error_log('[MyShop Core] WeChat shipping sync failed: ' . $message);
             self::note_wechat_sync_error($order, '微信订单中心同步失败：' . $message, $sync_key);
+            delete_transient($lock_key);
             return;
         }
 
         update_post_meta($order_id, '_myshop_wechat_shipping_synced_key', $sync_key);
         update_post_meta($order_id, '_myshop_wechat_shipping_synced_at', current_time('mysql'));
         $order->add_order_note('已同步微信订单中心发货信息');
+        if (in_array($order->get_status(), ['processing', 'pending'], true)) {
+            $order->update_status('on-hold', '订单已发货（微信同步成功）');
+        }
         self::log_wechat_shipping('success', ['order_id' => $order_id]);
+        delete_transient($lock_key);
     }
 
     private static function note_wechat_sync_error($order, $message, $sync_key = '') {
@@ -876,6 +1092,59 @@ class Order_Controller {
         $order->add_order_note($message);
         $order->update_meta_data('_myshop_wechat_shipping_last_error', $error_key);
         $order->save();
+    }
+
+    private static function build_goods_desc($order) {
+        if (!$order) {
+            return '商品';
+        }
+
+        $items = $order->get_items();
+        if (empty($items)) {
+            return '商品';
+        }
+
+        $names = [];
+        foreach ($items as $item) {
+            $name = trim((string) $item->get_name());
+            if ($name !== '') {
+                $names[] = $name;
+            }
+            if (count($names) >= 2) {
+                break;
+            }
+        }
+
+        if (empty($names)) {
+            return '商品';
+        }
+
+        $desc = implode('，', $names);
+        if (count($items) > 2) {
+            $desc .= '等';
+        }
+
+        $desc = mb_strimwidth($desc, 0, 32, '…', 'UTF-8');
+        $checked = wp_check_invalid_utf8($desc, true);
+        if ($checked === false) {
+            if (function_exists('mb_convert_encoding')) {
+                $checked = mb_convert_encoding($desc, 'UTF-8', 'UTF-8,GBK,GB2312,BIG5');
+            } elseif (function_exists('iconv')) {
+                $checked = @iconv('UTF-8', 'UTF-8//IGNORE', $desc);
+            }
+        }
+
+        return $checked !== false ? $checked : '';
+    }
+
+    private static function build_upload_time_rfc3339() {
+        $ts = microtime(true);
+        $dt = DateTimeImmutable::createFromFormat('U.u', sprintf('%.6f', $ts), new DateTimeZone('UTC'));
+        if ($dt instanceof DateTimeImmutable) {
+            return $dt->format('Y-m-d\TH:i:s.v\Z');
+        }
+
+        return gmdate('Y-m-d\TH:i:s\Z');
     }
 
     private static function normalize_express_company($raw) {

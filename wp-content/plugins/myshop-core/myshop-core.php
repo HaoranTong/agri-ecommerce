@@ -27,6 +27,7 @@ if (is_admin()) {
     // ✅ 已禁用：付款凭证管理（仅支持微信支付，无需上传凭证）
     // require_once MYSHOP_PLUGIN_DIR . 'admin/payment-proof-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/order-manager.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/return-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/test-users-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-template-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-manager.php';

@@ -46,6 +46,10 @@ function myshop_config_page() {
         $config['home_slider'] = $home_slider;
         $config['payment_qr_url'] = sanitize_text_field($_POST['payment_qr_url'] ?? '');
         $config['customer_service_qr'] = sanitize_text_field($_POST['customer_service_qr'] ?? '');
+        $config['notify_admin_enabled'] = !empty($_POST['notify_admin_enabled']) ? 1 : 0;
+        $config['notify_admin_openids'] = sanitize_textarea_field($_POST['notify_admin_openids'] ?? '');
+        $config['notify_admin_order'] = !empty($_POST['notify_admin_order']) ? 1 : 0;
+        $config['notify_admin_return'] = !empty($_POST['notify_admin_return']) ? 1 : 0;
         $config['last_updated_at'] = current_time('c');
         
         update_option('myshop_public_config', $config);
@@ -81,6 +85,10 @@ function myshop_config_page() {
     $payment_qr_url = $config['payment_qr_url'] ?? '';
     $customer_service_qr = $config['customer_service_qr'] ?? '';
     $express_map = get_option('myshop_wechat_express_map', []);
+    $notify_admin_enabled = !empty($config['notify_admin_enabled']);
+    $notify_admin_openids = $config['notify_admin_openids'] ?? '';
+    $notify_admin_order = !empty($config['notify_admin_order']);
+    $notify_admin_return = !empty($config['notify_admin_return']);
     $express_map_lines = '';
     if (is_array($express_map)) {
         foreach ($express_map as $k => $v) {
@@ -219,6 +227,44 @@ function myshop_config_page() {
                                    class="regular-text" 
                                    placeholder="https://...">
                             <p class="description">小程序客服入口的企业微信二维码</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 通知配置 -->
+            <div style="background: #fff; padding: 20px; margin-bottom: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04);">
+                <h2 style="margin-top: 0;">
+                    <span class="dashicons dashicons-bell" style="color: #2271b1;"></span>
+                    订单/退货通知
+                </h2>
+                <p class="description">填写接收通知的微信 OpenID（小程序用户 OpenID），可推送新订单与退货申请通知。</p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">启用通知</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="notify_admin_enabled" value="1" <?php checked($notify_admin_enabled); ?> />
+                                启用微信通知
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="notify_admin_openids">接收 OpenID</label></th>
+                        <td>
+                            <textarea name="notify_admin_openids" id="notify_admin_openids" rows="3" class="large-text" placeholder="多个 OpenID 用逗号或换行分隔"><?php echo esc_textarea($notify_admin_openids); ?></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">通知类型</th>
+                        <td>
+                            <label style="margin-right: 16px;">
+                                <input type="checkbox" name="notify_admin_order" value="1" <?php checked($notify_admin_order); ?> /> 新订单
+                            </label>
+                            <label>
+                                <input type="checkbox" name="notify_admin_return" value="1" <?php checked($notify_admin_return); ?> /> 退货申请
+                            </label>
                         </td>
                     </tr>
                 </table>

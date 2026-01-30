@@ -5,6 +5,9 @@
 
 class MyShop_Order_Manager {
 
+    private static $tracking_save_lock = [];
+    private static $status_enforce_lock = [];
+
     public static function init() {
         // 在订单列表添加快递单号列
         add_filter('manage_edit-shop_order_columns', [self::class, 'add_tracking_column']);
@@ -19,6 +22,10 @@ class MyShop_Order_Manager {
         // 保存快递单号
         add_action('save_post_shop_order', [self::class, 'save_tracking_number'], 10, 1);
         add_action('woocommerce_update_order', [self::class, 'save_tracking_number_hpos'], 10, 1); // HPOS
+
+        // 订单保存后，确保已录入快递的订单保持“已发货”状态
+        add_action('save_post_shop_order', [self::class, 'enforce_shipped_status'], 100, 1);
+        add_action('woocommerce_update_order', [self::class, 'enforce_shipped_status_hpos'], 100, 1); // HPOS
         
         // AJAX处理快递单号更新
         add_action('wp_ajax_myshop_update_tracking', [self::class, 'ajax_update_tracking']);
@@ -203,8 +210,15 @@ class MyShop_Order_Manager {
         if (!current_user_can('edit_shop_order', $post_id)) {
             return;
         }
+
+        if (!empty(self::$tracking_save_lock[$post_id])) {
+            return;
+        }
+        self::$tracking_save_lock[$post_id] = true;
         
         self::save_tracking_data($post_id);
+
+        unset(self::$tracking_save_lock[$post_id]);
     }
     
     /**
@@ -219,8 +233,15 @@ class MyShop_Order_Manager {
         if (!current_user_can('edit_shop_orders')) {
             return;
         }
+
+        if (!empty(self::$tracking_save_lock[$order_id])) {
+            return;
+        }
+        self::$tracking_save_lock[$order_id] = true;
         
         self::save_tracking_data($order_id);
+
+        unset(self::$tracking_save_lock[$order_id]);
     }
     
     /**
@@ -241,6 +262,8 @@ class MyShop_Order_Manager {
         // 保存快递单号
         if (!empty($tracking_number)) {
             update_post_meta($order_id, '_myshop_tracking_number', $tracking_number);
+            delete_post_meta($order_id, '_myshop_wechat_shipping_synced_key');
+            delete_post_meta($order_id, '_myshop_wechat_shipping_last_error');
             
             // 保存发货时间
             if (!empty($shipped_at)) {
@@ -252,10 +275,10 @@ class MyShop_Order_Manager {
                 update_post_meta($order_id, '_myshop_shipped_at', current_time('mysql'));
             }
             
-            // 可选：自动更新订单状态为"已发货"
+            // 自动更新订单状态为"已发货"（使用 on-hold 显示）
             $order = wc_get_order($order_id);
-            if ($order && $order->get_status() === 'processing') {
-                $order->update_status('completed', '订单已发货，快递单号: ' . $tracking_number);
+            if ($order && in_array($order->get_status(), ['processing', 'pending'], true)) {
+                $order->update_status('on-hold', '订单已发货，快递单号: ' . $tracking_number);
             }
             
             // 添加订单备注
@@ -267,6 +290,59 @@ class MyShop_Order_Manager {
         } else {
             delete_post_meta($order_id, '_myshop_tracking_number');
             delete_post_meta($order_id, '_myshop_shipped_at');
+        }
+    }
+
+    /**
+     * 订单保存后，强制保持发货状态（传统）
+     */
+    public static function enforce_shipped_status($post_id) {
+        if (get_post_type($post_id) !== 'shop_order') {
+            return;
+        }
+
+        $order = wc_get_order($post_id);
+        if (!$order) {
+            return;
+        }
+
+        self::maybe_force_shipped_status($order, $post_id);
+    }
+
+    /**
+     * 订单保存后，强制保持发货状态（HPOS）
+     */
+    public static function enforce_shipped_status_hpos($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        self::maybe_force_shipped_status($order, $order_id);
+    }
+
+    /**
+     * 如果已录入快递信息且当前为处理中/待付款，则保持为已发货(on-hold)
+     */
+    private static function maybe_force_shipped_status($order, $order_id) {
+        if (!($order instanceof WC_Order)) {
+            return;
+        }
+
+        if (!empty(self::$status_enforce_lock[$order_id])) {
+            return;
+        }
+
+        $tracking_number = get_post_meta($order_id, '_myshop_tracking_number', true);
+        $tracking_company = get_post_meta($order_id, '_myshop_tracking_company', true);
+        if (empty($tracking_number) || empty($tracking_company)) {
+            return;
+        }
+
+        if (in_array($order->get_status(), ['processing', 'pending'], true)) {
+            self::$status_enforce_lock[$order_id] = true;
+            $order->update_status('on-hold', '订单已发货（自动保持发货状态）');
+            unset(self::$status_enforce_lock[$order_id]);
         }
     }
     
@@ -296,15 +372,22 @@ class MyShop_Order_Manager {
         if (empty($tracking_number)) {
             wp_send_json_error(['message' => '请输入快递单号']);
         }
+
+        if (!empty(self::$tracking_save_lock[$order_id])) {
+            wp_send_json_error(['message' => '订单正在保存，请稍后再试']);
+        }
+        self::$tracking_save_lock[$order_id] = true;
         
         // 保存快递信息
         update_post_meta($order_id, '_myshop_tracking_number', $tracking_number);
         update_post_meta($order_id, '_myshop_tracking_company', $tracking_company);
         update_post_meta($order_id, '_myshop_shipped_at', current_time('mysql'));
+        delete_post_meta($order_id, '_myshop_wechat_shipping_synced_key');
+        delete_post_meta($order_id, '_myshop_wechat_shipping_last_error');
         
-        // 更新订单状态
-        if ($order->get_status() === 'processing') {
-            $order->update_status('completed', '订单已发货');
+        // 更新订单状态为"已发货"（使用 on-hold 显示）
+        if (in_array($order->get_status(), ['processing', 'pending'], true)) {
+            $order->update_status('on-hold', '订单已发货');
         }
         
         // 添加订单备注
@@ -314,6 +397,8 @@ class MyShop_Order_Manager {
             $tracking_number
         ));
         
+        unset(self::$tracking_save_lock[$order_id]);
+
         wp_send_json_success([
             'message' => '快递单号保存成功',
             'tracking_number' => $tracking_number,
