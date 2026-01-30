@@ -9,6 +9,10 @@ class MyShop_Points_Manager {
     public static function init() {
         // 添加管理菜单
         add_action('admin_menu', [self::class, 'add_menu_page']);
+
+        // 用户详情页展示积分概况
+        add_action('show_user_profile', [self::class, 'render_user_points_profile']);
+        add_action('edit_user_profile', [self::class, 'render_user_points_profile']);
         
         // 订单完成时自动发放积分
         add_action('woocommerce_order_status_completed', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
@@ -28,6 +32,157 @@ class MyShop_Points_Manager {
         
         // 保存积分兑换商品设置
         add_action('admin_post_myshop_save_points_redeem_products', [self::class, 'handle_save_redeem_products']);
+
+        // 保存积分任务与兑换项设置
+        add_action('admin_post_myshop_save_points_missions', [self::class, 'handle_save_missions']);
+        add_action('admin_post_myshop_save_points_redeem_options', [self::class, 'handle_save_redeem_options']);
+
+        // 积分过期处理
+        add_action('myshop_points_expire_daily', [self::class, 'expire_points_job']);
+        if (!wp_next_scheduled('myshop_points_expire_daily')) {
+            wp_schedule_event(time() + 300, 'daily', 'myshop_points_expire_daily');
+        }
+    }
+
+    /**
+     * 用户详情页展示积分概况与明细
+     */
+    public static function render_user_points_profile($user) {
+        if (!$user || !($user instanceof WP_User)) {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $user_id = (int) $user->ID;
+
+        $available = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+            $user_id
+        ));
+
+        $pending = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'pending'",
+            $user_id
+        ));
+
+        $earned = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND type = 'earn'",
+            $user_id
+        ));
+
+        $spent = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(ABS(delta)), 0) FROM {$table} WHERE user_id = %d AND type = 'spend'",
+            $user_id
+        ));
+
+        $records = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, type, delta, balance_after, status, channel, reference_order_id, created_at
+             FROM {$table}
+             WHERE user_id = %d
+             ORDER BY created_at DESC
+             LIMIT 20",
+            $user_id
+        ));
+
+        $ledger_url = admin_url('admin.php?page=myshop-points-ledger&s=' . $user_id);
+
+        $type_labels = [
+            'earn'   => '<span style="color: #0a9">🎁 获得</span>',
+            'spend'  => '<span style="color: #f44">💸 消费</span>',
+            'adjust' => '<span style="color: #2271b1">🛠 调整</span>',
+            'expire' => '<span style="color: #999">⏳ 过期</span>',
+            'refund' => '<span style="color: #fa0">↩️ 退款</span>'
+        ];
+
+        $status_labels = [
+            'confirmed' => '<span style="color: #0a9">✓ 已确认</span>',
+            'pending'   => '<span style="color: #fa0">⏳ 待确认</span>',
+            'released'  => '<span style="color: #999">↩ 已释放</span>',
+            'cancelled' => '<span style="color: #999">✗ 已取消</span>'
+        ];
+
+        $channel_labels = [
+            'order_complete' => '订单完成',
+            'order_discount' => '订单抵扣',
+            'order_refund'   => '订单退款',
+            'register_bonus' => '注册赠送',
+            'daily_signin'   => '每日签到',
+            'admin_grant'    => '管理员发放',
+            'manual_spend'   => '手动消费'
+        ];
+
+        ?>
+        <h2>💰 积分概况</h2>
+        <table class="form-table" role="presentation">
+            <tbody>
+                <tr>
+                    <th>可用积分</th>
+                    <td><strong><?php echo number_format(max($available, 0)); ?></strong></td>
+                </tr>
+                <tr>
+                    <th>待确认积分</th>
+                    <td><?php echo number_format(max($pending, 0)); ?></td>
+                </tr>
+                <tr>
+                    <th>累计获得</th>
+                    <td><?php echo number_format(max($earned, 0)); ?></td>
+                </tr>
+                <tr>
+                    <th>累计消耗</th>
+                    <td><?php echo number_format(max($spent, 0)); ?></td>
+                </tr>
+                <tr>
+                    <th>积分记录</th>
+                    <td><a href="<?php echo esc_url($ledger_url); ?>" target="_blank">查看完整积分记录</a></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3 style="margin-top: 20px;">最近 20 条积分记录</h3>
+        <table class="widefat fixed striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>类型</th>
+                    <th>变动</th>
+                    <th>余额</th>
+                    <th>状态</th>
+                    <th>来源</th>
+                    <th>订单ID</th>
+                    <th>时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($records)): ?>
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: #999; padding: 12px;">暂无积分记录</td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($records as $record): ?>
+                        <tr>
+                            <td><?php echo (int) $record->id; ?></td>
+                            <td><?php echo $type_labels[$record->type] ?? esc_html($record->type); ?></td>
+                            <td>
+                                <strong style="color: <?php echo $record->delta > 0 ? '#0a9' : '#f44'; ?>">
+                                    <?php echo $record->delta > 0 ? '+' : ''; ?><?php echo number_format((int) $record->delta); ?>
+                                </strong>
+                            </td>
+                            <td><?php echo number_format((int) $record->balance_after); ?></td>
+                            <td><?php echo $status_labels[$record->status] ?? esc_html($record->status); ?></td>
+                            <td><?php echo $channel_labels[$record->channel] ?? esc_html($record->channel); ?></td>
+                            <td><?php echo $record->reference_order_id ? (int) $record->reference_order_id : '-'; ?></td>
+                            <td><?php echo esc_html($record->created_at); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+        <?php
     }
     
     /**
@@ -70,6 +225,398 @@ class MyShop_Points_Manager {
             'myshop-points-redeem-products',
             [self::class, 'render_redeem_products_page']
         );
+
+        add_submenu_page(
+            'myshop-points',
+            '积分任务管理',
+            '积分任务',
+            'manage_options',
+            'myshop-points-missions',
+            [self::class, 'render_missions_page']
+        );
+
+        add_submenu_page(
+            'myshop-points',
+            '积分兑换项管理',
+            '积分兑换项',
+            'manage_options',
+            'myshop-points-redeem-options',
+            [self::class, 'render_redeem_options_page']
+        );
+    }
+
+    /**
+     * 渲染积分任务管理页面
+     */
+    public static function render_missions_page() {
+        $missions = get_option('myshop_points_missions', []);
+        if (!is_array($missions)) {
+            $missions = [];
+        }
+
+        if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
+            echo '<div class="notice notice-success is-dismissible"><p>✓ 积分任务已保存</p></div>';
+        }
+        ?>
+        <div class="wrap">
+            <h1>🎯 积分任务管理</h1>
+            <p class="description">配置积分任务（前端任务中心展示）。</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('myshop_save_points_missions'); ?>
+                <input type="hidden" name="action" value="myshop_save_points_missions" />
+
+                <table class="widefat striped">
+                    <thead>
+                        <tr>
+                            <th>删除</th>
+                            <th>任务ID</th>
+                            <th>标题</th>
+                            <th>描述</th>
+                            <th>奖励积分</th>
+                            <th>目标</th>
+                            <th>状态</th>
+                            <th>过期时间</th>
+                            <th>排序</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($missions)): ?>
+                            <tr><td colspan="9" style="text-align:center; color:#999;">暂无任务</td></tr>
+                        <?php endif; ?>
+                        <?php foreach ($missions as $index => $mission): ?>
+                            <tr>
+                                <td><input type="checkbox" name="missions[<?php echo esc_attr($index); ?>][delete]" value="1" /></td>
+                                <td><input type="text" name="missions[<?php echo esc_attr($index); ?>][mission_id]" value="<?php echo esc_attr($mission['mission_id'] ?? ''); ?>" style="width:160px;" /></td>
+                                <td><input type="text" name="missions[<?php echo esc_attr($index); ?>][title]" value="<?php echo esc_attr($mission['title'] ?? ''); ?>" style="width:160px;" /></td>
+                                <td><input type="text" name="missions[<?php echo esc_attr($index); ?>][description]" value="<?php echo esc_attr($mission['description'] ?? ''); ?>" style="width:240px;" /></td>
+                                <td><input type="number" name="missions[<?php echo esc_attr($index); ?>][reward_points]" value="<?php echo esc_attr($mission['reward_points'] ?? 0); ?>" min="0" style="width:90px;" /></td>
+                                <td><input type="number" name="missions[<?php echo esc_attr($index); ?>][goal]" value="<?php echo esc_attr($mission['goal'] ?? 1); ?>" min="1" style="width:70px;" /></td>
+                                <td>
+                                    <select name="missions[<?php echo esc_attr($index); ?>][status]">
+                                        <option value="available" <?php selected(($mission['status'] ?? 'available'), 'available'); ?>>可用</option>
+                                        <option value="disabled" <?php selected(($mission['status'] ?? 'available'), 'disabled'); ?>>停用</option>
+                                    </select>
+                                </td>
+                                <td><input type="date" name="missions[<?php echo esc_attr($index); ?>][expires_at]" value="<?php echo esc_attr(!empty($mission['expires_at']) ? date('Y-m-d', strtotime($mission['expires_at'])) : ''); ?>" /></td>
+                                <td><input type="number" name="missions[<?php echo esc_attr($index); ?>][sort]" value="<?php echo esc_attr($mission['sort'] ?? 0); ?>" style="width:70px;" /></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <tr>
+                            <td>新增</td>
+                            <td><input type="text" name="missions[new][mission_id]" placeholder="自动生成" style="width:160px;" /></td>
+                            <td><input type="text" name="missions[new][title]" placeholder="任务标题" style="width:160px;" /></td>
+                            <td><input type="text" name="missions[new][description]" placeholder="任务描述" style="width:240px;" /></td>
+                            <td><input type="number" name="missions[new][reward_points]" value="0" min="0" style="width:90px;" /></td>
+                            <td><input type="number" name="missions[new][goal]" value="1" min="1" style="width:70px;" /></td>
+                            <td>
+                                <select name="missions[new][status]">
+                                    <option value="available">可用</option>
+                                    <option value="disabled">停用</option>
+                                </select>
+                            </td>
+                            <td><input type="date" name="missions[new][expires_at]" /></td>
+                            <td><input type="number" name="missions[new][sort]" value="0" style="width:70px;" /></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><button type="submit" class="button button-primary">保存任务</button></p>
+            </form>
+        </div>
+        <?php
+    }
+
+    public static function handle_save_missions() {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'myshop_save_points_missions')) {
+            wp_die('安全验证失败');
+        }
+
+        if (!current_user_can('manage_options')) {
+            wp_die('权限不足');
+        }
+
+        $missions_input = $_POST['missions'] ?? [];
+        $saved = [];
+
+        foreach ($missions_input as $key => $mission) {
+            if (!is_array($mission)) {
+                continue;
+            }
+            if (!empty($mission['delete'])) {
+                continue;
+            }
+
+            $mission_id = sanitize_text_field($mission['mission_id'] ?? '');
+            $title = sanitize_text_field($mission['title'] ?? '');
+            $description = sanitize_text_field($mission['description'] ?? '');
+            $reward_points = (int) ($mission['reward_points'] ?? 0);
+            $goal = max(1, (int) ($mission['goal'] ?? 1));
+            $status = ($mission['status'] ?? 'available') === 'disabled' ? 'disabled' : 'available';
+            $expires_at = sanitize_text_field($mission['expires_at'] ?? '');
+            $sort = (int) ($mission['sort'] ?? 0);
+
+            if ($title === '' && $description === '' && $reward_points <= 0) {
+                continue;
+            }
+
+            if ($mission_id === '') {
+                $mission_id = 'mission_' . wp_generate_password(8, false, false);
+            }
+
+            $saved[] = [
+                'mission_id' => $mission_id,
+                'title' => $title,
+                'description' => $description,
+                'reward_points' => $reward_points,
+                'status' => $status,
+                'progress' => 0,
+                'goal' => $goal,
+                'expires_at' => $expires_at ? date('Y-m-d H:i:s', strtotime($expires_at)) : null,
+                'sort' => $sort
+            ];
+        }
+
+        usort($saved, static function ($a, $b) {
+            return ($a['sort'] ?? 0) <=> ($b['sort'] ?? 0);
+        });
+
+        update_option('myshop_points_missions', $saved);
+
+        wp_redirect(add_query_arg([
+            'page' => 'myshop-points-missions',
+            'settings-updated' => 'true'
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    /**
+     * 渲染积分兑换项管理页面
+     */
+    public static function render_redeem_options_page() {
+        $options = get_option('myshop_points_redeem_options', []);
+        if (!is_array($options)) {
+            $options = [];
+        }
+
+        if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
+            echo '<div class="notice notice-success is-dismissible"><p>✓ 积分兑换项已保存</p></div>';
+        }
+        ?>
+        <div class="wrap">
+            <h1>🛍️ 积分兑换项管理</h1>
+            <p class="description">配置积分兑换项（优惠券、礼品等）。</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('myshop_save_points_redeem_options'); ?>
+                <input type="hidden" name="action" value="myshop_save_points_redeem_options" />
+
+                <table class="widefat striped">
+                    <thead>
+                        <tr>
+                            <th>删除</th>
+                            <th>兑换项ID</th>
+                            <th>类型</th>
+                            <th>标题</th>
+                            <th>消耗积分</th>
+                            <th>库存</th>
+                            <th>状态</th>
+                            <th>优惠券码</th>
+                            <th>描述</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($options)): ?>
+                            <tr><td colspan="9" style="text-align:center; color:#999;">暂无兑换项</td></tr>
+                        <?php endif; ?>
+                        <?php foreach ($options as $index => $option): ?>
+                            <tr>
+                                <td><input type="checkbox" name="options[<?php echo esc_attr($index); ?>][delete]" value="1" /></td>
+                                <td><input type="text" name="options[<?php echo esc_attr($index); ?>][option_id]" value="<?php echo esc_attr($option['option_id'] ?? ($option['id'] ?? '')); ?>" style="width:160px;" /></td>
+                                <td>
+                                    <select name="options[<?php echo esc_attr($index); ?>][type]">
+                                        <option value="coupon" <?php selected(($option['type'] ?? 'coupon'), 'coupon'); ?>>优惠券</option>
+                                        <option value="gift" <?php selected(($option['type'] ?? 'coupon'), 'gift'); ?>>礼品</option>
+                                    </select>
+                                </td>
+                                <td><input type="text" name="options[<?php echo esc_attr($index); ?>][title]" value="<?php echo esc_attr($option['title'] ?? ''); ?>" style="width:160px;" /></td>
+                                <td><input type="number" name="options[<?php echo esc_attr($index); ?>][cost_points]" value="<?php echo esc_attr($option['cost_points'] ?? 0); ?>" min="0" style="width:90px;" /></td>
+                                <td><input type="number" name="options[<?php echo esc_attr($index); ?>][stock]" value="<?php echo esc_attr($option['stock'] ?? ''); ?>" min="0" style="width:70px;" /></td>
+                                <td>
+                                    <select name="options[<?php echo esc_attr($index); ?>][status]">
+                                        <option value="active" <?php selected(($option['status'] ?? 'active'), 'active'); ?>>可用</option>
+                                        <option value="disabled" <?php selected(($option['status'] ?? 'active'), 'disabled'); ?>>停用</option>
+                                    </select>
+                                </td>
+                                <td><input type="text" name="options[<?php echo esc_attr($index); ?>][coupon_code]" value="<?php echo esc_attr($option['coupon_code'] ?? ''); ?>" style="width:140px;" /></td>
+                                <td><input type="text" name="options[<?php echo esc_attr($index); ?>][description]" value="<?php echo esc_attr($option['description'] ?? ''); ?>" style="width:200px;" /></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <tr>
+                            <td>新增</td>
+                            <td><input type="text" name="options[new][option_id]" placeholder="自动生成" style="width:160px;" /></td>
+                            <td>
+                                <select name="options[new][type]">
+                                    <option value="coupon">优惠券</option>
+                                    <option value="gift">礼品</option>
+                                </select>
+                            </td>
+                            <td><input type="text" name="options[new][title]" placeholder="兑换项标题" style="width:160px;" /></td>
+                            <td><input type="number" name="options[new][cost_points]" value="0" min="0" style="width:90px;" /></td>
+                            <td><input type="number" name="options[new][stock]" value="" min="0" style="width:70px;" /></td>
+                            <td>
+                                <select name="options[new][status]">
+                                    <option value="active">可用</option>
+                                    <option value="disabled">停用</option>
+                                </select>
+                            </td>
+                            <td><input type="text" name="options[new][coupon_code]" placeholder="可选" style="width:140px;" /></td>
+                            <td><input type="text" name="options[new][description]" placeholder="描述" style="width:200px;" /></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><button type="submit" class="button button-primary">保存兑换项</button></p>
+            </form>
+        </div>
+        <?php
+    }
+
+    public static function handle_save_redeem_options() {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'myshop_save_points_redeem_options')) {
+            wp_die('安全验证失败');
+        }
+
+        if (!current_user_can('manage_options')) {
+            wp_die('权限不足');
+        }
+
+        $options_input = $_POST['options'] ?? [];
+        $saved = [];
+
+        foreach ($options_input as $key => $option) {
+            if (!is_array($option)) {
+                continue;
+            }
+            if (!empty($option['delete'])) {
+                continue;
+            }
+
+            $option_id = sanitize_text_field($option['option_id'] ?? '');
+            $type = sanitize_text_field($option['type'] ?? 'coupon');
+            $title = sanitize_text_field($option['title'] ?? '');
+            $cost_points = (int) ($option['cost_points'] ?? 0);
+            $stock = $option['stock'] === '' ? null : (int) ($option['stock'] ?? 0);
+            $status = ($option['status'] ?? 'active') === 'disabled' ? 'disabled' : 'active';
+            $coupon_code = sanitize_text_field($option['coupon_code'] ?? '');
+            $description = sanitize_text_field($option['description'] ?? '');
+
+            if ($title === '' && $cost_points <= 0) {
+                continue;
+            }
+
+            if ($option_id === '') {
+                $option_id = 'option_' . wp_generate_password(8, false, false);
+            }
+
+            $saved[] = [
+                'option_id' => $option_id,
+                'type' => $type ?: 'coupon',
+                'title' => $title,
+                'cost_points' => $cost_points,
+                'stock' => $stock,
+                'status' => $status,
+                'coupon_code' => $coupon_code,
+                'description' => $description
+            ];
+        }
+
+        update_option('myshop_points_redeem_options', $saved);
+
+        wp_redirect(add_query_arg([
+            'page' => 'myshop-points-redeem-options',
+            'settings-updated' => 'true'
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    /**
+     * 积分过期处理任务
+     */
+    public static function expire_points_job() {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $now_mysql = current_time('mysql');
+
+        $users = $wpdb->get_results($wpdb->prepare(
+            "SELECT DISTINCT user_id FROM {$table} WHERE status = 'confirmed' AND delta > 0 AND expire_at IS NOT NULL AND expire_at < %s",
+            $now_mysql
+        ));
+
+        if (empty($users)) {
+            return;
+        }
+
+        foreach ($users as $row) {
+            $user_id = (int) $row->user_id;
+            if ($user_id <= 0) {
+                continue;
+            }
+
+            $available = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+                $user_id
+            ));
+
+            if ($available <= 0) {
+                continue;
+            }
+
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT id, delta FROM {$table} WHERE user_id = %d AND status = 'confirmed' AND delta > 0 AND expire_at IS NOT NULL AND expire_at < %s ORDER BY expire_at ASC, id ASC",
+                $user_id,
+                $now_mysql
+            ));
+
+            $expired_sum = 0;
+            $ids_to_clear = [];
+            foreach ($rows as $entry) {
+                $delta = (int) $entry->delta;
+                if ($delta <= 0) {
+                    continue;
+                }
+                if (($available - $expired_sum - $delta) < 0) {
+                    break;
+                }
+                $expired_sum += $delta;
+                $ids_to_clear[] = (int) $entry->id;
+            }
+
+            if ($expired_sum <= 0 || empty($ids_to_clear)) {
+                continue;
+            }
+
+            $ids_placeholders = implode(',', array_fill(0, count($ids_to_clear), '%d'));
+            $wpdb->query($wpdb->prepare(
+                "UPDATE {$table} SET expire_at = NULL, updated_at = %s WHERE id IN ({$ids_placeholders})",
+                array_merge([$now_mysql], $ids_to_clear)
+            ));
+
+            $balance_after = $available - $expired_sum;
+            $wpdb->insert(
+                $table,
+                [
+                    'user_id'       => $user_id,
+                    'type'          => 'expire',
+                    'delta'         => -$expired_sum,
+                    'balance_after' => $balance_after,
+                    'status'        => 'confirmed',
+                    'channel'       => 'points_expire',
+                    'created_at'    => $now_mysql,
+                    'updated_at'    => $now_mysql
+                ],
+                ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s']
+            );
+        }
     }
     
     /**

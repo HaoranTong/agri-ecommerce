@@ -8,6 +8,12 @@ class Points_Controller {
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
 
+        register_rest_route('myshop/v1', '/points/summary', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_summary'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+
         register_rest_route('myshop/v1', '/points/ledger', [
             'methods'  => \WP_REST_Server::READABLE,
             'callback' => [self::class, 'get_ledger'],
@@ -82,6 +88,39 @@ class Points_Controller {
                 'option_id' => ['required' => true, 'type' => 'string']
             ]
         ]);
+
+        register_rest_route('myshop/v1', '/points/signin', [
+            'methods'  => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'daily_signin'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+    }
+
+    private static function get_internal_settings() {
+        $defaults = [
+            'enable_points' => 1,
+            'earn_rate' => 10,
+            'min_order_amount' => 0,
+            'register_bonus' => 100,
+            'daily_signin_points' => 10,
+            'enable_points_discount' => 1,
+            'redeem_rate' => 100,
+            'min_points_to_use' => 100,
+            'max_discount_percent' => 50,
+            'min_order_amount_to_use' => 0,
+            'enable_expiry' => 0,
+            'expiry_days' => 365
+        ];
+
+        $settings = get_option('myshop_points_settings', []);
+        return wp_parse_args($settings, $defaults);
+    }
+
+    private static function build_expire_at($settings) {
+        if (!empty($settings['enable_expiry']) && (int) $settings['expiry_days'] > 0) {
+            return date('Y-m-d H:i:s', strtotime('+' . (int) $settings['expiry_days'] . ' days'));
+        }
+        return null;
     }
 
     public static function get_balance($request) {
@@ -122,6 +161,59 @@ class Points_Controller {
                 'pending'        => max($pending, 0),
                 'total_earned'   => max($earned, 0),
                 'total_spent'    => max($spent, 0)
+            ]
+        ]);
+    }
+
+    public static function get_summary($request) {
+        global $wpdb;
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $user_id = (int) $user->ID;
+
+        $available = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+            $user_id
+        ));
+
+        $pending = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'pending'",
+            $user_id
+        ));
+
+        $earned = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND type = 'earn'",
+            $user_id
+        ));
+
+        $spent = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(ABS(delta)), 0) FROM {$table} WHERE user_id = %d AND type = 'spend'",
+            $user_id
+        ));
+
+        $now = current_time('mysql');
+        $soon = date('Y-m-d H:i:s', strtotime('+30 days', current_time('timestamp')));
+        $expiring = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed' AND delta > 0 AND expire_at IS NOT NULL AND expire_at <= %s AND expire_at >= %s",
+            $user_id,
+            $soon,
+            $now
+        ));
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'available'      => max($available, 0),
+                'pending'        => max($pending, 0),
+                'total_earned'   => max($earned, 0),
+                'total_spent'    => max($spent, 0),
+                'expiring_soon'  => max($expiring, 0),
+                'expiring_window_days' => 30
             ]
         ]);
     }
@@ -382,6 +474,8 @@ class Points_Controller {
         ));
 
         $balance_after = $available + $points;
+        $settings = self::get_internal_settings();
+        $expire_at = self::build_expire_at($settings);
         $inserted = $wpdb->insert(
             $table,
             [
@@ -392,10 +486,11 @@ class Points_Controller {
                 'status'        => 'confirmed',
                 'channel'       => 'mission_reward',
                 'reservation_id'=> $mission_id,
+                'expire_at'     => $expire_at,
                 'created_at'    => current_time('mysql'),
                 'updated_at'    => current_time('mysql')
             ],
-            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s']
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s']
         );
 
         if ($inserted === false) {
@@ -562,6 +657,67 @@ class Points_Controller {
         ]);
     }
 
+    public static function daily_signin($request) {
+        global $wpdb;
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $settings = self::get_internal_settings();
+        if (empty($settings['enable_points']) || (int) $settings['daily_signin_points'] <= 0) {
+            return new WP_Error('signin_disabled', '签到积分未启用', ['status' => 400]);
+        }
+
+        $today = date('Y-m-d', current_time('timestamp'));
+        $last_signin = get_user_meta($user->ID, '_myshop_last_signin_date', true);
+        if ($last_signin === $today) {
+            return new WP_Error('signin_already', '今日已签到', ['status' => 409]);
+        }
+
+        $table = $wpdb->prefix . 'myshop_point_ledger';
+        $available = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$table} WHERE user_id = %d AND status = 'confirmed'",
+            $user->ID
+        ));
+
+        $points = (int) $settings['daily_signin_points'];
+        $balance_after = $available + $points;
+        $expire_at = self::build_expire_at($settings);
+
+        $inserted = $wpdb->insert(
+            $table,
+            [
+                'user_id'       => $user->ID,
+                'type'          => 'earn',
+                'delta'         => $points,
+                'balance_after' => $balance_after,
+                'status'        => 'confirmed',
+                'channel'       => 'daily_signin',
+                'expire_at'     => $expire_at,
+                'created_at'    => current_time('mysql'),
+                'updated_at'    => current_time('mysql')
+            ],
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s']
+        );
+
+        if ($inserted === false) {
+            return new WP_Error('signin_failed', '签到积分发放失败', ['status' => 500]);
+        }
+
+        update_user_meta($user->ID, '_myshop_last_signin_date', $today);
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'awarded_points' => $points,
+                'new_balance' => $balance_after,
+                'signed_in_at' => current_time('mysql')
+            ]
+        ]);
+    }
+
     public static function grant_points($request) {
         global $wpdb;
 
@@ -704,13 +860,22 @@ class Points_Controller {
      * 获取积分规则列表
      */
     public static function get_rules($request) {
-        // 从积分设置中获取规则信息，或者从其他地方获取
-        // 这里先返回空数组，后续可以从后台设置中获取
-        $rules = [];
-        
-        // 可以后续扩展：从数据库或设置中读取规则
-        // 目前先返回空数组，避免前端报错
-        
+        $settings = self::get_internal_settings();
+        $rules = [
+            'enable_points' => (bool) $settings['enable_points'],
+            'earn_rate' => (float) $settings['earn_rate'],
+            'min_order_amount' => (float) $settings['min_order_amount'],
+            'register_bonus' => (int) $settings['register_bonus'],
+            'daily_signin_points' => (int) $settings['daily_signin_points'],
+            'enable_points_discount' => (bool) $settings['enable_points_discount'],
+            'redeem_rate' => (int) $settings['redeem_rate'],
+            'min_points_to_use' => (int) $settings['min_points_to_use'],
+            'max_discount_percent' => (float) $settings['max_discount_percent'],
+            'min_order_amount_to_use' => (float) $settings['min_order_amount_to_use'],
+            'enable_expiry' => (bool) $settings['enable_expiry'],
+            'expiry_days' => (int) $settings['expiry_days']
+        ];
+
         return rest_ensure_response([
             'success' => true,
             'data' => $rules
