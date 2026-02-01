@@ -1289,14 +1289,34 @@ class Order_Controller {
             $user_addresses = [];
         }
 
+        $normalize_value = static function ($value) {
+            return trim(strtolower((string) $value));
+        };
+
+        $incoming = [
+            'name' => $normalize_value($address['name'] ?? ''),
+            'phone' => $normalize_value($address['phone'] ?? ''),
+            'province' => $normalize_value($address['province'] ?? ''),
+            'city' => $normalize_value($address['city'] ?? ''),
+            'district' => $normalize_value($address['district'] ?? ''),
+            'detail' => $normalize_value($address['detail'] ?? '')
+        ];
+
         foreach ($user_addresses as $existing) {
+            $existing_detail = '';
+            if (isset($existing['detail'])) {
+                $existing_detail = $existing['detail'];
+            } elseif (isset($existing['detail_address'])) {
+                $existing_detail = $existing['detail_address'];
+            }
+
             if (
-                $existing['name'] === $address['name'] &&
-                $existing['phone'] === $address['phone'] &&
-                $existing['province'] === $address['province'] &&
-                $existing['city'] === $address['city'] &&
-                $existing['district'] === $address['district'] &&
-                $existing['detail'] === $address['detail']
+                $normalize_value($existing['name'] ?? '') === $incoming['name'] &&
+                $normalize_value($existing['phone'] ?? '') === $incoming['phone'] &&
+                $normalize_value($existing['province'] ?? '') === $incoming['province'] &&
+                $normalize_value($existing['city'] ?? '') === $incoming['city'] &&
+                $normalize_value($existing['district'] ?? '') === $incoming['district'] &&
+                $normalize_value($existing_detail) === $incoming['detail']
             ) {
                 return;
             }

@@ -14,7 +14,9 @@ class MyShop_Points_Manager {
         add_action('show_user_profile', [self::class, 'render_user_points_profile']);
         add_action('edit_user_profile', [self::class, 'render_user_points_profile']);
         
-        // 订单完成时自动发放积分
+        // ✅ 订单进入处理中/已发货/已完成时自动发放积分
+        add_action('woocommerce_order_status_processing', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
+        add_action('woocommerce_order_status_on-hold', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
         add_action('woocommerce_order_status_completed', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
         
         // 订单状态变为processing时扣除积分
@@ -1026,7 +1028,9 @@ class MyShop_Points_Manager {
     public static function auto_grant_points_on_order_complete($order_id) {
         global $wpdb;
         
-        $settings = self::get_settings();
+        // ✅ 支付成功后订单进入 processing 即发放积分，避免等待 completed
+        // ✅ 已发货/运输中（on-hold）也应发放积分
+        add_action('woocommerce_order_status_on-hold', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
         
         // 检查是否启用积分系统
         if (!$settings['enable_points']) {
