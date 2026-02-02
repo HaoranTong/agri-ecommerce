@@ -155,6 +155,10 @@ class Gift_Card_Controller {
             return;
         }
 
+        if (!$order->is_paid() && !$order->get_date_paid()) {
+            return;
+        }
+
         $is_gift_order = $order->get_meta('_myshop_is_gift_card_order');
         if (empty($is_gift_order)) {
             return;
@@ -414,6 +418,34 @@ class Gift_Card_Controller {
             return new WP_Error('not_card_owner', '仅持有人可使用该购物卡', ['status' => 403]);
         }
 
+        $template = self::get_template_row((int) $card->template_id);
+        if (!$template) {
+            return new WP_Error('template_not_found', '礼品卡模板不存在', ['status' => 404]);
+        }
+
+        if ($card->template_type === 'fixed_amount') {
+            return new WP_Error('card_not_exchangeable', '储值卡请在订单支付页使用，无法直接兑换商品', ['status' => 400]);
+        }
+
+        $exchange_items = self::resolve_exchange_items($card, $template);
+        if (empty($exchange_items)) {
+            return new WP_Error('card_items_missing', '礼品卡未绑定可兑换的商品', ['status' => 400]);
+        }
+
+        $shipping_address = null;
+        if (isset($params['shipping_address']) && is_array($params['shipping_address'])) {
+            $shipping_address = self::sanitize_shipping_address($params['shipping_address']);
+            if (is_wp_error($shipping_address)) {
+                return $shipping_address;
+            }
+        }
+
+        $exchange_order = self::create_exchange_order($user, $card, $template, $exchange_items, $shipping_address);
+        if (is_wp_error($exchange_order)) {
+            return $exchange_order;
+        }
+        $exchange_order_id = $exchange_order->get_id();
+
         $now = current_time('mysql', true);
 
         $update_data = [
@@ -472,9 +504,10 @@ class Gift_Card_Controller {
                 'channel'       => 'miniprogram',
                 'used_amount'   => $used_amount,
                 'balance_after' => 0,
+                'target_order_id' => $exchange_order_id,
                 'redeemed_at'   => current_time('mysql', true)
             ],
-            ['%d','%d','%d','%s','%s','%f','%f','%s']
+            ['%d','%d','%d','%s','%s','%f','%f','%d','%s']
         );
 
         return rest_ensure_response([
@@ -482,9 +515,187 @@ class Gift_Card_Controller {
             'message' => '礼品卡兑换成功',
             'data'    => [
                 'card_number' => $card->card_number,
-                'status'      => 'redeemed'
+                'status'      => 'redeemed',
+                'order_id'    => $exchange_order_id,
+                'order_number'=> $exchange_order->get_order_number()
             ]
         ]);
+    }
+
+    private static function resolve_exchange_items($card, $template) {
+        $items = [];
+
+        if ($card->template_type === 'product_bundle') {
+            if (!empty($template->bundle_items)) {
+                $decoded = json_decode($template->bundle_items, true);
+                if (is_array($decoded)) {
+                    $items = $decoded;
+                }
+            }
+
+            if (empty($items) && !empty($card->bundle_config)) {
+                $decoded = json_decode($card->bundle_config, true);
+                if (is_array($decoded)) {
+                    $items = isset($decoded['items']) && is_array($decoded['items']) ? $decoded['items'] : $decoded;
+                }
+            }
+        } else {
+            if (!empty($card->bundle_config)) {
+                $decoded = json_decode($card->bundle_config, true);
+                if (is_array($decoded)) {
+                    $items = isset($decoded['items']) && is_array($decoded['items']) ? $decoded['items'] : $decoded;
+                }
+            }
+        }
+
+        if (!is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $product_id = isset($item['product_id']) ? absint($item['product_id']) : 0;
+            $variation_id = isset($item['variation_id']) ? absint($item['variation_id']) : 0;
+            $quantity = isset($item['quantity']) ? max(1, absint($item['quantity'])) : 1;
+            if (!$product_id && !$variation_id) {
+                continue;
+            }
+            $normalized[] = [
+                'product_id' => $product_id,
+                'variation_id' => $variation_id,
+                'quantity' => $quantity
+            ];
+        }
+
+        return $normalized;
+    }
+
+    private static function create_exchange_order($user, $card, $template, array $items, $shipping_address = null) {
+        if (!$user || !($user instanceof \WP_User)) {
+            return new WP_Error('invalid_user', '用户信息无效', ['status' => 403]);
+        }
+
+        $order = wc_create_order();
+        if (!$order) {
+            return new WP_Error('order_create_failed', '兑换订单创建失败', ['status' => 500]);
+        }
+
+        foreach ($items as $item) {
+            $variation_id = !empty($item['variation_id']) ? absint($item['variation_id']) : 0;
+            $product_id = !empty($item['product_id']) ? absint($item['product_id']) : 0;
+            $quantity = !empty($item['quantity']) ? max(1, absint($item['quantity'])) : 1;
+
+            $product = $variation_id ? wc_get_product($variation_id) : ($product_id ? wc_get_product($product_id) : null);
+            if (!$product) {
+                $order->delete(true);
+                return new WP_Error('redeem_product_missing', '兑换商品不存在或已下架', ['status' => 400]);
+            }
+
+            $item_id = $order->add_product($product, $quantity);
+            $order_item = $item_id ? $order->get_item($item_id) : null;
+            if ($order_item instanceof WC_Order_Item_Product) {
+                $order_item->set_subtotal(0);
+                $order_item->set_total(0);
+                $order_item->save();
+            }
+        }
+
+        $order->set_customer_id($user->ID);
+        $order->set_payment_method('cod');
+
+        $default_address = $shipping_address ?: self::resolve_default_address($user->ID);
+        if ($default_address) {
+            $order->set_address([
+                'first_name' => $default_address['name'],
+                'last_name'  => '',
+                'address_1'  => $default_address['detail'],
+                'city'       => $default_address['city'],
+                'state'      => $default_address['province'],
+                'postcode'   => $default_address['postal_code'] ?? '',
+                'country'    => 'CN'
+            ], 'shipping');
+            $order->set_billing_phone($default_address['phone']);
+        }
+
+        $order->update_meta_data('_myshop_giftcard_redeem', 'yes');
+        $order->update_meta_data('_myshop_giftcard_redeem_card', $card->card_number);
+        $order->update_meta_data('_myshop_giftcard_template_id', (int) $card->template_id);
+        $order->calculate_totals();
+
+        $payable_total = (float) $order->get_total();
+        if ($payable_total > 0) {
+            $fee = new WC_Order_Item_Fee();
+            $fee->set_name('购物卡兑换抵扣');
+            $fee->set_amount(-$payable_total);
+            $fee->set_total(-$payable_total);
+            $order->add_item($fee);
+            $order->calculate_totals();
+        }
+
+        $order->set_status('processing');
+        $order->save();
+
+        return $order;
+    }
+
+    private static function resolve_default_address($user_id) {
+        $user_addresses = get_user_meta($user_id, '_myshop_addresses', true);
+        if (!is_array($user_addresses) || empty($user_addresses)) {
+            return null;
+        }
+
+        $default = null;
+        foreach ($user_addresses as $addr) {
+            if (!empty($addr['is_default'])) {
+                $default = $addr;
+                break;
+            }
+        }
+
+        if (!$default) {
+            $default = $user_addresses[0];
+        }
+
+        return [
+            'name' => $default['name'] ?? '',
+            'phone' => $default['phone'] ?? '',
+            'province' => $default['province'] ?? '',
+            'city' => $default['city'] ?? '',
+            'district' => $default['district'] ?? '',
+            'detail' => $default['detail'] ?? ($default['detail_address'] ?? ''),
+            'postal_code' => $default['postal_code'] ?? ($default['postcode'] ?? '')
+        ];
+    }
+
+    private static function sanitize_shipping_address($payload) {
+        if (!is_array($payload)) {
+            return new WP_Error('invalid_address', '收货地址格式错误', ['status' => 400]);
+        }
+
+        $name = isset($payload['name']) ? sanitize_text_field($payload['name']) : '';
+        $phone = isset($payload['phone']) ? sanitize_text_field($payload['phone']) : '';
+        $province = isset($payload['province']) ? sanitize_text_field($payload['province']) : '';
+        $city = isset($payload['city']) ? sanitize_text_field($payload['city']) : '';
+        $district = isset($payload['district']) ? sanitize_text_field($payload['district']) : '';
+        $detail = isset($payload['detail_address']) ? sanitize_text_field($payload['detail_address']) : '';
+        $postcode = isset($payload['postcode']) ? sanitize_text_field($payload['postcode']) : '';
+
+        if (empty($name) || empty($phone) || empty($province) || empty($detail)) {
+            return new WP_Error('invalid_address', '请填写完整收货信息', ['status' => 400]);
+        }
+
+        return [
+            'name' => $name,
+            'phone' => $phone,
+            'province' => $province,
+            'city' => $city,
+            'district' => $district,
+            'detail' => $detail,
+            'postal_code' => $postcode
+        ];
     }
 
     public static function list_templates($request) {
@@ -492,7 +703,7 @@ class Gift_Card_Controller {
 
         $table = $wpdb->prefix . 'myshop_gift_card_templates';
         $rows = $wpdb->get_results(
-            "SELECT id, name, type, fixed_amount, currency, product_id, variation_ids, bundle_items, delivery_modes, share_template_config, print_template_url, valid_days, created_at, updated_at
+            "SELECT *
              FROM {$table}
              ORDER BY id DESC"
         );
@@ -543,14 +754,61 @@ class Gift_Card_Controller {
         $card_number = self::generate_unique_card_number();
         $expires_at = gmdate('Y-m-d H:i:s', strtotime($now . ' +' . (int) $template->valid_days . ' days'));
 
+        $fixed_amount = $template->fixed_amount !== null ? (float) $template->fixed_amount : null;
+        $amount_param = isset($params['amount']) ? (float) $params['amount'] : null;
+        if ($amount_param !== null && $amount_param <= 0) {
+            $amount_param = null;
+        }
+
+        $purchase_flow = isset($template->purchase_flow) && $template->purchase_flow ? $template->purchase_flow : null;
+        if (!$purchase_flow) {
+            if ($template->type === 'product_bundle') {
+                $purchase_flow = 'bundle';
+            } elseif ($template->type === 'custom_bundle') {
+                $purchase_flow = 'custom';
+            } else {
+                $purchase_flow = 'stored_value';
+            }
+        }
+
+        $final_amount = $fixed_amount;
+        if ($purchase_flow === 'stored_value') {
+            $amount_options = self::normalize_number_list($template->amount_options ?? null);
+            $min_amount = isset($template->min_amount) && $template->min_amount !== null ? (float) $template->min_amount : null;
+            $max_amount = isset($template->max_amount) && $template->max_amount !== null ? (float) $template->max_amount : null;
+
+            if ($amount_param !== null) {
+                if (!empty($amount_options) && !in_array($amount_param, $amount_options, true)) {
+                    return new WP_Error('invalid_amount', '购卡金额不在可选范围内', ['status' => 400]);
+                }
+                if ($min_amount !== null && $amount_param < $min_amount) {
+                    return new WP_Error('invalid_amount', '购卡金额低于最低限制', ['status' => 400]);
+                }
+                if ($max_amount !== null && $amount_param > $max_amount) {
+                    return new WP_Error('invalid_amount', '购卡金额超过最高限制', ['status' => 400]);
+                }
+                $final_amount = $amount_param;
+            } elseif ($fixed_amount !== null) {
+                $final_amount = $fixed_amount;
+            } elseif (!empty($amount_options)) {
+                $final_amount = $amount_options[0];
+            } else {
+                return new WP_Error('missing_amount', '请提供购卡金额', ['status' => 400]);
+            }
+        }
+
+        if ($final_amount === null || $final_amount <= 0) {
+            return new WP_Error('invalid_amount', '购卡金额无效', ['status' => 400]);
+        }
+
         $cards_table = $wpdb->prefix . 'myshop_gift_cards';
 
         $insert_data = [
             'card_number'         => $card_number,
             'template_id'         => $template->id,
             'template_type'       => $template->type,
-            'initial_amount'      => $template->fixed_amount,
-            'balance'             => $template->fixed_amount,
+            'initial_amount'      => $final_amount,
+            'balance'             => $final_amount,
             'currency'            => $template->currency,
             'linked_product_id'   => $template->product_id ?: null,
             'linked_variation_ids'=> $template->variation_ids,
@@ -579,7 +837,7 @@ class Gift_Card_Controller {
             $insert_data['card_code'] = $card_number;
         }
         if (in_array('amount', $known_columns, true)) {
-            $insert_data['amount'] = $template->fixed_amount;
+            $insert_data['amount'] = $final_amount;
         }
         if (in_array('user_id', $known_columns, true)) {
             $insert_data['user_id'] = $user->ID;
@@ -866,6 +1124,30 @@ class Gift_Card_Controller {
         return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
     }
 
+    private static function normalize_id_list($raw) {
+        $decoded = self::decode_meta_json($raw);
+        if (is_array($decoded)) {
+            return array_values(array_map('intval', $decoded));
+        }
+        if (is_string($raw)) {
+            $parts = array_filter(array_map('trim', explode(',', $raw)), 'strlen');
+            return array_values(array_map('intval', $parts));
+        }
+        return [];
+    }
+
+    private static function normalize_number_list($raw) {
+        $decoded = self::decode_meta_json($raw);
+        if (is_array($decoded)) {
+            return array_values(array_map('floatval', $decoded));
+        }
+        if (is_string($raw)) {
+            $parts = array_filter(array_map('trim', explode(',', $raw)), 'strlen');
+            return array_values(array_map('floatval', $parts));
+        }
+        return [];
+    }
+
     private static function find_template_for_mode($mode) {
         global $wpdb;
 
@@ -1118,6 +1400,21 @@ class Gift_Card_Controller {
     }
 
     private static function format_template($row, $include_config = false) {
+        $purchase_flow = isset($row->purchase_flow) && $row->purchase_flow ? $row->purchase_flow : null;
+        if (!$purchase_flow) {
+            if ($row->type === 'product_bundle') {
+                $purchase_flow = 'bundle';
+            } elseif ($row->type === 'custom_bundle') {
+                $purchase_flow = 'custom';
+            } else {
+                $purchase_flow = 'stored_value';
+            }
+        }
+
+        $amount_options = self::normalize_number_list($row->amount_options ?? null);
+        $allowed_product_ids = self::normalize_id_list($row->allowed_product_ids ?? null);
+        $allowed_variation_ids = self::normalize_id_list($row->allowed_variation_ids ?? null);
+
         return [
             'id'                 => (int) $row->id,
             'name'               => $row->name,
@@ -1132,7 +1429,16 @@ class Gift_Card_Controller {
             'created_at'         => $row->created_at,
             'updated_at'         => $row->updated_at,
             'share_template_config' => $include_config && !empty($row->share_template_config) ? json_decode($row->share_template_config, true) : null,
-            'print_template_url' => $include_config ? self::resolve_print_template_url($row->print_template_url ?? '') : null
+            'print_template_url' => $include_config ? self::resolve_print_template_url($row->print_template_url ?? '') : null,
+            'purchase_flow'      => $purchase_flow,
+            'amount_options'     => !empty($amount_options) ? $amount_options : null,
+            'min_amount'         => isset($row->min_amount) && $row->min_amount !== null ? (float) $row->min_amount : null,
+            'max_amount'         => isset($row->max_amount) && $row->max_amount !== null ? (float) $row->max_amount : null,
+            'allowed_product_ids' => !empty($allowed_product_ids) ? $allowed_product_ids : null,
+            'allowed_variation_ids' => !empty($allowed_variation_ids) ? $allowed_variation_ids : null,
+            'max_items'          => isset($row->max_items) && $row->max_items !== null ? (int) $row->max_items : null,
+            'max_total'          => isset($row->max_total) && $row->max_total !== null ? (float) $row->max_total : null,
+            'success_copywriting' => isset($row->success_copywriting) ? $row->success_copywriting : null
         ];
     }
 
@@ -1360,16 +1666,18 @@ class Gift_Card_Controller {
         }
 
         $mini_program_path = '/pages/shopping-card/claim?token=' . rawurlencode($token);
-        if (empty($qr_payload)) {
-            $qr_payload = self::QR_SCHEME . '?token=' . rawurlencode($token);
-        }
         $share_url = add_query_arg(
             ['giftcard_token' => rawurlencode($token)],
             home_url('/')
         );
+        if (empty($qr_payload)) {
+            $qr_payload = $share_url;
+        }
 
         // 生成二维码图片URL（带模板图案的版本）
         $qr_image_url = self::generate_qr_image_url($token, $qr_payload, $share_style_config, $message, $card, $template);
+
+        $mini_program_qr = self::generate_miniprogram_qr_image($mini_program_path, $token);
 
         return [
             'share_token' => $token,
@@ -1377,8 +1685,97 @@ class Gift_Card_Controller {
             'mini_program_path' => $mini_program_path,
             'qr_payload' => $qr_payload,
             'qr_image_url' => $qr_image_url,
-            'mini_program_qr' => $qr_image_url // 兼容字段
+            'mini_program_qr' => $mini_program_qr ?: $qr_image_url // 兼容字段
         ];
+    }
+
+    private static function generate_miniprogram_qr_image($path, $token) {
+        $access_token = self::get_wechat_access_token();
+        if (empty($access_token)) {
+            return null;
+        }
+
+        $endpoint = 'https://api.weixin.qq.com/wxa/getwxacode?access_token=' . rawurlencode($access_token);
+        $body = wp_json_encode([
+            'path' => $path,
+            'width' => 430,
+            'is_hyaline' => true
+        ]);
+
+        $response = wp_remote_post($endpoint, [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => $body,
+            'timeout' => 15
+        ]);
+
+        if (is_wp_error($response)) {
+            return null;
+        }
+
+        $status = wp_remote_retrieve_response_code($response);
+        $content_type = wp_remote_retrieve_header($response, 'content-type');
+        $raw = wp_remote_retrieve_body($response);
+
+        if ($status !== 200 || empty($raw)) {
+            return null;
+        }
+
+        if (!empty($content_type) && stripos($content_type, 'application/json') !== false) {
+            return null;
+        }
+
+        $upload_dir = wp_upload_dir();
+        if (empty($upload_dir['basedir']) || empty($upload_dir['baseurl'])) {
+            return null;
+        }
+
+        $dir = trailingslashit($upload_dir['basedir']) . 'myshop/giftcard/qr';
+        if (!file_exists($dir)) {
+            wp_mkdir_p($dir);
+        }
+
+        $file_name = sprintf('giftcard_%s.png', preg_replace('/[^A-Za-z0-9]/', '', $token));
+        $file_path = trailingslashit($dir) . $file_name;
+        $written = file_put_contents($file_path, $raw);
+        if ($written === false) {
+            return null;
+        }
+
+        return trailingslashit($upload_dir['baseurl']) . 'myshop/giftcard/qr/' . $file_name;
+    }
+
+    private static function get_wechat_access_token() {
+        $cached = get_transient('myshop_wechat_access_token');
+        if ($cached) {
+            return $cached;
+        }
+
+        $appid = get_option('myshop_wechat_appid');
+        $secret = get_option('myshop_wechat_secret');
+        if (empty($appid) || empty($secret)) {
+            return null;
+        }
+
+        $url = add_query_arg([
+            'grant_type' => 'client_credential',
+            'appid' => $appid,
+            'secret' => $secret
+        ], 'https://api.weixin.qq.com/cgi-bin/token');
+
+        $response = wp_remote_get($url, ['timeout' => 15]);
+        if (is_wp_error($response)) {
+            return null;
+        }
+
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($data) || empty($data['access_token'])) {
+            return null;
+        }
+
+        $expires = isset($data['expires_in']) ? max(300, ((int) $data['expires_in']) - 120) : 6600;
+        set_transient('myshop_wechat_access_token', $data['access_token'], $expires);
+
+        return $data['access_token'];
     }
 
     /**
@@ -1747,9 +2144,20 @@ class Gift_Card_Controller {
         $files = glob($pattern);
         
         if (!$files || !is_array($files)) {
+            $styles[] = [
+                'id' => 'default',
+                'name' => '默认样式',
+                'preview_image' => 'https://dummyimage.com/300x400/1e3a8a/ffffff&text=%E9%BB%98%E8%AE%A4%E6%A0%B7%E5%BC%8F',
+                'config' => [
+                    'id' => 'default',
+                    'name' => '默认样式',
+                    'default_message' => '送你一份精心准备的好礼，愿你喜欢。'
+                ]
+            ];
+
             return rest_ensure_response([
                 'success' => true,
-                'data' => []
+                'data' => $styles
             ]);
         }
         

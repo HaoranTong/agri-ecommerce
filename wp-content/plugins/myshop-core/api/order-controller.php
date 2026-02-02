@@ -26,6 +26,7 @@ class Order_Controller {
         add_action('added_post_meta', [self::class, 'handle_tracking_meta_update'], 10, 4);
         add_action('woocommerce_order_status_changed', [self::class, 'handle_order_status_changed'], 10, 4);
         add_action('myshop_sync_wechat_shipping', [self::class, 'run_wechat_shipping_sync'], 10, 1);
+        add_action('myshop_notify_admin', [self::class, 'run_notify_admin'], 10, 3);
     }
 
     public static function run_wechat_shipping_sync($order_id) {
@@ -137,39 +138,77 @@ class Order_Controller {
 
     public static function create($request) {
         $params = $request->get_json_params();
-        if (!isset($params['variation_id']) || !isset($params['quantity'])) {
-            return new WP_Error('invalid_request', '缺少 variation_id 或 quantity', ['status' => 400]);
-        }
-
-        $variation_id = absint($params['variation_id']);
-        $quantity = max(1, absint($params['quantity']));
-
-        $variation = wc_get_product($variation_id);
-        if (!$variation || !$variation->is_type('variation')) {
-            return new WP_Error('invalid_variation', '无效的 SKU', ['status' => 400]);
-        }
-        if ($variation->get_stock_quantity() < $quantity) {
-            return new WP_Error('insufficient_stock', '库存不足', ['status' => 400]);
-        }
-
-        $order = wc_create_order();
-        $order->add_product($variation, $quantity);
-
         $user = MyShop_Auth::get_user_from_request($request);
         if (is_wp_error($user)) {
             return $user;
         }
-        $order->set_customer_id($user->ID);
-        $user_id = $user->ID;
-        $order->set_payment_method('cod'); // 设置为货到付款
 
-        $is_gift_card_order = !empty($params['is_gift_card_order']);
         $giftcard_hint = isset($params['giftcard_hint']) ? sanitize_text_field($params['giftcard_hint']) : '';
         $giftcard_mode = isset($params['giftcard_mode']) ? sanitize_key($params['giftcard_mode']) : '';
         $giftcard_template_id = isset($params['giftcard_template_id']) ? absint($params['giftcard_template_id']) : 0;
         $giftcard_payload = isset($params['giftcard_payload'])
             ? self::sanitize_giftcard_payload($params['giftcard_payload'])
             : [];
+        $is_gift_card_order = !empty($params['is_gift_card_order']) || !empty($giftcard_mode);
+
+        $order = wc_create_order();
+        if (!$order) {
+            return new WP_Error('order_create_failed', '订单创建失败', ['status' => 500]);
+        }
+
+        if ($is_gift_card_order) {
+            $giftcard_items = self::build_giftcard_order_items($giftcard_mode, $giftcard_template_id, $giftcard_payload, $params);
+            if (is_wp_error($giftcard_items)) {
+                return $giftcard_items;
+            }
+
+            foreach ($giftcard_items as $item) {
+                if (!empty($item['fee_amount'])) {
+                    $fee = new WC_Order_Item_Fee();
+                    $fee->set_name($item['name'] ?? '购物卡购买');
+                    $fee->set_amount($item['fee_amount']);
+                    $fee->set_total($item['fee_amount']);
+                    $order->add_item($fee);
+                    continue;
+                }
+
+                $product_id = !empty($item['product_id']) ? absint($item['product_id']) : 0;
+                $variation_id = !empty($item['variation_id']) ? absint($item['variation_id']) : 0;
+                $quantity = !empty($item['quantity']) ? max(1, absint($item['quantity'])) : 1;
+
+                $product = $variation_id ? wc_get_product($variation_id) : ($product_id ? wc_get_product($product_id) : null);
+                if (!$product) {
+                    return new WP_Error('invalid_variation', '无效的 SKU', ['status' => 400]);
+                }
+                if ($product->managing_stock() && $product->get_stock_quantity() < $quantity) {
+                    return new WP_Error('insufficient_stock', '库存不足', ['status' => 400]);
+                }
+
+                $order->add_product($product, $quantity);
+            }
+        } else {
+            if (!isset($params['variation_id']) || !isset($params['quantity'])) {
+                return new WP_Error('invalid_request', '缺少 variation_id 或 quantity', ['status' => 400]);
+            }
+
+            $variation_id = absint($params['variation_id']);
+            $quantity = max(1, absint($params['quantity']));
+
+            $variation = wc_get_product($variation_id);
+            if (!$variation || !$variation->is_type('variation')) {
+                return new WP_Error('invalid_variation', '无效的 SKU', ['status' => 400]);
+            }
+            if ($variation->get_stock_quantity() < $quantity) {
+                return new WP_Error('insufficient_stock', '库存不足', ['status' => 400]);
+            }
+
+            $order->add_product($variation, $quantity);
+        }
+
+        $order->set_customer_id($user->ID);
+        $user_id = $user->ID;
+        $order->set_payment_method('cod'); // 设置为货到付款
+
         $requires_shipping = !$is_gift_card_order;
 
         // ✅ 处理积分抵扣
@@ -253,21 +292,61 @@ class Order_Controller {
 
         // ✅ 已移除扫码支付二维码逻辑，前端仅使用微信支付
 
-        self::notify_wechat_admin('order', $order);
+        self::queue_wechat_admin_notify('order', $order->get_id());
+
+        $response_items = [];
+        foreach ($order->get_items() as $item) {
+            if (!$item instanceof WC_Order_Item_Product) {
+                continue;
+            }
+            $product = $item->get_product();
+            $response_items[] = [
+                'product_id' => $item->get_product_id(),
+                'variation_id' => $item->get_variation_id(),
+                'quantity' => $item->get_quantity(),
+                'price' => $product ? $product->get_price() : $item->get_total()
+            ];
+        }
 
         return rest_ensure_response([
             'order_id' => $order->get_id(),
             'order_number' => $order->get_order_number(),
             'total' => $order->get_total(),
             'status' => $order->get_status(),
-            'items' => [[
-                'product_id' => $variation->get_parent_id(),
-                'variation_id' => $variation_id,
-                'quantity' => $quantity,
-                'price' => $variation->get_price()
-            ]]
+            'items' => $response_items
             // ✅ 已移除 payment_qr_url, customer_service_qr, message 字段
         ]);
+    }
+
+    private static function queue_wechat_admin_notify($type, $order_id, $context = []) {
+        $order_id = absint($order_id);
+        if (!$order_id) {
+            return;
+        }
+
+        if (!is_array($context)) {
+            $context = [];
+        }
+
+        wp_schedule_single_event(time() + 3, 'myshop_notify_admin', [$type, $order_id, $context]);
+    }
+
+    public static function run_notify_admin($type, $order_id, $context = []) {
+        $order_id = absint($order_id);
+        if (!$order_id) {
+            return;
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        if (!is_array($context)) {
+            $context = [];
+        }
+
+        self::notify_wechat_admin($type, $order, $context);
     }
 
     private static function notify_wechat_admin($type, $order, $context = []) {
@@ -667,7 +746,7 @@ class Order_Controller {
         }
         $order->save();
 
-        self::notify_wechat_admin('return', $order, [
+        self::queue_wechat_admin_notify('return', $order->get_id(), [
             'reason' => $reason,
             'contact' => $contact,
             'images' => $clean_images
@@ -850,6 +929,93 @@ class Order_Controller {
         return $sanitized;
     }
 
+    private static function build_giftcard_order_items($giftcard_mode, $giftcard_template_id, $giftcard_payload, $params) {
+        $mode = $giftcard_mode ? sanitize_key($giftcard_mode) : '';
+        if (!$mode) {
+            return new WP_Error('invalid_request', '缺少 giftcard_mode', ['status' => 400]);
+        }
+
+        if ($mode === 'stored_value') {
+            $amount = 0;
+            if (isset($giftcard_payload['amount'])) {
+                $amount = (float) $giftcard_payload['amount'];
+            } elseif (isset($params['amount'])) {
+                $amount = (float) $params['amount'];
+            }
+
+            if ($amount <= 0) {
+                return new WP_Error('invalid_amount', '无效的面值金额', ['status' => 400]);
+            }
+
+            return [[
+                'fee_amount' => $amount,
+                'name' => '购物卡购买'
+            ]];
+        }
+
+        $selected_items = [];
+        if (!empty($giftcard_payload['selected_items']) && is_array($giftcard_payload['selected_items'])) {
+            $selected_items = $giftcard_payload['selected_items'];
+        } elseif (!empty($giftcard_payload['items']) && is_array($giftcard_payload['items'])) {
+            $selected_items = $giftcard_payload['items'];
+        }
+
+        if (empty($selected_items) && $mode === 'bundle' && $giftcard_template_id) {
+            $template = self::get_giftcard_template_row($giftcard_template_id);
+            if ($template && !empty($template->bundle_items)) {
+                $decoded = json_decode($template->bundle_items, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $selected_items = $decoded;
+                }
+            }
+        }
+
+        if (empty($selected_items)) {
+            return new WP_Error('invalid_giftcard_items', '缺少礼品卡商品配置', ['status' => 400]);
+        }
+
+        $items = [];
+        foreach ($selected_items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $product_id = isset($item['product_id']) ? absint($item['product_id']) : 0;
+            $variation_id = isset($item['variation_id']) ? absint($item['variation_id']) : 0;
+            $quantity = isset($item['quantity']) ? max(1, absint($item['quantity'])) : 1;
+
+            if (!$product_id && !$variation_id) {
+                continue;
+            }
+
+            $items[] = [
+                'product_id' => $product_id,
+                'variation_id' => $variation_id,
+                'quantity' => $quantity
+            ];
+        }
+
+        if (empty($items)) {
+            return new WP_Error('invalid_giftcard_items', '缺少礼品卡商品配置', ['status' => 400]);
+        }
+
+        return $items;
+    }
+
+    private static function get_giftcard_template_row($template_id) {
+        global $wpdb;
+
+        $template_id = absint($template_id);
+        if (!$template_id) {
+            return null;
+        }
+
+        $table = $wpdb->prefix . 'myshop_gift_card_templates';
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table} WHERE id = %d",
+            $template_id
+        ));
+    }
+
     private static function resolve_tracking_meta($order_id) {
         $order = wc_get_order($order_id);
         if (!$order) {
@@ -931,7 +1097,7 @@ class Order_Controller {
         ];
     }
 
-    private static function maybe_sync_wechat_shipping($order_id) {
+    public static function maybe_sync_wechat_shipping($order_id) {
         $order = wc_get_order($order_id);
         if (!$order) {
             return;
@@ -1436,11 +1602,6 @@ class Order_Controller {
             return new WP_Error('insufficient_points', '积分不足', ['status' => 400]);
         }
         
-        // 检查最低使用积分
-        if ($points_to_use < $settings['min_points_to_use']) {
-            return new WP_Error('points_too_low', sprintf('最少需要使用 %d 积分', $settings['min_points_to_use']), ['status' => 400]);
-        }
-        
         // 计算订单金额
         $order->calculate_totals();
         $order_total = $order->get_total();
@@ -1450,15 +1611,31 @@ class Order_Controller {
             return new WP_Error('order_amount_too_low', sprintf('订单金额需满 ¥%.2f 才能使用积分', $settings['min_order_amount_to_use']), ['status' => 400]);
         }
         
-        // 计算可抵扣金额
-        $discount_amount = $points_to_use / $settings['redeem_rate'];
-        
         // 检查最大抵扣比例
         $max_discount_percent = (float) $settings['max_discount_percent'];
         if ($max_discount_percent <= 1) {
             $max_discount_percent = 100;
         }
         $max_discount = $order_total * ($max_discount_percent / 100);
+        $max_points_by_order = (int) floor($max_discount * $settings['redeem_rate']);
+
+        if ($max_points_by_order <= 0) {
+            return new WP_Error('points_not_applicable', '当前订单不可使用积分', ['status' => 400]);
+        }
+
+        $min_points_to_use = (int) $settings['min_points_to_use'];
+        if ($max_points_by_order < $min_points_to_use) {
+            $min_points_to_use = $max_points_by_order;
+        }
+
+        // 检查最低使用积分（小额订单允许按最大可用积分使用）
+        if ($points_to_use < $min_points_to_use) {
+            return new WP_Error('points_too_low', sprintf('最少需要使用 %d 积分', $min_points_to_use), ['status' => 400]);
+        }
+
+        // 计算可抵扣金额
+        $discount_amount = $points_to_use / $settings['redeem_rate'];
+
         if ($discount_amount > $max_discount) {
             $discount_amount = $max_discount;
             $points_to_use = floor($max_discount * $settings['redeem_rate']);

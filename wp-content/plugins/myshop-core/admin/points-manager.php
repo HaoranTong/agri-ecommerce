@@ -1028,12 +1028,17 @@ class MyShop_Points_Manager {
     public static function auto_grant_points_on_order_complete($order_id) {
         global $wpdb;
         
-        // ✅ 支付成功后订单进入 processing 即发放积分，避免等待 completed
-        // ✅ 已发货/运输中（on-hold）也应发放积分
-        add_action('woocommerce_order_status_on-hold', [self::class, 'auto_grant_points_on_order_complete'], 10, 1);
-        
+        $settings = get_option('myshop_points_settings', []);
+        $settings = wp_parse_args($settings, [
+            'enable_points' => 1,
+            'earn_rate' => 10,
+            'min_order_amount' => 0,
+            'enable_expiry' => 0,
+            'expiry_days' => 365
+        ]);
+
         // 检查是否启用积分系统
-        if (!$settings['enable_points']) {
+        if (empty($settings['enable_points'])) {
             return;
         }
         

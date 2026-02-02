@@ -21,7 +21,10 @@ class Points_Controller {
             'args' => [
                 'page'     => ['type' => 'integer', 'default' => 1],
                 'per_page' => ['type' => 'integer', 'default' => 20],
-                'status'   => ['type' => 'string', 'required' => false]
+                'status'   => ['type' => 'string', 'required' => false],
+                'type'     => ['type' => 'string', 'required' => false],
+                'from'     => ['type' => 'string', 'required' => false],
+                'to'       => ['type' => 'string', 'required' => false]
             ]
         ]);
 
@@ -245,6 +248,33 @@ class Points_Controller {
             $status = sanitize_text_field($status_filter);
             $where[] = 'status = %s';
             $params[] = $status;
+        }
+
+        $type_filter = $request->get_param('type');
+        if ($type_filter) {
+            $type = sanitize_key($type_filter);
+            if ($type) {
+                $where[] = 'type = %s';
+                $params[] = $type;
+            }
+        }
+
+        $from_param = $request->get_param('from');
+        if ($from_param) {
+            $from_ts = strtotime(sanitize_text_field($from_param));
+            if ($from_ts) {
+                $where[] = 'created_at >= %s';
+                $params[] = date('Y-m-d H:i:s', $from_ts);
+            }
+        }
+
+        $to_param = $request->get_param('to');
+        if ($to_param) {
+            $to_ts = strtotime(sanitize_text_field($to_param));
+            if ($to_ts) {
+                $where[] = 'created_at <= %s';
+                $params[] = date('Y-m-d H:i:s', $to_ts);
+            }
         }
 
         $where_sql = 'WHERE ' . implode(' AND ', $where);
@@ -861,19 +891,69 @@ class Points_Controller {
      */
     public static function get_rules($request) {
         $settings = self::get_internal_settings();
-        $rules = [
-            'enable_points' => (bool) $settings['enable_points'],
-            'earn_rate' => (float) $settings['earn_rate'],
-            'min_order_amount' => (float) $settings['min_order_amount'],
-            'register_bonus' => (int) $settings['register_bonus'],
-            'daily_signin_points' => (int) $settings['daily_signin_points'],
-            'enable_points_discount' => (bool) $settings['enable_points_discount'],
-            'redeem_rate' => (int) $settings['redeem_rate'],
-            'min_points_to_use' => (int) $settings['min_points_to_use'],
-            'max_discount_percent' => (float) $settings['max_discount_percent'],
-            'min_order_amount_to_use' => (float) $settings['min_order_amount_to_use'],
-            'enable_expiry' => (bool) $settings['enable_expiry'],
-            'expiry_days' => (int) $settings['expiry_days']
+        $rules = [];
+        $enable_points = !empty($settings['enable_points']);
+
+        $earn_rate = (float) $settings['earn_rate'];
+        if ($earn_rate > 0) {
+            $min_order_amount = (float) $settings['min_order_amount'];
+            $desc = $min_order_amount > 0
+                ? sprintf('订单实付满 %.2f 元起，每消费 1 元获得 %.2f 积分，订单完成后发放', $min_order_amount, $earn_rate)
+                : sprintf('每消费 1 元获得 %.2f 积分，订单完成后发放', $earn_rate);
+            $rules[] = [
+                'rule_id' => 'order_reward',
+                'title' => '下单返积分',
+                'description' => $desc,
+                'status' => $enable_points ? 'active' : 'inactive'
+            ];
+        }
+
+        $register_bonus = (int) $settings['register_bonus'];
+        $rules[] = [
+            'rule_id' => 'register_bonus',
+            'title' => '注册奖励',
+            'description' => $register_bonus > 0 ? sprintf('新用户注册即赠送 %d 积分', $register_bonus) : '新用户注册奖励已关闭',
+            'status' => $register_bonus > 0 && $enable_points ? 'active' : 'inactive'
+        ];
+
+        $daily_signin_points = (int) $settings['daily_signin_points'];
+        $rules[] = [
+            'rule_id' => 'daily_signin',
+            'title' => '每日签到',
+            'description' => $daily_signin_points > 0 ? sprintf('每日签到可得 %d 积分', $daily_signin_points) : '签到奖励已关闭',
+            'status' => $daily_signin_points > 0 && $enable_points ? 'active' : 'inactive'
+        ];
+
+        $enable_discount = !empty($settings['enable_points_discount']);
+        $redeem_rate = (int) $settings['redeem_rate'];
+        $min_points = (int) $settings['min_points_to_use'];
+        $max_discount = (float) $settings['max_discount_percent'];
+        $min_order_amount = (float) $settings['min_order_amount_to_use'];
+        $discount_desc = $enable_discount
+            ? sprintf('每 %d 积分抵扣 1 元，最低使用 %d 积分，最高抵扣订单金额 %.0f%%，订单满 %.2f 元可用',
+                $redeem_rate,
+                $min_points,
+                $max_discount,
+                $min_order_amount
+            )
+            : '积分抵扣已关闭';
+        $rules[] = [
+            'rule_id' => 'points_discount',
+            'title' => '积分抵扣',
+            'description' => $discount_desc,
+            'status' => $enable_discount && $enable_points ? 'active' : 'inactive'
+        ];
+
+        $enable_expiry = !empty($settings['enable_expiry']);
+        $expiry_days = (int) $settings['expiry_days'];
+        $expiry_desc = $enable_expiry && $expiry_days > 0
+            ? sprintf('积分有效期 %d 天，到期自动失效', $expiry_days)
+            : '积分长期有效';
+        $rules[] = [
+            'rule_id' => 'points_expiry',
+            'title' => '积分有效期',
+            'description' => $expiry_desc,
+            'status' => $enable_points ? 'active' : 'inactive'
         ];
 
         return rest_ensure_response([
