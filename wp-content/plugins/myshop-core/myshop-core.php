@@ -31,6 +31,7 @@ if (is_admin()) {
     require_once MYSHOP_PLUGIN_DIR . 'admin/test-users-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-template-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-manager.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-share-style-manager.php';
     
     // 测试用户清理工具（仅开发环境）
     add_action('admin_menu', function() {
