@@ -980,13 +980,21 @@ class Gift_Card_Controller {
 
         self::log_share_event((int) $card->id, (int) $user->ID, $delivery_mode, $channel, $token);
 
-        // 获取分享样式配置
-        $share_style_config = null;
-        if ($theme && $theme !== self::DEFAULT_SHARE_THEME) {
-            $share_style_config = self::get_share_style_config($theme);
+        // 获取分享样式配置（默认主题也要读取默认模板）
+        $share_style_config = self::get_share_style_config($theme ?: self::DEFAULT_SHARE_THEME);
+        if (!$share_style_config) {
+            $share_style_config = self::get_share_style_config(self::DEFAULT_SHARE_THEME);
         }
-        
-        $share_payload = self::build_share_urls($token, $qr_payload, $share_style_config, $message, $card, $template);
+
+        $share_payload = self::build_share_urls($token, null, $share_style_config, $message, $card, $template);
+        error_log('[GiftCard] share payload: ' . wp_json_encode([
+            'card_number' => $card->card_number,
+            'token' => $token,
+            'mini_program_path' => $share_payload['mini_program_path'] ?? null,
+            'qr_payload' => $share_payload['qr_payload'] ?? null,
+            'qr_image_url' => $share_payload['qr_image_url'] ?? null,
+            'mini_program_qr' => $share_payload['mini_program_qr'] ?? null
+        ]));
 
         return rest_ensure_response([
             'success' => true,
@@ -1023,16 +1031,23 @@ class Gift_Card_Controller {
         $template = self::get_template_row((int) $card->template_id);
         $share_meta = self::decode_share_meta($card->share_meta ?? null);
         
-        // 获取分享样式配置
+        // 获取分享样式配置（默认主题也要读取默认模板）
         $theme = is_array($share_meta) ? ($share_meta['theme'] ?? self::DEFAULT_SHARE_THEME) : self::DEFAULT_SHARE_THEME;
-        $share_style_config = null;
-        if ($theme && $theme !== self::DEFAULT_SHARE_THEME) {
-            $share_style_config = self::get_share_style_config($theme);
+        $share_style_config = self::get_share_style_config($theme ?: self::DEFAULT_SHARE_THEME);
+        if (!$share_style_config) {
+            $share_style_config = self::get_share_style_config(self::DEFAULT_SHARE_THEME);
         }
         
         $message = is_array($share_meta) ? ($share_meta['message'] ?? null) : null;
-        $qr_payload = self::QR_SCHEME . '?token=' . rawurlencode($card->share_token);
-        $share_payload = self::build_share_urls($card->share_token, $qr_payload, $share_style_config, $message, $card, $template);
+        $share_payload = self::build_share_urls($card->share_token, null, $share_style_config, $message, $card, $template);
+        error_log('[GiftCard] share detail payload: ' . wp_json_encode([
+            'card_number' => $card->card_number,
+            'token' => $card->share_token,
+            'mini_program_path' => $share_payload['mini_program_path'] ?? null,
+            'qr_payload' => $share_payload['qr_payload'] ?? null,
+            'qr_image_url' => $share_payload['qr_image_url'] ?? null,
+            'mini_program_qr' => $share_payload['mini_program_qr'] ?? null
+        ]));
 
         return rest_ensure_response([
             'success' => true,
@@ -1070,15 +1085,18 @@ class Gift_Card_Controller {
         $token = sanitize_text_field($request->get_param('token'));
         $card = self::get_card_by_share_token($token);
         if (!$card) {
+            error_log(sprintf('[GiftCard] claim failed: share token not found. token=%s, user_id=%d', $token, (int) $user->ID));
             return new WP_Error('share_not_found', '分享链接不存在', ['status' => 404]);
         }
 
         if ($card->share_token_expires_at && strtotime($card->share_token_expires_at) < current_time('timestamp')) {
+            error_log(sprintf('[GiftCard] claim failed: share token expired. token=%s, user_id=%d, expires_at=%s', $token, (int) $user->ID, $card->share_token_expires_at));
             return new WP_Error('share_expired', '分享链接已过期', ['status' => 410]);
         }
 
         $current_holder_id = self::get_card_holder_user_id($card);
         if ($current_holder_id === (int) $user->ID) {
+            error_log(sprintf('[GiftCard] claim blocked: self-claim. token=%s, user_id=%d, card_number=%s', $token, (int) $user->ID, $card->card_number));
             return new WP_Error('card_self_claim', '不可领取自己分享的礼品卡', ['status' => 400]);
         }
 
@@ -1099,8 +1117,11 @@ class Gift_Card_Controller {
         );
 
         if ($updated === false) {
+            error_log(sprintf('[GiftCard] claim failed: db update error. token=%s, user_id=%d, card_number=%s, error=%s', $token, (int) $user->ID, $card->card_number, $wpdb->last_error ?: 'unknown'));
             return new WP_Error('card_claim_failed', '领取礼品卡失败', ['status' => 500]);
         }
+
+        error_log(sprintf('[GiftCard] claim success: token=%s, card_number=%s, from_user=%d, to_user=%d', $token, $card->card_number, (int) $current_holder_id, (int) $user->ID));
 
         return rest_ensure_response([
             'success' => true,
@@ -1674,10 +1695,30 @@ class Gift_Card_Controller {
             $qr_payload = $share_url;
         }
 
+        $qr_size = null;
+        if (is_array($share_style_config) && !empty($share_style_config['qr_size'])) {
+            $qr_size = absint($share_style_config['qr_size']);
+        }
+        $mini_program_qr = self::generate_miniprogram_qr_image($mini_program_path, $token, $qr_size);
+        if ($mini_program_qr && is_array($share_style_config)) {
+            $qr_image_for_style = $mini_program_qr;
+            $upload_dir = wp_upload_dir();
+            if (!empty($upload_dir['baseurl']) && !empty($upload_dir['basedir'])) {
+                $baseurl_http = $upload_dir['baseurl'];
+                $baseurl_https = set_url_scheme($upload_dir['baseurl'], 'https');
+                if (strpos($mini_program_qr, $baseurl_https) === 0 || strpos($mini_program_qr, $baseurl_http) === 0) {
+                    $relative = ltrim(str_replace([$baseurl_https, $baseurl_http], '', $mini_program_qr), '/');
+                    $local_path = trailingslashit($upload_dir['basedir']) . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+                    if (file_exists($local_path)) {
+                        $qr_image_for_style = $local_path;
+                    }
+                }
+            }
+            $share_style_config['qr_image_url'] = $qr_image_for_style;
+        }
+
         // 生成二维码图片URL（带模板图案的版本）
         $qr_image_url = self::generate_qr_image_url($token, $qr_payload, $share_style_config, $message, $card, $template);
-
-        $mini_program_qr = self::generate_miniprogram_qr_image($mini_program_path, $token);
 
         return [
             'share_token' => $token,
@@ -1689,17 +1730,46 @@ class Gift_Card_Controller {
         ];
     }
 
-    private static function generate_miniprogram_qr_image($path, $token) {
+    private static function generate_miniprogram_qr_image($path, $token, $width = null) {
         $access_token = self::get_wechat_access_token();
         if (empty($access_token)) {
+            error_log('[GiftCard] mini program qr failed: access token missing');
             return null;
         }
 
-        $endpoint = 'https://api.weixin.qq.com/wxa/getwxacode?access_token=' . rawurlencode($access_token);
+        $width = $width ? absint($width) : 430;
+        if ($width < 280) {
+            $width = 280;
+        }
+        if ($width > 1280) {
+            $width = 1280;
+        }
+
+        $env_version = 'release';
+        $configured_env = get_option('myshop_wechat_env_version');
+        if (is_string($configured_env) && in_array($configured_env, ['develop', 'trial', 'release'], true)) {
+            $env_version = $configured_env;
+        } else {
+            $home_url = home_url('/');
+            if (strpos($home_url, 'dev.') !== false || strpos($home_url, 'localhost') !== false) {
+                $env_version = 'develop';
+            } elseif (strpos($home_url, 'trial') !== false || strpos($home_url, 'staging') !== false) {
+                $env_version = 'trial';
+            }
+        }
+
+        $scene = $token;
+        if (is_string($scene) && strlen($scene) > 32) {
+            $scene = substr($scene, 0, 32);
+        }
+
+        $endpoint = 'https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=' . rawurlencode($access_token);
         $body = wp_json_encode([
-            'path' => $path,
-            'width' => 430,
-            'is_hyaline' => true
+            'scene' => $scene,
+            'page' => 'pages/shopping-card/claim',
+            'width' => $width,
+            'is_hyaline' => false,
+            'env_version' => $env_version
         ]);
 
         $response = wp_remote_post($endpoint, [
@@ -1709,6 +1779,7 @@ class Gift_Card_Controller {
         ]);
 
         if (is_wp_error($response)) {
+            error_log('[GiftCard] mini program qr request error: ' . $response->get_error_message());
             return null;
         }
 
@@ -1717,14 +1788,56 @@ class Gift_Card_Controller {
         $raw = wp_remote_retrieve_body($response);
 
         if ($status !== 200 || empty($raw)) {
-            return null;
-        }
-
-        if (!empty($content_type) && stripos($content_type, 'application/json') !== false) {
+            error_log('[GiftCard] mini program qr invalid response: status=' . $status . ', content_type=' . $content_type . ', size=' . strlen($raw));
             return null;
         }
 
         $upload_dir = wp_upload_dir();
+        $file_path = null;
+        $png_path = null;
+        $jpg_path = null;
+        $safe_token = preg_replace('/[^A-Za-z0-9]/', '', $token);
+        if (!empty($upload_dir['basedir'])) {
+            $dir = trailingslashit($upload_dir['basedir']) . 'myshop/giftcard/qr';
+            $png_path = trailingslashit($dir) . sprintf('giftcard_%s.png', $safe_token);
+            $jpg_path = trailingslashit($dir) . sprintf('giftcard_%s.jpg', $safe_token);
+            $file_path = $png_path;
+        }
+
+        $raw_trim = ltrim($raw);
+        $looks_like_json = (!empty($content_type) && stripos($content_type, 'application/json') !== false)
+            || (!empty($raw_trim) && $raw_trim[0] === '{');
+        if ($looks_like_json) {
+            error_log('[GiftCard] mini program qr response json: ' . $raw);
+            if ($png_path && file_exists($png_path)) {
+                @unlink($png_path);
+            }
+            if ($jpg_path && file_exists($jpg_path)) {
+                @unlink($jpg_path);
+            }
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded) && isset($decoded['errcode']) && (int) $decoded['errcode'] === 40001) {
+                delete_transient('myshop_wechat_access_token');
+                $access_token = self::get_wechat_access_token(true);
+                if ($access_token) {
+                    return self::generate_miniprogram_qr_image($path, $token, $width);
+                }
+            }
+            return null;
+        }
+
+        $image_info = @getimagesizefromstring($raw);
+        if ($image_info === false) {
+            error_log('[GiftCard] mini program qr invalid image response, content_type=' . $content_type . ', size=' . strlen($raw));
+            if ($png_path && file_exists($png_path)) {
+                @unlink($png_path);
+            }
+            if ($jpg_path && file_exists($jpg_path)) {
+                @unlink($jpg_path);
+            }
+            return null;
+        }
+
         if (empty($upload_dir['basedir']) || empty($upload_dir['baseurl'])) {
             return null;
         }
@@ -1734,18 +1847,30 @@ class Gift_Card_Controller {
             wp_mkdir_p($dir);
         }
 
-        $file_name = sprintf('giftcard_%s.png', preg_replace('/[^A-Za-z0-9]/', '', $token));
-        $file_path = trailingslashit($dir) . $file_name;
+        $mime = $image_info['mime'] ?? '';
+        $ext = ($mime === 'image/jpeg') ? 'jpg' : 'png';
+        $file_name = sprintf('giftcard_%s.%s', $safe_token, $ext);
+        $file_path = ($ext === 'jpg' && $jpg_path) ? $jpg_path : ($png_path ?: trailingslashit($dir) . $file_name);
+        if ($png_path && file_exists($png_path) && $file_path !== $png_path) {
+            @unlink($png_path);
+        }
+        if ($jpg_path && file_exists($jpg_path) && $file_path !== $jpg_path) {
+            @unlink($jpg_path);
+        }
         $written = file_put_contents($file_path, $raw);
         if ($written === false) {
+            error_log('[GiftCard] mini program qr write failed: ' . $file_path);
             return null;
         }
 
-        return trailingslashit($upload_dir['baseurl']) . 'myshop/giftcard/qr/' . $file_name;
+        error_log('[GiftCard] mini program qr saved: ' . $file_path . ', size=' . $written . ', mime=' . ($image_info['mime'] ?? 'unknown'));
+
+        $baseurl = set_url_scheme($upload_dir['baseurl'], 'https');
+        return trailingslashit($baseurl) . 'myshop/giftcard/qr/' . $file_name;
     }
 
-    private static function get_wechat_access_token() {
-        $cached = get_transient('myshop_wechat_access_token');
+    private static function get_wechat_access_token($force_refresh = false) {
+        $cached = $force_refresh ? null : get_transient('myshop_wechat_access_token');
         if ($cached) {
             return $cached;
         }
@@ -1756,13 +1881,16 @@ class Gift_Card_Controller {
             return null;
         }
 
-        $url = add_query_arg([
-            'grant_type' => 'client_credential',
-            'appid' => $appid,
-            'secret' => $secret
-        ], 'https://api.weixin.qq.com/cgi-bin/token');
-
-        $response = wp_remote_get($url, ['timeout' => 15]);
+        $response = wp_remote_post('https://api.weixin.qq.com/cgi-bin/stable_token', [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => wp_json_encode([
+                'grant_type' => 'client_credential',
+                'appid' => $appid,
+                'secret' => $secret,
+                'force_refresh' => $force_refresh ? true : false
+            ]),
+            'timeout' => 15
+        ]);
         if (is_wp_error($response)) {
             return null;
         }
@@ -1785,15 +1913,27 @@ class Gift_Card_Controller {
      * @return array|null 样式配置
      */
     private static function get_share_style_config($style_id) {
+        $option_styles = get_option('myshop_giftcard_share_styles', []);
+        if (is_array($option_styles)) {
+            foreach ($option_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+                if (!empty($style['id']) && $style['id'] === $style_id) {
+                    return $style;
+                }
+            }
+        }
+
         $styles_dir = MYSHOP_PLUGIN_DIR . 'assets/giftcard/';
-        
+
         // 尝试匹配样式文件
         $possible_files = [
             $styles_dir . 'share-style-' . $style_id . '.json',
             $styles_dir . 'share-' . $style_id . '.json',
             $styles_dir . 'share-default.json'
         ];
-        
+
         foreach ($possible_files as $file) {
             if (file_exists($file) && is_readable($file)) {
                 $content = file_get_contents($file);
@@ -1805,7 +1945,7 @@ class Gift_Card_Controller {
                 }
             }
         }
-        
+
         return null;
     }
 
@@ -1835,6 +1975,7 @@ class Gift_Card_Controller {
             if ($image_url) {
                 return $image_url;
             }
+            error_log('[GiftCard] styled qr returned null, fallback to qrserver');
         } catch (Exception $e) {
             error_log('[GiftCard] 生成带模板二维码失败: ' . $e->getMessage());
         }
@@ -1857,12 +1998,21 @@ class Gift_Card_Controller {
      * @return string|null 图片URL
      */
     private static function generate_styled_qr_image($token, $qr_payload, $style_config = null, $message = null, $card = null, $template = null) {
-        // 图片尺寸 - 改为方形，小巧美观
-        $canvas_size = 600; // 方形画布，600x600像素
+        if (!is_array($style_config)) {
+            $style_config = [];
+        }
+        // 图片尺寸
+        $canvas_size = isset($style_config['canvas_size']) ? absint($style_config['canvas_size']) : 600;
+        if ($canvas_size <= 0) {
+            $canvas_size = 600;
+        }
         $canvas_width = $canvas_size;
         $canvas_height = $canvas_size;
-        $qr_size = 360; // 二维码尺寸
-        $padding = 40; // 内边距
+        $qr_size = isset($style_config['qr_size']) ? absint($style_config['qr_size']) : 360;
+        if ($qr_size <= 0) {
+            $qr_size = 360;
+        }
+        $padding = isset($style_config['padding']) ? absint($style_config['padding']) : 40;
 
         // 创建画布
         $canvas = imagecreatetruecolor($canvas_width, $canvas_height);
@@ -1872,7 +2022,7 @@ class Gift_Card_Controller {
 
         // 设置背景色（从样式配置或使用默认）
         $bg_color = imagecolorallocate($canvas, 255, 255, 255); // 默认白色
-        if ($style_config && isset($style_config['background_color'])) {
+        if (isset($style_config['background_color'])) {
             $bg_rgb = self::hex_to_rgb($style_config['background_color']);
             if ($bg_rgb) {
                 $bg_color = imagecolorallocate($canvas, $bg_rgb['r'], $bg_rgb['g'], $bg_rgb['b']);
@@ -1881,36 +2031,79 @@ class Gift_Card_Controller {
         imagefill($canvas, 0, 0, $bg_color);
 
         // 如果有背景图片，加载并绘制
-        if ($style_config && !empty($style_config['background_image'])) {
+        if (!empty($style_config['background_image'])) {
             $bg_image = self::load_image_from_url($style_config['background_image']);
             if ($bg_image) {
                 $bg_w = imagesx($bg_image);
                 $bg_h = imagesy($bg_image);
                 imagecopyresampled($canvas, $bg_image, 0, 0, 0, 0, $canvas_width, $canvas_height, $bg_w, $bg_h);
-                imagedestroy($bg_image);
             }
         }
 
         // 生成二维码图片（使用在线服务生成基础二维码）
-        $qr_image_url = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $qr_size . 'x' . $qr_size . '&data=' . rawurlencode($qr_payload);
+        $qr_image_url = !empty($style_config['qr_image_url'])
+            ? $style_config['qr_image_url']
+            : 'https://api.qrserver.com/v1/create-qr-code/?size=' . $qr_size . 'x' . $qr_size . '&data=' . rawurlencode($qr_payload);
+        error_log('[GiftCard] styled qr: qr_image_url=' . $qr_image_url);
         $qr_image = self::load_image_from_url($qr_image_url);
+        if (!$qr_image && !empty($qr_payload)) {
+            $fallback_url = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $qr_size . 'x' . $qr_size . '&data=' . rawurlencode($qr_payload);
+            error_log('[GiftCard] styled qr: fallback url=' . $fallback_url);
+            $qr_image = self::load_image_from_url($fallback_url);
+        }
+        if (!$qr_image && !empty($style_config['qr_placeholder_image'])) {
+            error_log('[GiftCard] styled qr: placeholder=' . $style_config['qr_placeholder_image']);
+            $qr_image = self::load_image_from_url($style_config['qr_placeholder_image']);
+        }
+        if (!$qr_image) {
+            error_log('[GiftCard] styled qr: qr image load failed');
+            return null;
+        }
         
         // 计算二维码位置（居中，根据祝福语动态调整）
-        $qr_x = ($canvas_width - $qr_size) / 2;
-        // 如果有祝福语，预留更多空间；否则二维码更靠上
-        $message_height = $message ? 60 : 0;
-        $qr_y = $padding + $message_height + 20;
+        $qr_x = (int) round(($canvas_width - $qr_size) / 2);
+        $message_top = isset($style_config['message_top']) ? absint($style_config['message_top']) : ($padding + 30);
+        $message_font_size = isset($style_config['message_font_size']) ? absint($style_config['message_font_size']) : 28;
+        $message_line_height = isset($style_config['message_line_height']) ? absint($style_config['message_line_height']) : 38;
+        $message_max_chars = isset($style_config['message_max_chars']) ? absint($style_config['message_max_chars']) : 15;
+
+        $message_lines = [];
+        if ($message) {
+            $message_lines = self::wrap_text($message, $message_max_chars, $canvas_width - ($padding * 2));
+        }
+        $message_height = $message_lines ? count($message_lines) * $message_line_height : 0;
+        $qr_y = isset($style_config['qr_top']) ? absint($style_config['qr_top']) : ($message_top + $message_height + 20);
+        if ($qr_y < $padding) {
+            $qr_y = $padding;
+        }
         
         if ($qr_image) {
-            // 绘制二维码
-            imagecopyresampled($canvas, $qr_image, $qr_x, $qr_y, 0, 0, $qr_size, $qr_size, $qr_size, $qr_size);
-            imagedestroy($qr_image);
+            $src_w = imagesx($qr_image);
+            $src_h = imagesy($qr_image);
+            $dest_w = (int) round($qr_size);
+            $dest_h = (int) round($qr_size);
+            if ($src_w === $dest_w && $src_h === $dest_h) {
+                imagecopy($canvas, $qr_image, (int) round($qr_x), (int) round($qr_y), 0, 0, $dest_w, $dest_h);
+            } else {
+                imagecopyresized(
+                    $canvas,
+                    $qr_image,
+                    (int) round($qr_x),
+                    (int) round($qr_y),
+                    0,
+                    0,
+                    $dest_w,
+                    $dest_h,
+                    $src_w,
+                    $src_h
+                );
+            }
         }
 
         // 添加文字信息
         $text_color = imagecolorallocate($canvas, 51, 51, 51); // 深灰色，更美观
         $hint_color = imagecolorallocate($canvas, 153, 153, 153); // 浅灰色，用于提示文字
-        if ($style_config && isset($style_config['text_color'])) {
+        if (isset($style_config['text_color'])) {
             $text_rgb = self::hex_to_rgb($style_config['text_color']);
             if ($text_rgb) {
                 $text_color = imagecolorallocate($canvas, $text_rgb['r'], $text_rgb['g'], $text_rgb['b']);
@@ -1922,41 +2115,39 @@ class Gift_Card_Controller {
 
         // 添加祝福语（在二维码上方，美化样式）
         if ($message) {
-            $message_y = $padding + 30;
+            $message_y = $message_top;
             if ($use_ttf) {
-                // 处理长文本换行，限制宽度，每行最多15个字符
-                $message_lines = self::wrap_text($message, 15, $canvas_width - ($padding * 2));
-                $line_height = 38; // 行高
-                $font_size = 28; // 字体大小
-                
+                $line_height = $message_line_height;
+                $font_size = $message_font_size;
+
                 foreach ($message_lines as $index => $line) {
                     // 计算文字居中位置
                     $bbox = imagettfbbox($font_size, 0, $font_path, $line);
                     $text_width = $bbox[4] - $bbox[0];
-                    $text_x = ($canvas_width - $text_width) / 2;
-                    $y_pos = $message_y + ($index * $line_height);
+                    $text_x = (int) round(($canvas_width - $text_width) / 2);
+                    $y_pos = (int) round($message_y + ($index * $line_height));
                     imagettftext($canvas, $font_size, 0, $text_x, $y_pos, $text_color, $font_path, $line);
                 }
             } else {
                 // 使用内置字体，居中显示
-                $text_x = ($canvas_width - mb_strlen($message, 'UTF-8') * 6) / 2;
-                imagestring($canvas, 3, $text_x, $message_y, mb_substr($message, 0, 30, 'UTF-8'), $text_color);
+                $text_x = (int) round(($canvas_width - mb_strlen($message, 'UTF-8') * 6) / 2);
+                imagestring($canvas, 3, $text_x, (int) round($message_y), mb_substr($message, 0, 30, 'UTF-8'), $text_color);
             }
         }
 
         // 添加提示文字（在二维码下方，美化样式）
-        $hint_text = '长按或扫码识别领取购物卡';
-        $hint_y = $qr_y + $qr_size + 25;
+        $hint_text = !empty($style_config['hint_text']) ? $style_config['hint_text'] : '长按或扫码识别领取购物卡';
+        $hint_font_size = isset($style_config['hint_font_size']) ? absint($style_config['hint_font_size']) : 20;
+        $hint_y = isset($style_config['hint_top']) ? absint($style_config['hint_top']) : ($qr_y + $qr_size + 25);
         if ($use_ttf) {
             // 计算文字居中位置，使用稍小的字体
-            $hint_font_size = 20;
             $bbox = imagettfbbox($hint_font_size, 0, $font_path, $hint_text);
             $text_width = $bbox[4] - $bbox[0];
-            $text_x = ($canvas_width - $text_width) / 2;
-            imagettftext($canvas, $hint_font_size, 0, $text_x, $hint_y, $hint_color, $font_path, $hint_text);
+            $text_x = (int) round(($canvas_width - $text_width) / 2);
+            imagettftext($canvas, $hint_font_size, 0, $text_x, (int) round($hint_y), $hint_color, $font_path, $hint_text);
         } else {
-            $text_x = ($canvas_width - mb_strlen($hint_text, 'UTF-8') * 6) / 2;
-            imagestring($canvas, 2, $text_x, $hint_y - 10, mb_substr($hint_text, 0, 20, 'UTF-8'), $hint_color);
+            $text_x = (int) round(($canvas_width - mb_strlen($hint_text, 'UTF-8') * 6) / 2);
+            imagestring($canvas, 2, $text_x, (int) round($hint_y - 10), mb_substr($hint_text, 0, 20, 'UTF-8'), $hint_color);
         }
 
         // 保存图片到服务器
@@ -1968,14 +2159,15 @@ class Gift_Card_Controller {
 
         $filename = 'giftcard-' . $token . '-' . time() . '.png';
         $filepath = $giftcard_dir . '/' . $filename;
-        $fileurl = $upload_dir['baseurl'] . '/giftcards/' . $filename;
+        $baseurl = set_url_scheme($upload_dir['baseurl'], 'https');
+        $fileurl = $baseurl . '/giftcards/' . $filename;
 
         if (imagepng($canvas, $filepath, 9)) {
-            imagedestroy($canvas);
+            error_log('[GiftCard] styled qr saved: ' . $filepath);
             return $fileurl;
         }
 
-        imagedestroy($canvas);
+        error_log('[GiftCard] styled qr save failed: ' . $filepath);
         return null;
     }
 
@@ -1987,18 +2179,41 @@ class Gift_Card_Controller {
             return null;
         }
 
+        // 如果是上传目录的URL，直接映射为本地路径，避免回源请求
+        $upload_dir = wp_upload_dir();
+        if (!empty($upload_dir['baseurl']) && !empty($upload_dir['basedir'])) {
+            if (strpos($url, $upload_dir['baseurl']) === 0) {
+                $relative = ltrim(str_replace($upload_dir['baseurl'], '', $url), '/');
+                $local_path = trailingslashit($upload_dir['basedir']) . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+                if (file_exists($local_path)) {
+                    $info = @getimagesize($local_path);
+                    if ($info && !empty($info['mime'])) {
+                        switch ($info['mime']) {
+                            case 'image/jpeg':
+                                return imagecreatefromjpeg($local_path);
+                            case 'image/png':
+                                return imagecreatefrompng($local_path);
+                            case 'image/gif':
+                                return imagecreatefromgif($local_path);
+                        }
+                    }
+                }
+            }
+        }
+
         // 如果是本地文件路径
         if (strpos($url, 'http') !== 0) {
             if (file_exists($url)) {
-                $ext = strtolower(pathinfo($url, PATHINFO_EXTENSION));
-                switch ($ext) {
-                    case 'jpg':
-                    case 'jpeg':
-                        return imagecreatefromjpeg($url);
-                    case 'png':
-                        return imagecreatefrompng($url);
-                    case 'gif':
-                        return imagecreatefromgif($url);
+                $info = @getimagesize($url);
+                if ($info && !empty($info['mime'])) {
+                    switch ($info['mime']) {
+                        case 'image/jpeg':
+                            return imagecreatefromjpeg($url);
+                        case 'image/png':
+                            return imagecreatefrompng($url);
+                        case 'image/gif':
+                            return imagecreatefromgif($url);
+                    }
                 }
             }
             return null;
@@ -2138,12 +2353,74 @@ class Gift_Card_Controller {
     public static function list_share_styles($request) {
         $styles_dir = MYSHOP_PLUGIN_DIR . 'assets/giftcard/';
         $styles = [];
-        
+
+        $option_styles = get_option('myshop_giftcard_share_styles', []);
+        if (is_array($option_styles)) {
+            foreach ($option_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+                if (empty($style['id'])) {
+                    continue;
+                }
+                $styles[] = [
+                    'id' => $style['id'],
+                    'name' => $style['name'] ?? $style['id'],
+                    'preview_image' => $style['preview_image'] ?? '',
+                    'config' => $style
+                ];
+            }
+        }
+
         // 读取所有 share-*.json 文件（包括 share-style-*.json 和 share-default.json）
         $pattern = $styles_dir . 'share-*.json';
         $files = glob($pattern);
-        
-        if (!$files || !is_array($files)) {
+
+        if ($files && is_array($files)) {
+            foreach ($files as $file) {
+                if (!is_readable($file)) {
+                    continue;
+                }
+
+                $content = file_get_contents($file);
+                if ($content === false) {
+                    continue;
+                }
+
+                $style = json_decode($content, true);
+                if (!$style || !is_array($style)) {
+                    continue;
+                }
+
+                // 提取样式信息
+                $style_id = $style['id'] ?? basename($file, '.json');
+                $style_name = $style['name'] ?? '未命名样式';
+
+                // 如果JSON中没有id字段，从文件名提取
+                if (empty($style['id'])) {
+                    $style['id'] = $style_id;
+                }
+
+                // 如果JSON中没有name字段，设置默认名称
+                if (empty($style['name'])) {
+                    $style['name'] = $style_name;
+                }
+
+                // 如果没有预览图，使用占位图
+                if (empty($style['preview_image'])) {
+                    $style['preview_image'] = 'https://dummyimage.com/300x400/cccccc/666666&text=' . urlencode($style_name);
+                }
+
+                $styles[] = [
+                    'id' => $style['id'],
+                    'name' => $style['name'],
+                    'preview_image' => $style['preview_image'] ?? '',
+                    'config' => $style
+                ];
+            }
+        }
+
+        if (empty($styles)) {
             $styles[] = [
                 'id' => 'default',
                 'name' => '默认样式',
@@ -2154,60 +2431,13 @@ class Gift_Card_Controller {
                     'default_message' => '送你一份精心准备的好礼，愿你喜欢。'
                 ]
             ];
+        }
 
-            return rest_ensure_response([
-                'success' => true,
-                'data' => $styles
-            ]);
-        }
-        
-        foreach ($files as $file) {
-            if (!is_readable($file)) {
-                continue;
-            }
-            
-            $content = file_get_contents($file);
-            if ($content === false) {
-                continue;
-            }
-            
-            $style = json_decode($content, true);
-            if (!$style || !is_array($style)) {
-                continue;
-            }
-            
-            // 提取样式信息
-            $style_id = $style['id'] ?? basename($file, '.json');
-            $style_name = $style['name'] ?? '未命名样式';
-            
-            // 如果JSON中没有id字段，从文件名提取
-            if (empty($style['id'])) {
-                $style['id'] = $style_id;
-            }
-            
-            // 如果JSON中没有name字段，设置默认名称
-            if (empty($style['name'])) {
-                $style['name'] = $style_name;
-            }
-            
-            // 如果没有预览图，使用占位图
-            if (empty($style['preview_image'])) {
-                $style['preview_image'] = 'https://dummyimage.com/300x400/cccccc/666666&text=' . urlencode($style_name);
-            }
-            
-            $styles[] = [
-                'id' => $style['id'],
-                'name' => $style['name'],
-                'preview_image' => $style['preview_image'] ?? '',
-                'config' => $style
-            ];
-        }
-        
         // 按ID排序
         usort($styles, function($a, $b) {
             return strcmp($a['id'], $b['id']);
         });
-        
+
         return rest_ensure_response([
             'success' => true,
             'data' => $styles
