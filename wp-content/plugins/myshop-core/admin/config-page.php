@@ -54,6 +54,16 @@ function myshop_config_page() {
         
         update_option('myshop_public_config', $config);
 
+        // 保存小程序 AppID/Secret
+        $wechat_appid = sanitize_text_field($_POST['myshop_wechat_appid'] ?? '');
+        $wechat_secret = sanitize_text_field($_POST['myshop_wechat_secret'] ?? '');
+        if ($wechat_appid !== '') {
+            update_option('myshop_wechat_appid', $wechat_appid);
+        }
+        if ($wechat_secret !== '') {
+            update_option('myshop_wechat_secret', $wechat_secret);
+        }
+
         // 保存快递公司映射
         $express_raw = sanitize_textarea_field($_POST['express_map'] ?? '');
         $express_map = [];
@@ -85,6 +95,8 @@ function myshop_config_page() {
     $payment_qr_url = $config['payment_qr_url'] ?? '';
     $customer_service_qr = $config['customer_service_qr'] ?? '';
     $express_map = get_option('myshop_wechat_express_map', []);
+    $wechat_appid = get_option('myshop_wechat_appid', '');
+    $wechat_secret = get_option('myshop_wechat_secret', '');
     $notify_admin_enabled = !empty($config['notify_admin_enabled']);
     $notify_admin_openids = $config['notify_admin_openids'] ?? '';
     $notify_admin_order = !empty($config['notify_admin_order']);
@@ -227,6 +239,35 @@ function myshop_config_page() {
                                    class="regular-text" 
                                    placeholder="https://...">
                             <p class="description">小程序客服入口的企业微信二维码</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 小程序配置 -->
+            <div style="background: #fff; padding: 20px; margin-bottom: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04);">
+                <h2 style="margin-top: 0;">
+                    <span class="dashicons dashicons-smartphone" style="color: #2271b1;"></span>
+                    小程序配置
+                </h2>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="myshop_wechat_appid">小程序 AppID</label>
+                        </th>
+                        <td>
+                            <input type="text" id="myshop_wechat_appid" name="myshop_wechat_appid" value="<?php echo esc_attr($wechat_appid); ?>" class="regular-text" placeholder="wx123...">
+                            <p class="description">用于生成小程序码与分享二维码</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="myshop_wechat_secret">小程序 AppSecret</label>
+                        </th>
+                        <td>
+                            <input type="password" id="myshop_wechat_secret" name="myshop_wechat_secret" value="<?php echo esc_attr($wechat_secret); ?>" class="regular-text" placeholder="AppSecret">
+                            <p class="description">建议仅管理员可见，保存后用于生成小程序码</p>
                         </td>
                     </tr>
                 </table>
