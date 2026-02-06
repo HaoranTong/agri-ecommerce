@@ -507,13 +507,49 @@ class Payment_Controller {
             $order->update_meta_data('_myshop_payment_intent_id', $intent_id);
         }
 
-        $out_trade_no = sprintf(
-            'MS%010d%08d%06d',
-            $order->get_id(),
-            time() % 100000000,
-            wp_rand(100000, 999999)
-        );
-        $order->update_meta_data('_myshop_wechat_out_trade_no', $out_trade_no);
+        $existing_out_trade_no = $order->get_meta('_myshop_wechat_out_trade_no', true);
+        $existing_prepay_id = $order->get_meta('_myshop_wechat_prepay_id', true);
+        $existing_status = $order->get_meta('_myshop_payment_status', true);
+        $created_at = $order->get_meta('_myshop_wechat_out_trade_no_created_at', true);
+        $reuse = false;
+        if ($existing_out_trade_no && $existing_status === 'pending' && $existing_prepay_id) {
+            $age = $created_at ? (time() - strtotime($created_at)) : 0;
+            if ($age <= 60) {
+                $reuse = true;
+            }
+        }
+
+        if ($reuse) {
+            $out_trade_no = $existing_out_trade_no;
+            self::log_debug_always('wechat pay reuse out_trade_no', [
+                'order_id' => $order->get_id(),
+                'out_trade_no' => $out_trade_no,
+                'age_seconds' => $age
+            ]);
+        } else {
+            $out_trade_no = sprintf(
+                'MS%010d%08d%06d',
+                $order->get_id(),
+                time() % 100000000,
+                wp_rand(100000, 999999)
+            );
+            if ($existing_out_trade_no && $existing_out_trade_no !== $out_trade_no) {
+                $history = $order->get_meta('_myshop_wechat_out_trade_no_history', true);
+                if (!is_array($history)) {
+                    $history = $history ? [$history] : [];
+                }
+                if (!in_array($existing_out_trade_no, $history, true)) {
+                    $history[] = $existing_out_trade_no;
+                }
+                $order->update_meta_data('_myshop_wechat_out_trade_no_history', $history);
+            }
+            $order->update_meta_data('_myshop_wechat_out_trade_no', $out_trade_no);
+            $order->update_meta_data('_myshop_wechat_out_trade_no_created_at', current_time('mysql'));
+            self::log_debug_always('wechat pay new out_trade_no', [
+                'order_id' => $order->get_id(),
+                'out_trade_no' => $out_trade_no
+            ]);
+        }
         $order->update_meta_data('_myshop_wechat_payer_openid', $openid);
         $order->update_meta_data('_myshop_payment_provider', 'wechat');
         $order->update_meta_data('_myshop_payment_status', 'pending');
@@ -836,8 +872,18 @@ class Payment_Controller {
         $orders = wc_get_orders([
             'limit' => 1,
             'type' => 'shop_order',
-            'meta_key' => '_myshop_wechat_out_trade_no',
-            'meta_value' => $out_trade_no
+            'meta_query' => [
+                'relation' => 'OR',
+                [
+                    'key' => '_myshop_wechat_out_trade_no',
+                    'value' => $out_trade_no
+                ],
+                [
+                    'key' => '_myshop_wechat_out_trade_no_history',
+                    'value' => $out_trade_no,
+                    'compare' => 'LIKE'
+                ]
+            ]
         ]);
 
         return $orders ? $orders[0] : null;

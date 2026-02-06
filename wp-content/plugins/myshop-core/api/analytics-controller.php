@@ -17,8 +17,18 @@ class Analytics_Controller {
             return $user;
         }
 
+        if (!MyShop_Auth::has_operator_permission($user)) {
+            return new WP_Error('forbidden', '无权限', ['status' => 403]);
+        }
+
         $from = $request->get_param('from');
         $to   = $request->get_param('to');
+        $page = max(1, (int) $request->get_param('page'));
+        $page_size = (int) $request->get_param('page_size');
+        if ($page_size <= 0) {
+            $page_size = 20;
+        }
+        $page_size = min(100, $page_size);
 
         $conditions = [];
         $params     = [];
@@ -49,16 +59,24 @@ class Analytics_Controller {
             ];
         }
 
+        $total = count($channels);
+        $total_pages = max(1, (int) ceil($total / $page_size));
+        $offset = ($page - 1) * $page_size;
+        $channels = array_slice($channels, $offset, $page_size);
+
         return rest_ensure_response([
-            'range' => [
-                'from' => $from,
-                'to'   => $to
-            ],
-            'channels'   => $channels,
-            'pagination' => [
-                'page'       => 1,
-                'page_size'  => count($channels),
-                'total_pages'=> 1
+            'success' => true,
+            'data' => [
+                'range' => [
+                    'from' => $from,
+                    'to'   => $to
+                ],
+                'channels'   => $channels,
+                'pagination' => [
+                    'page'        => $page,
+                    'page_size'   => $page_size,
+                    'total_pages' => $total_pages
+                ]
             ]
         ]);
     }

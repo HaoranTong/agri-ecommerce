@@ -69,6 +69,35 @@ class Auth_Controller {
             update_user_meta($user_id, '_wechat_avatar', esc_url_raw($json_params['avatar']));
         }
 
+        $referrer_code = isset($json_params['referrer_code']) ? sanitize_text_field($json_params['referrer_code']) : null;
+        $inviter_id = isset($json_params['inviter_id']) ? absint($json_params['inviter_id']) : 0;
+        $channel_param = !empty($json_params['channel']) ? sanitize_text_field($json_params['channel']) : null;
+        $scene_param = !empty($json_params['scene']) ? sanitize_text_field($json_params['scene']) : null;
+        $landing_page = !empty($json_params['landing_page']) ? sanitize_text_field($json_params['landing_page']) : null;
+        $channel_code = null;
+        if ($channel_param) {
+            $channel_code = $channel_param;
+        } elseif ($scene_param) {
+            $channel_code = $scene_param;
+        }
+
+        if ($is_new_user || $inviter_id || $referrer_code) {
+            if (!$inviter_id && $referrer_code) {
+                $matched = get_users([
+                    'meta_key' => 'myshop_referral_code',
+                    'meta_value' => $referrer_code,
+                    'number' => 1,
+                    'fields' => 'ID'
+                ]);
+                $inviter_id = $matched ? (int) $matched[0] : 0;
+            }
+            if ($inviter_id > 0 && class_exists('Referral_Controller')) {
+                Referral_Controller::bind_referral($user_id, $inviter_id, $channel_code);
+            }
+        }
+
+        self::store_attribution_meta($user_id, $channel_param, $scene_param, $landing_page, $referrer_code);
+
         $wechat_nickname = get_user_meta($user_id, '_wechat_nickname', true);
         $wechat_avatar = get_user_meta($user_id, '_wechat_avatar', true);
         $phone = get_user_meta($user_id, '_wechat_phone', true);
@@ -99,6 +128,31 @@ class Auth_Controller {
                 'phone' => $phone ?: null
             ]
         ]);
+    }
+
+    private static function store_attribution_meta($user_id, $channel, $scene, $landing_page, $referrer_code) {
+        if (!$user_id) {
+            return;
+        }
+
+        if (!$channel && !$scene && !$landing_page && !$referrer_code) {
+            return;
+        }
+
+        if ($channel) {
+            update_user_meta($user_id, '_myshop_attr_channel', $channel);
+        }
+        if ($scene) {
+            update_user_meta($user_id, '_myshop_attr_scene', $scene);
+        }
+        if ($landing_page) {
+            update_user_meta($user_id, '_myshop_attr_landing_page', $landing_page);
+        }
+        if ($referrer_code) {
+            update_user_meta($user_id, '_myshop_attr_referrer_code', $referrer_code);
+        }
+
+        update_user_meta($user_id, '_myshop_attr_recorded_at', current_time('mysql'));
     }
 
     /**

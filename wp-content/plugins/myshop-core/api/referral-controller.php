@@ -299,6 +299,56 @@ class Referral_Controller {
         return $code;
     }
 
+    public static function bind_referral($invitee_id, $inviter_id, $channel_code = null) {
+        $invitee_id = (int) $invitee_id;
+        $inviter_id = (int) $inviter_id;
+        if ($invitee_id <= 0 || $inviter_id <= 0 || $invitee_id === $inviter_id) {
+            return false;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'myshop_referrals';
+
+        $existing = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE invitee_id = %d",
+            $invitee_id
+        ));
+        if ($existing > 0) {
+            return false;
+        }
+
+        $parent = $wpdb->get_row($wpdb->prepare(
+            "SELECT inviter_id, path, level FROM {$table} WHERE invitee_id = %d LIMIT 1",
+            $inviter_id
+        ));
+
+        $level = 1;
+        $path = '/' . $inviter_id;
+        if ($parent) {
+            $parent_level = (int) $parent->level;
+            $level = $parent_level + 1;
+            $parent_path = $parent->path ?: '/' . (int) $parent->inviter_id;
+            $path = rtrim($parent_path, '/') . '/' . $inviter_id;
+        }
+
+        $now = current_time('mysql');
+        $wpdb->insert(
+            $table,
+            [
+                'inviter_id' => $inviter_id,
+                'invitee_id' => $invitee_id,
+                'path' => $path,
+                'level' => $level,
+                'channel_code' => $channel_code,
+                'first_order_status' => 'pending',
+                'created_at' => $now
+            ],
+            ['%d', '%d', '%s', '%d', '%s', '%s', '%s']
+        );
+
+        return $wpdb->insert_id > 0;
+    }
+
     private static function mask_phone($phone) {
         if (!is_string($phone) || $phone === '') {
             return null;

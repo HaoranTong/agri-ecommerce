@@ -42,17 +42,29 @@ class Invitation_Controller {
             $inviter_id
         ));
 
+        $pending_invitations = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$referral_table} WHERE inviter_id = %d AND first_order_status = 'pending'",
+            $inviter_id
+        ));
+
         $latest_invite = $wpdb->get_row($wpdb->prepare(
             "SELECT invitee_id, first_order_status, created_at FROM {$referral_table} WHERE inviter_id = %d ORDER BY created_at DESC LIMIT 1",
             $inviter_id
         ));
 
+        $conversion_rate = '0.00';
+        if ($total_invites > 0) {
+            $conversion_rate = number_format(($first_order_count / $total_invites) * 100, 2, '.', '');
+        }
+
         $response = [
-            'invite_code'       => self::ensure_invite_code($inviter_id),
-            'total_invites'     => $total_invites,
-            'first_order_count' => $first_order_count,
-            'pending_rewards'   => number_format($pending_rewards ?: 0, 2, '.', ''),
-            'latest_invite'     => null
+            'invite_code'         => self::ensure_invite_code($inviter_id),
+            'total_invites'       => $total_invites,
+            'first_order_count'   => $first_order_count,
+            'conversion_rate'     => $conversion_rate,
+            'pending_invitations' => $pending_invitations,
+            'pending_rewards'     => number_format($pending_rewards ?: 0, 2, '.', ''),
+            'latest_invite'       => null
         ];
 
         if ($latest_invite) {
@@ -64,7 +76,10 @@ class Invitation_Controller {
             ];
         }
 
-        return rest_ensure_response($response);
+        return rest_ensure_response([
+            'success' => true,
+            'data' => $response
+        ]);
     }
 
     public static function track($request) {
@@ -72,10 +87,15 @@ class Invitation_Controller {
 
         $params = $request->get_json_params();
         $inviter_id   = isset($params['inviter_id']) ? absint($params['inviter_id']) : null;
+        $referrer_code = isset($params['referrer_code']) ? sanitize_text_field($params['referrer_code']) : null;
         $channel      = isset($params['channel']) ? sanitize_text_field($params['channel']) : null;
         $scene        = isset($params['scene']) ? sanitize_text_field($params['scene']) : null;
         $landing_page = isset($params['landing_page']) ? sanitize_text_field($params['landing_page']) : null;
         $extra        = isset($params['extra']) ? wp_json_encode($params['extra']) : null;
+
+        if (!$inviter_id && $referrer_code) {
+            $inviter_id = self::find_user_id_by_referrer_code($referrer_code);
+        }
 
         $table = $wpdb->prefix . 'myshop_invitation_logs';
         $data = [
@@ -99,9 +119,27 @@ class Invitation_Controller {
         }
 
         return rest_ensure_response([
-            'log_id'      => (int) $wpdb->insert_id,
-            'recorded_at' => mysql2date('c', current_time('mysql', true))
+            'success' => true,
+            'data' => [
+                'tracked' => true,
+                'log_id' => (int) $wpdb->insert_id,
+                'recorded_at' => mysql2date('c', current_time('mysql', true))
+            ]
         ]);
+    }
+
+    private static function find_user_id_by_referrer_code($referrer_code) {
+        if (!$referrer_code) {
+            return null;
+        }
+        global $wpdb;
+        $meta_key = 'myshop_referral_code';
+        $user_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value = %s LIMIT 1",
+            $meta_key,
+            $referrer_code
+        ));
+        return $user_id ? (int) $user_id : null;
     }
 
     private static function ensure_invite_code($user_id) {
