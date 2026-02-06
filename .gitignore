@@ -103,3 +103,7 @@ Thumbs.db
 /info.php
 /agri-products.txt
 /ceshiwebhool.md
+
+# ---- local performance/debug artifacts ----
+/cpu-*.csv
+/vscode-thread-snapshot.txt
