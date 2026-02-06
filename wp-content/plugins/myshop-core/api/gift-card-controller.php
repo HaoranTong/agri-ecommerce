@@ -5,6 +5,22 @@ class Gift_Card_Controller {
     private const SHARE_TOKEN_TTL_DAYS = 7;
     private const QR_SCHEME = 'myshop://giftcard';
     private const DEFAULT_SHARE_THEME = 'default';
+    private const LOG_FILE_NAME = 'myshop-giftcard.log';
+
+    private static function log_giftcard($message, $context = null) {
+        try {
+            $dir = defined('WP_CONTENT_DIR') ? WP_CONTENT_DIR : (defined('ABSPATH') ? ABSPATH . 'wp-content' : __DIR__);
+            $log_path = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . self::LOG_FILE_NAME;
+            $ts = gmdate('Y-m-d H:i:s');
+            $payload = '';
+            if (!is_null($context)) {
+                $payload = ' ' . wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            @file_put_contents($log_path, '[' . $ts . '] ' . $message . $payload . PHP_EOL, FILE_APPEND);
+        } catch (Exception $e) {
+            // ignore logging failures
+        }
+    }
     public static function register_routes() {
         register_rest_route('myshop/v1', '/gift-cards/templates', [
             'methods'  => \WP_REST_Server::READABLE,
@@ -109,6 +125,12 @@ class Gift_Card_Controller {
         register_rest_route('myshop/v1', '/gift-cards/share-styles', [
             'methods'  => \WP_REST_Server::READABLE,
             'callback' => [self::class, 'list_share_styles'],
+            'permission_callback' => '__return_true'
+        ]);
+
+        register_rest_route('myshop/v1', '/debug/client-log', [
+            'methods'  => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'client_log'],
             'permission_callback' => '__return_true'
         ]);
     }
@@ -912,6 +934,10 @@ class Gift_Card_Controller {
 
         $card = self::get_card_by_number($card_number);
         if (!$card) {
+            self::log_giftcard('share attempt: card not found', [
+                'card_number' => $card_number,
+                'user_id' => (int) $user->ID
+            ]);
             return new WP_Error('card_not_found', '礼品卡不存在', ['status' => 404]);
         }
 
@@ -919,7 +945,19 @@ class Gift_Card_Controller {
         $allowed_modes = $template ? self::normalize_delivery_modes($template->delivery_modes ?? '') : self::DEFAULT_DELIVERY_MODES;
 
         $current_holder_id = self::get_card_holder_user_id($card);
+        self::log_giftcard('share attempt', [
+            'card_number' => $card->card_number,
+            'user_id' => (int) $user->ID,
+            'holder_id' => (int) $current_holder_id,
+            'status' => $card->status ?? null,
+            'share_state' => self::determine_share_state($card)
+        ]);
         if ($current_holder_id !== (int) $user->ID) {
+            self::log_giftcard('share forbidden', [
+                'card_number' => $card->card_number,
+                'user_id' => (int) $user->ID,
+                'holder_id' => (int) $current_holder_id
+            ]);
             return new WP_Error('card_forbidden', '无权分享该礼品卡', ['status' => 403]);
         }
 
@@ -995,6 +1033,14 @@ class Gift_Card_Controller {
             'qr_image_url' => $share_payload['qr_image_url'] ?? null,
             'mini_program_qr' => $share_payload['mini_program_qr'] ?? null
         ]));
+        self::log_giftcard('share payload', [
+            'card_number' => $card->card_number,
+            'token' => $token,
+            'mini_program_path' => $share_payload['mini_program_path'] ?? null,
+            'qr_payload' => $share_payload['qr_payload'] ?? null,
+            'qr_image_url' => $share_payload['qr_image_url'] ?? null,
+            'mini_program_qr' => $share_payload['mini_program_qr'] ?? null
+        ]);
 
         return rest_ensure_response([
             'success' => true,
@@ -1021,10 +1067,17 @@ class Gift_Card_Controller {
         $token = sanitize_text_field($request->get_param('token'));
         $card = self::get_card_by_share_token($token);
         if (!$card) {
+            self::log_giftcard('share detail: token not found', [
+                'token' => $token
+            ]);
             return new WP_Error('share_not_found', '分享链接已失效', ['status' => 404]);
         }
 
         if ($card->share_token_expires_at && strtotime($card->share_token_expires_at) < current_time('timestamp')) {
+            self::log_giftcard('share detail: token expired', [
+                'token' => $card->share_token,
+                'expires_at' => $card->share_token_expires_at
+            ]);
             return new WP_Error('share_expired', '分享链接已过期', ['status' => 410]);
         }
 
@@ -1048,6 +1101,14 @@ class Gift_Card_Controller {
             'qr_image_url' => $share_payload['qr_image_url'] ?? null,
             'mini_program_qr' => $share_payload['mini_program_qr'] ?? null
         ]));
+        self::log_giftcard('share detail payload', [
+            'card_number' => $card->card_number,
+            'token' => $card->share_token,
+            'mini_program_path' => $share_payload['mini_program_path'] ?? null,
+            'qr_payload' => $share_payload['qr_payload'] ?? null,
+            'qr_image_url' => $share_payload['qr_image_url'] ?? null,
+            'mini_program_qr' => $share_payload['mini_program_qr'] ?? null
+        ]);
 
         return rest_ensure_response([
             'success' => true,
@@ -1083,20 +1144,38 @@ class Gift_Card_Controller {
         }
 
         $token = sanitize_text_field($request->get_param('token'));
+        self::log_giftcard('claim attempt', [
+            'token' => $token,
+            'user_id' => (int) $user->ID
+        ]);
         $card = self::get_card_by_share_token($token);
         if (!$card) {
             error_log(sprintf('[GiftCard] claim failed: share token not found. token=%s, user_id=%d', $token, (int) $user->ID));
+            self::log_giftcard('claim failed: token not found', [
+                'token' => $token,
+                'user_id' => (int) $user->ID
+            ]);
             return new WP_Error('share_not_found', '分享链接不存在', ['status' => 404]);
         }
 
         if ($card->share_token_expires_at && strtotime($card->share_token_expires_at) < current_time('timestamp')) {
             error_log(sprintf('[GiftCard] claim failed: share token expired. token=%s, user_id=%d, expires_at=%s', $token, (int) $user->ID, $card->share_token_expires_at));
+            self::log_giftcard('claim failed: token expired', [
+                'token' => $token,
+                'user_id' => (int) $user->ID,
+                'expires_at' => $card->share_token_expires_at
+            ]);
             return new WP_Error('share_expired', '分享链接已过期', ['status' => 410]);
         }
 
         $current_holder_id = self::get_card_holder_user_id($card);
         if ($current_holder_id === (int) $user->ID) {
             error_log(sprintf('[GiftCard] claim blocked: self-claim. token=%s, user_id=%d, card_number=%s', $token, (int) $user->ID, $card->card_number));
+            self::log_giftcard('claim blocked: self-claim', [
+                'token' => $token,
+                'user_id' => (int) $user->ID,
+                'card_number' => $card->card_number
+            ]);
             return new WP_Error('card_self_claim', '不可领取自己分享的礼品卡', ['status' => 400]);
         }
 
@@ -1130,6 +1209,17 @@ class Gift_Card_Controller {
                 'status'      => 'bound'
             ]
         ]);
+    }
+
+    public static function client_log($request) {
+        $params = $request->get_json_params();
+        $event = isset($params['event']) ? sanitize_text_field($params['event']) : 'client_log';
+        $payload = isset($params['payload']) ? $params['payload'] : null;
+        if (is_string($payload) && strlen($payload) > 4000) {
+            $payload = substr($payload, 0, 4000) . '...';
+        }
+        self::log_giftcard('client: ' . $event, is_array($payload) ? $payload : ['payload' => $payload]);
+        return rest_ensure_response(['success' => true]);
     }
 
     private static function decode_meta_json($raw) {
@@ -1718,7 +1808,13 @@ class Gift_Card_Controller {
         }
 
         // 生成二维码图片URL（带模板图案的版本）
-        $qr_image_url = self::generate_qr_image_url($token, $qr_payload, $share_style_config, $message, $card, $template);
+        $env_version = self::resolve_env_version();
+        if ($env_version === 'develop') {
+            // 开发环境下避免生成复杂模板图，降低阻塞与卡顿
+            $qr_image_url = $mini_program_qr ?: $qr_payload;
+        } else {
+            $qr_image_url = self::generate_qr_image_url($token, $qr_payload, $share_style_config, $message, $card, $template);
+        }
 
         return [
             'share_token' => $token,
@@ -1745,18 +1841,7 @@ class Gift_Card_Controller {
             $width = 1280;
         }
 
-        $env_version = 'release';
-        $configured_env = get_option('myshop_wechat_env_version');
-        if (is_string($configured_env) && in_array($configured_env, ['develop', 'trial', 'release'], true)) {
-            $env_version = $configured_env;
-        } else {
-            $home_url = home_url('/');
-            if (strpos($home_url, 'dev.') !== false || strpos($home_url, 'localhost') !== false) {
-                $env_version = 'develop';
-            } elseif (strpos($home_url, 'trial') !== false || strpos($home_url, 'staging') !== false) {
-                $env_version = 'trial';
-            }
-        }
+        $env_version = self::resolve_env_version();
 
         $scene = $token;
         if (is_string($scene) && strlen($scene) > 32) {
@@ -1770,6 +1855,15 @@ class Gift_Card_Controller {
             'width' => $width,
             'is_hyaline' => false,
             'env_version' => $env_version
+        ]);
+
+        $appid_for_log = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : get_option('myshop_wechat_appid');
+        error_log('[GiftCard] mini program qr env_version=' . $env_version . ', appid=' . $appid_for_log . ', token=' . $token . ', width=' . $width);
+        self::log_giftcard('mini program qr request', [
+            'env_version' => $env_version,
+            'appid' => $appid_for_log,
+            'token' => $token,
+            'width' => $width
         ]);
 
         $response = wp_remote_post($endpoint, [
@@ -1789,6 +1883,11 @@ class Gift_Card_Controller {
 
         if ($status !== 200 || empty($raw)) {
             error_log('[GiftCard] mini program qr invalid response: status=' . $status . ', content_type=' . $content_type . ', size=' . strlen($raw));
+            self::log_giftcard('mini program qr invalid response', [
+                'status' => $status,
+                'content_type' => $content_type,
+                'size' => strlen($raw)
+            ]);
             return null;
         }
 
@@ -1809,13 +1908,18 @@ class Gift_Card_Controller {
             || (!empty($raw_trim) && $raw_trim[0] === '{');
         if ($looks_like_json) {
             error_log('[GiftCard] mini program qr response json: ' . $raw);
+            $decoded = json_decode($raw, true);
+            self::log_giftcard('mini program qr response json', [
+                'status' => $status,
+                'content_type' => $content_type,
+                'body' => is_array($decoded) ? $decoded : $raw
+            ]);
             if ($png_path && file_exists($png_path)) {
                 @unlink($png_path);
             }
             if ($jpg_path && file_exists($jpg_path)) {
                 @unlink($jpg_path);
             }
-            $decoded = json_decode($raw, true);
             if (is_array($decoded) && isset($decoded['errcode']) && (int) $decoded['errcode'] === 40001) {
                 delete_transient('myshop_wechat_access_token');
                 $access_token = self::get_wechat_access_token(true);
@@ -1829,6 +1933,10 @@ class Gift_Card_Controller {
         $image_info = @getimagesizefromstring($raw);
         if ($image_info === false) {
             error_log('[GiftCard] mini program qr invalid image response, content_type=' . $content_type . ', size=' . strlen($raw));
+            self::log_giftcard('mini program qr invalid image', [
+                'content_type' => $content_type,
+                'size' => strlen($raw)
+            ]);
             if ($png_path && file_exists($png_path)) {
                 @unlink($png_path);
             }
@@ -1860,13 +1968,50 @@ class Gift_Card_Controller {
         $written = file_put_contents($file_path, $raw);
         if ($written === false) {
             error_log('[GiftCard] mini program qr write failed: ' . $file_path);
+            self::log_giftcard('mini program qr write failed', ['file_path' => $file_path]);
             return null;
         }
 
         error_log('[GiftCard] mini program qr saved: ' . $file_path . ', size=' . $written . ', mime=' . ($image_info['mime'] ?? 'unknown'));
+        self::log_giftcard('mini program qr saved', [
+            'file_path' => $file_path,
+            'size' => $written,
+            'mime' => $image_info['mime'] ?? 'unknown'
+        ]);
 
         $baseurl = set_url_scheme($upload_dir['baseurl'], 'https');
-        return trailingslashit($baseurl) . 'myshop/giftcard/qr/' . $file_name;
+        $mtime = @filemtime($file_path);
+        $version = $mtime ? (string) $mtime : (string) time();
+        return trailingslashit($baseurl) . 'myshop/giftcard/qr/' . $file_name . '?v=' . $version;
+    }
+
+    private static function resolve_env_version() {
+        $env_version = 'release';
+        if (defined('MYSHOP_MINIAPP_ENV_VERSION')) {
+            $candidate = constant('MYSHOP_MINIAPP_ENV_VERSION');
+            if (is_string($candidate) && in_array($candidate, ['develop', 'trial', 'release'], true)) {
+                return $candidate;
+            }
+        }
+        if (defined('MYSHOP_WECHAT_ENV_VERSION')) {
+            $candidate = constant('MYSHOP_WECHAT_ENV_VERSION');
+            if (is_string($candidate) && in_array($candidate, ['develop', 'trial', 'release'], true)) {
+                return $candidate;
+            }
+        }
+        $configured_env = get_option('myshop_wechat_env_version');
+        if (is_string($configured_env) && in_array($configured_env, ['develop', 'trial', 'release'], true)) {
+            return $configured_env;
+        }
+
+        $home_url = home_url('/');
+        if (strpos($home_url, 'dev.') !== false || strpos($home_url, 'localhost') !== false) {
+            $env_version = 'develop';
+        } elseif (strpos($home_url, 'trial') !== false || strpos($home_url, 'staging') !== false) {
+            $env_version = 'trial';
+        }
+
+        return $env_version;
     }
 
     private static function get_wechat_access_token($force_refresh = false) {
@@ -1875,9 +2020,10 @@ class Gift_Card_Controller {
             return $cached;
         }
 
-        $appid = get_option('myshop_wechat_appid');
-        $secret = get_option('myshop_wechat_secret');
+        $appid = defined('MYSHOP_MINIAPP_APP_ID') ? MYSHOP_MINIAPP_APP_ID : get_option('myshop_wechat_appid');
+        $secret = defined('MYSHOP_MINIAPP_APP_SECRET') ? MYSHOP_MINIAPP_APP_SECRET : get_option('myshop_wechat_secret');
         if (empty($appid) || empty($secret)) {
+            error_log('[GiftCard] access token missing appid/secret');
             return null;
         }
 

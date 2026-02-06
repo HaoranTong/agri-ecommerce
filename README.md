@@ -31,3 +31,13 @@ WordPress + WooCommerce backend for the Agri E-commerce mini program. The busine
 
 - Do not commit secrets (API keys, tokens, private keys) into the repository.
 - Configuration should be handled via environment or server-side settings.
+
+## Development Workflow Requirements
+
+- Always follow: user requirements -> product requirements -> architecture -> technical implementation -> tests -> doc/code alignment.
+- If an issue is found, validate against docs first:
+	- If docs are wrong, fix docs first, then code, then tests.
+	- If code is wrong, fix code per docs with clear comments, then tests.
+- New features must be documented and aligned before coding.
+- Every feature must pass unit/API tests, then proceed to staged real-device testing.
+- Docs are the single source of truth for API contracts, data dictionary, and models.

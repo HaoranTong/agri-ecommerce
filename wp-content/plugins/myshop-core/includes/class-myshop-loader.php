@@ -4,6 +4,7 @@ class MyShop_Loader {
         $includes = [
             'includes/class-myshop-auth.php',
             'includes/class-myshop-wechat.php',
+            'includes/class-myshop-commission-service.php',
             'api/auth-controller.php',
             'api/user-controller.php',
             'api/product-controller.php',
@@ -40,6 +41,10 @@ class MyShop_Loader {
 
         if (class_exists('Order_Controller') && method_exists('Order_Controller', 'boot')) {
             Order_Controller::boot();
+        }
+
+        if (class_exists('MyShop_Commission_Service') && method_exists('MyShop_Commission_Service', 'boot')) {
+            MyShop_Commission_Service::boot();
         }
 
         add_action('init', function () {

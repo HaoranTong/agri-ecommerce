@@ -20,6 +20,7 @@ define('MYSHOP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 require_once MYSHOP_PLUGIN_DIR . 'db/class-myshop-db.php';
 require_once MYSHOP_PLUGIN_DIR . 'includes/class-myshop-loader.php';
 require_once MYSHOP_PLUGIN_DIR . 'admin/points-manager.php';
+require_once MYSHOP_PLUGIN_DIR . 'admin/commission-manager.php';
 
 // 引入后台管理页面
 if (is_admin()) {
@@ -67,4 +68,8 @@ MyShop_Loader::init();
 
 if (class_exists('MyShop_Points_Manager') && method_exists('MyShop_Points_Manager', 'init')) {
     MyShop_Points_Manager::init();
+}
+
+if (is_admin() && class_exists('MyShop_Commission_Manager') && method_exists('MyShop_Commission_Manager', 'init')) {
+    MyShop_Commission_Manager::init();
 }

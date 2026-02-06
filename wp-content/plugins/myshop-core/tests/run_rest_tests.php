@@ -56,12 +56,14 @@ $old_missions = get_option('myshop_points_missions');
 $old_redeem_options = get_option('myshop_points_redeem_options');
 $old_posters = get_option('myshop_promo_posters');
 $old_points_settings = get_option('myshop_points_settings');
+$old_payout_min = get_option('myshop_commission_payout_min');
 
-register_shutdown_function(function () use ($old_missions, $old_redeem_options, $old_posters, $old_points_settings) {
+register_shutdown_function(function () use ($old_missions, $old_redeem_options, $old_posters, $old_points_settings, $old_payout_min) {
     update_option('myshop_points_missions', $old_missions);
     update_option('myshop_points_redeem_options', $old_redeem_options);
     update_option('myshop_promo_posters', $old_posters);
     update_option('myshop_points_settings', $old_points_settings);
+    update_option('myshop_commission_payout_min', $old_payout_min);
 });
 
 do_action('rest_api_init');
@@ -85,6 +87,23 @@ if ($login_response->get_status() === 200) {
 
 $user = MyShop_Auth::validate_token($token);
 assert_true($user instanceof WP_User, 'user from token');
+
+$operator_cap_added = false;
+if (!user_can($user, 'manage_woocommerce') && !user_can($user, 'manage_options')) {
+    $user->add_cap('manage_woocommerce');
+    $operator_cap_added = true;
+}
+
+register_shutdown_function(function () use ($user, $operator_cap_added) {
+    if (!$operator_cap_added || !$user instanceof WP_User) {
+        return;
+    }
+
+    $fresh_user = get_userdata($user->ID);
+    if ($fresh_user instanceof WP_User) {
+        $fresh_user->remove_cap('manage_woocommerce');
+    }
+});
 
 $payment_order_id = null;
 if (function_exists('wc_create_order')) {
@@ -111,6 +130,8 @@ update_option('myshop_points_settings', [
     'enable_expiry' => 1,
     'expiry_days' => 1
 ]);
+
+update_option('myshop_commission_payout_min', 0);
 
 update_option('myshop_points_missions', [
     [
@@ -286,6 +307,34 @@ if ((int) $commission_exists === 0) {
 $resp = call_api('GET', '/myshop/v1/referrals/my-downlines', null, $auth_header);
 assert_true($resp->get_status() === 200, 'downlines status');
 
+$referral_code = null;
+if (class_exists('Referral_Controller') && method_exists('Referral_Controller', 'ensure_referral_code')) {
+    $referral_code = Referral_Controller::ensure_referral_code($user->ID);
+}
+
+$resp = call_api('GET', '/myshop/v1/invitations/summary', null, $auth_header);
+assert_true($resp->get_status() === 200, 'invitations/summary status');
+$invitation_payload = $resp->get_data();
+assert_true(isset($invitation_payload['success']), 'invitations/summary success');
+
+$track_payload = [
+    'scene' => 'test-scene',
+    'channel' => 'test-channel',
+    'landing_page' => '/pages/index/index'
+];
+if ($referral_code) {
+    $track_payload['referrer_code'] = $referral_code;
+}
+$resp = call_api('POST', '/myshop/v1/invitations/track', $track_payload, $auth_header);
+assert_true($resp->get_status() === 200, 'invitations/track status');
+$track_resp = $resp->get_data();
+assert_true(isset($track_resp['success']), 'invitations/track success');
+
+$resp = call_api('GET', '/myshop/v1/analytics/channel', null, $auth_header);
+assert_true($resp->get_status() === 200, 'analytics/channel status');
+$analytics_payload = $resp->get_data();
+assert_true(isset($analytics_payload['success']), 'analytics/channel success');
+
 $resp = call_api('GET', '/myshop/v1/agents/me', null, $auth_header);
 assert_true($resp->get_status() === 200, 'agents/me status');
 $agent_payload = $resp->get_data();
@@ -406,5 +455,82 @@ $resp = call_api('GET', '/myshop/v1/commissions', null, $auth_header);
 assert_true($resp->get_status() === 200, 'commissions status');
 $commission_payload = $resp->get_data();
 assert_true(isset($commission_payload['commissions']), 'commissions payload');
+
+$payout_table = $wpdb->prefix . 'myshop_commission_payouts';
+$payout_table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $payout_table));
+if ($payout_table_exists) {
+    $wpdb->query($wpdb->prepare(
+        "DELETE FROM {$payout_table} WHERE earner_id = %d AND status = 'processing'",
+        $user->ID
+    ));
+    $wpdb->query($wpdb->prepare(
+        "UPDATE {$commission_table} SET settlement_batch = NULL, expected_payout_at = NULL
+         WHERE earner_id = %d AND status = 'approved'",
+        $user->ID
+    ));
+
+    $commission_order_id = 0;
+    $temp_order_id = 0;
+    if (function_exists('wc_create_order')) {
+        $temp_order = wc_create_order();
+        if ($temp_order) {
+            $temp_order->set_customer_id($user->ID);
+            $temp_order->set_status('completed');
+            $temp_order->set_total(1);
+            $temp_order->save();
+            $temp_order_id = $temp_order->get_id();
+            $commission_order_id = $temp_order_id;
+        }
+    }
+
+    if ($commission_order_id <= 0) {
+        fwrite(STDERR, "skip payout test: no order id available\n");
+        goto payout_list_check;
+    }
+
+    $inserted_commission = $wpdb->insert(
+        $commission_table,
+        [
+            'order_id' => $commission_order_id,
+            'user_id' => $user->ID,
+            'earner_id' => $user->ID,
+            'amount' => 20.00,
+            'currency' => 'CNY',
+            'commission_type' => 'referral',
+            'referrer_id' => $user->ID,
+            'status' => 'approved',
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql')
+        ],
+        ['%d', '%d', '%d', '%f', '%s', '%s', '%d', '%s', '%s', '%s']
+    );
+    assert_true($inserted_commission !== false, 'commission insert');
+
+    $resp = call_api('POST', '/myshop/v1/commissions/payout', [
+        'amount' => 20.00,
+        'payout_method' => 'manual',
+        'account_name' => '测试用户',
+        'account_no' => '6222000000000000',
+        'bank_name' => '测试银行'
+    ], $auth_header);
+    if ($resp->get_status() !== 201) {
+        fwrite(STDERR, "commissions/payout unexpected status: " . $resp->get_status() . "\n");
+        fwrite(STDERR, wp_json_encode($resp->get_data()) . "\n");
+        exit(1);
+    }
+    $payout_payload = $resp->get_data();
+    assert_true(isset($payout_payload['success']), 'commissions/payout success');
+
+payout_list_check:
+
+    $resp = call_api('GET', '/myshop/v1/commissions/payouts', null, $auth_header);
+    assert_true($resp->get_status() === 200, 'commissions/payouts status');
+    $payout_list_payload = $resp->get_data();
+    assert_true(isset($payout_list_payload['data']), 'commissions/payouts data');
+
+    if ($temp_order_id) {
+        wp_delete_post($temp_order_id, true);
+    }
+}
 
 fwrite(STDOUT, "ALL REST TESTS PASSED\n");

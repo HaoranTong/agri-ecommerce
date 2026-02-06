@@ -1,6 +1,23 @@
 <?php
 
 class MyShop_Auth {
+    private static function log_auth($message, $context = null) {
+        if (!defined('MYSHOP_AUTH_DEBUG') || !MYSHOP_AUTH_DEBUG) {
+            return;
+        }
+        try {
+            $dir = defined('WP_CONTENT_DIR') ? WP_CONTENT_DIR : (defined('ABSPATH') ? ABSPATH . 'wp-content' : __DIR__);
+            $log_path = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . 'myshop-auth.log';
+            $ts = gmdate('Y-m-d H:i:s');
+            $payload = '';
+            if (!is_null($context)) {
+                $payload = ' ' . wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            @file_put_contents($log_path, '[' . $ts . '] ' . $message . $payload . PHP_EOL, FILE_APPEND);
+        } catch (Exception $e) {
+            // ignore logging failures
+        }
+    }
     const SECRET_KEY = 'myshop_jwt_secret_key_123456';
     const TOKEN_TTL = 604800; // 7 days
 
@@ -307,6 +324,14 @@ class MyShop_Auth {
         return true;
     }
 
+    public static function has_operator_permission($user) {
+        if (!$user instanceof WP_User) {
+            return false;
+        }
+
+        return user_can($user, 'manage_woocommerce') || user_can($user, 'manage_options');
+    }
+
     public static function get_user_from_request($request) {
         if ($request instanceof \WP_REST_Request) {
             $token = self::extract_token_from_request($request);
@@ -315,11 +340,23 @@ class MyShop_Auth {
         }
 
         if (!$token) {
+            $route = $request instanceof \WP_REST_Request ? $request->get_route() : null;
+            $method = $request instanceof \WP_REST_Request ? $request->get_method() : null;
+            self::log_auth('unauthorized: missing token', [
+                'route' => $route,
+                'method' => $method
+            ]);
             return new WP_Error('unauthorized', '无效的令牌', ['status' => 401]);
         }
 
         $user = self::validate_token($token);
         if (!$user) {
+            $route = $request instanceof \WP_REST_Request ? $request->get_route() : null;
+            $method = $request instanceof \WP_REST_Request ? $request->get_method() : null;
+            self::log_auth('unauthorized: invalid token', [
+                'route' => $route,
+                'method' => $method
+            ]);
             return new WP_Error('unauthorized', '无效的令牌', ['status' => 401]);
         }
 

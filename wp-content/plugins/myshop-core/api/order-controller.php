@@ -519,7 +519,21 @@ class Order_Controller {
 
         // 验证订单所有权
         if ($order->get_customer_id() !== $user_id) {
-            return new WP_Error('unauthorized', '无权访问此订单', ['status' => 403]);
+            $is_gift_card_order = $order->get_meta('_myshop_is_gift_card_order', true) === 'yes';
+            if ($is_gift_card_order) {
+                global $wpdb;
+                $cards_table = $wpdb->prefix . 'myshop_gift_cards';
+                $redeemed = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$cards_table} WHERE order_id = %d AND redeemer_id = %d",
+                    $order->get_id(),
+                    $user_id
+                ));
+                if ((int) $redeemed === 0) {
+                    return new WP_Error('unauthorized', '无权访问此订单', ['status' => 403]);
+                }
+            } else {
+                return new WP_Error('unauthorized', '无权访问此订单', ['status' => 403]);
+            }
         }
 
         // 获取订单商品
