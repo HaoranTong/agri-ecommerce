@@ -1,10 +1,53 @@
 <?php
 
 class Referral_Controller {
+    private static function normalize_asset_url($url, $request) {
+        if (!$url || !is_string($url)) {
+            return $url;
+        }
+        $parsed = wp_parse_url($url);
+        if (empty($parsed['host'])) {
+            return $url;
+        }
+        $host = '';
+        if ($request instanceof WP_REST_Request) {
+            $host = $request->get_header('host');
+        }
+        if (!$host) {
+            $host = $_SERVER['HTTP_HOST'] ?? '';
+        }
+        if (!$host) {
+            return $url;
+        }
+        $scheme = 'http';
+        if (
+            (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        ) {
+            $scheme = 'https';
+        }
+        $rebuilt = $scheme . '://' . $host;
+        if (!empty($parsed['path'])) {
+            $rebuilt .= $parsed['path'];
+        }
+        if (!empty($parsed['query'])) {
+            $rebuilt .= '?' . $parsed['query'];
+        }
+        if (!empty($parsed['fragment'])) {
+            $rebuilt .= '#' . $parsed['fragment'];
+        }
+        return $rebuilt;
+    }
     public static function register_routes() {
         register_rest_route('myshop/v1', '/referral/code', [
             'methods'  => \WP_REST_Server::READABLE,
             'callback' => [self::class, 'get_code'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
+
+        register_rest_route('myshop/v1', '/referral/qr', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_qr'],
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
 
@@ -47,6 +90,83 @@ class Referral_Controller {
             'success' => true,
             'data' => [
                 'referral_code' => self::ensure_referral_code($user->ID)
+            ]
+        ]);
+    }
+
+    public static function get_qr($request) {
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $referral_code = self::ensure_referral_code($user->ID);
+        $page = 'pages/auth/login';
+        $settings = get_option('myshop_referral_qr_settings', []);
+        $fixed_qr_url = is_array($settings) ? esc_url_raw($settings['fixed_qr_url'] ?? '') : '';
+        $logo_url = is_array($settings) ? esc_url_raw($settings['logo_url'] ?? '') : '';
+        error_log(sprintf('[Referral] QR request user_id=%d, fixed=%s, logo=%s', (int) $user->ID, $fixed_qr_url ? 'yes' : 'no', $logo_url ? 'yes' : 'no'));
+
+        if (!class_exists('MyShop_Wechat')) {
+            return new WP_Error('wechat_missing', '微信服务未初始化', ['status' => 500]);
+        }
+
+        if ($fixed_qr_url) {
+            return rest_ensure_response([
+                'success' => true,
+                'data' => [
+                    'referral_code' => $referral_code,
+                    'page' => $page,
+                    'qr_url' => self::normalize_asset_url($fixed_qr_url, $request),
+                    'qr_mode' => 'fixed',
+                    'updated_at' => current_time('mysql')
+                ]
+            ]);
+        }
+
+        $cache = MyShop_Wechat::get_or_create_user_qr(
+            $user->ID,
+            $referral_code,
+            $page,
+            'myshop_referral_qr',
+            'myshop/qr',
+            [
+                'logo_url' => $logo_url
+            ]
+        );
+
+        if (is_wp_error($cache)) {
+            error_log('[Referral] QR generate failed: ' . $cache->get_error_message());
+            return $cache;
+        }
+
+        if (empty($cache['url'])) {
+            error_log('[Referral] QR cache missing url, fallback regenerate');
+            $binary = MyShop_Wechat::get_mini_program_code($referral_code, $page);
+            if (!is_wp_error($binary)) {
+                if ($logo_url) {
+                    $binary = MyShop_Wechat::overlay_logo_on_qr($binary, $logo_url);
+                }
+                $saved = MyShop_Wechat::save_qr_image($binary, 'qr-fallback-' . substr(md5($referral_code . $page . $user->ID), 0, 12), 'myshop/qr');
+                if (!is_wp_error($saved)) {
+                    $cache['url'] = $saved['url'];
+                }
+            }
+        }
+
+        $normalized_qr = self::normalize_asset_url($cache['url'] ?? '', $request);
+        if ($normalized_qr !== ($cache['url'] ?? '')) {
+            error_log('[Referral] QR url normalized to ' . $normalized_qr);
+        }
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'referral_code' => $referral_code,
+                'page' => $page,
+                'qr_url' => $normalized_qr,
+                'qr_mode' => 'dynamic',
+                'updated_at' => $cache['updated_at'] ?? null
             ]
         ]);
     }
@@ -229,6 +349,7 @@ class Referral_Controller {
         $user_id = (int) $user->ID;
         $referral_table = $wpdb->prefix . 'myshop_referrals';
         $commission_table = $wpdb->prefix . 'myshop_commissions';
+        $ledger_table = $wpdb->prefix . 'myshop_point_ledger';
 
         $total_invitees = (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$referral_table} WHERE inviter_id = %d",
@@ -276,6 +397,20 @@ class Referral_Controller {
             }
         }
 
+        $reward_points_total = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$ledger_table}
+             WHERE user_id = %d AND type = 'earn' AND status = 'confirmed' AND channel LIKE %s",
+            $user_id,
+            'referral_reward%'
+        ));
+
+        $reward_points_pending = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$ledger_table}
+             WHERE user_id = %d AND type = 'earn' AND status = 'pending' AND channel LIKE %s",
+            $user_id,
+            'referral_reward%'
+        ));
+
         return rest_ensure_response([
             'success' => true,
             'data' => [
@@ -285,7 +420,9 @@ class Referral_Controller {
                 'level_two_count'       => $level2_count,
                 'completed_first_orders'=> $completed_orders,
                 'pending_first_orders'  => $pending_orders,
-                'commission_totals'     => $commission_totals
+                'commission_totals'     => $commission_totals,
+                'reward_points_total'   => $reward_points_total,
+                'reward_points_pending' => $reward_points_pending
             ]
         ]);
     }
@@ -309,11 +446,23 @@ class Referral_Controller {
         global $wpdb;
         $table = $wpdb->prefix . 'myshop_referrals';
 
-        $existing = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE invitee_id = %d",
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, inviter_id, created_at, first_order_status FROM {$table} WHERE invitee_id = %d LIMIT 1",
             $invitee_id
         ));
-        if ($existing > 0) {
+        if ($existing) {
+            if (self::is_referral_expired($invitee_id, $existing)) {
+                $wpdb->delete($table, ['id' => (int) $existing->id], ['%d']);
+            } else {
+                return false;
+            }
+        }
+
+        $inviter_ref = $wpdb->get_row($wpdb->prepare(
+            "SELECT path FROM {$table} WHERE invitee_id = %d LIMIT 1",
+            $inviter_id
+        ));
+        if ($inviter_ref && self::path_contains_user($inviter_ref->path, $invitee_id)) {
             return false;
         }
 
@@ -347,6 +496,53 @@ class Referral_Controller {
         );
 
         return $wpdb->insert_id > 0;
+    }
+
+    private static function is_referral_expired($invitee_id, $existing) {
+        if (!$existing) {
+            return false;
+        }
+
+        if (!empty($existing->first_order_status) && $existing->first_order_status === 'completed') {
+            return false;
+        }
+
+        $created_at = strtotime($existing->created_at);
+        if (!$created_at) {
+            return false;
+        }
+
+        $cutoff = strtotime('-365 days', current_time('timestamp'));
+        if ($created_at > $cutoff) {
+            return false;
+        }
+
+        if (self::has_user_orders($invitee_id)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function has_user_orders($user_id) {
+        if (!function_exists('wc_get_orders')) {
+            return false;
+        }
+        $orders = wc_get_orders([
+            'customer_id' => $user_id,
+            'status'      => ['processing', 'completed', 'on-hold', 'pending'],
+            'limit'       => 1,
+            'return'      => 'ids'
+        ]);
+        return !empty($orders);
+    }
+
+    private static function path_contains_user($path, $user_id) {
+        if (!$path) {
+            return false;
+        }
+        $pattern = '/(^|\\/)' . preg_quote((string) $user_id, '/') . '(\\/|$)/';
+        return preg_match($pattern, $path) === 1;
     }
 
     private static function mask_phone($phone) {

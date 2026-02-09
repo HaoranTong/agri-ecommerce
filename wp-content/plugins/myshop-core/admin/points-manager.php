@@ -754,6 +754,123 @@ class MyShop_Points_Manager {
                         </tr>
                     </table>
                 </div>
+
+                <div style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #ccc; border-radius: 8px;">
+                    <h2>🤝 分销奖励积分</h2>
+                    <table class="form-table">
+                        <tr>
+                            <th><label for="enable_referral_points">启用分销奖励积分</label></th>
+                            <td>
+                                <input type="checkbox" name="enable_referral_points" id="enable_referral_points" value="1"
+                                       <?php checked($settings['enable_referral_points'], 1); ?>>
+                                <p class="description">开启后，邀请用户下单将奖励积分（按订单实付金额计算）</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="referral_points_rate_level1">一级奖励比例</label></th>
+                            <td>
+                                订单实付 ¥1 =
+                                <input type="number" name="referral_points_rate_level1" id="referral_points_rate_level1"
+                                       value="<?php echo esc_attr($settings['referral_points_rate_level1']); ?>"
+                                       min="0" step="0.1" style="width: 100px;">
+                                积分
+                                <p class="description">示例：设置为 10，则一级用户订单每 1 元奖励 10 积分</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="referral_points_rate_level2">二级奖励比例</label></th>
+                            <td>
+                                订单实付 ¥1 =
+                                <input type="number" name="referral_points_rate_level2" id="referral_points_rate_level2"
+                                       value="<?php echo esc_attr($settings['referral_points_rate_level2']); ?>"
+                                       min="0" step="0.1" style="width: 100px;">
+                                积分
+                                <p class="description">示例：设置为 5，则二级用户订单每 1 元奖励 5 积分</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #ccc; border-radius: 8px;">
+                    <h2>💸 积分兑换佣金</h2>
+                    <table class="form-table">
+                        <tr>
+                            <th><label for="enable_points_exchange">启用积分兑换</label></th>
+                            <td>
+                                <input type="checkbox" name="enable_points_exchange" id="enable_points_exchange" value="1"
+                                       <?php checked($settings['enable_points_exchange'], 1); ?>>
+                                <p class="description">开启后，用户可用积分兑换佣金提现</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="exchange_rate">兑换比例</label></th>
+                            <td>
+                                <input type="number" name="exchange_rate" id="exchange_rate"
+                                       value="<?php echo esc_attr($settings['exchange_rate']); ?>"
+                                       min="0" step="0.1" style="width: 100px;">
+                                积分 = ¥1
+                                <p class="description">例如：设置为 100，则 100 积分可兑换 1 元</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="exchange_min_points">最低兑换积分</label></th>
+                            <td>
+                                <input type="number" name="exchange_min_points" id="exchange_min_points"
+                                       value="<?php echo esc_attr($settings['exchange_min_points']); ?>"
+                                       min="0" step="1" style="width: 100px;">
+                                积分
+                                <p class="description">单次申请最低兑换积分（0 表示不限制）</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="exchange_min_amount">最低兑换金额</label></th>
+                            <td>
+                                ¥ <input type="number" name="exchange_min_amount" id="exchange_min_amount"
+                                         value="<?php echo esc_attr($settings['exchange_min_amount']); ?>"
+                                         min="0" step="0.01" style="width: 100px;">
+                                <p class="description">单次兑换金额低于此值将不可提交（0 表示不限制）</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="exchange_max_amount">单次兑换上限</label></th>
+                            <td>
+                                ¥ <input type="number" name="exchange_max_amount" id="exchange_max_amount"
+                                         value="<?php echo esc_attr($settings['exchange_max_amount']); ?>"
+                                         min="0" step="0.01" style="width: 100px;">
+                                <p class="description">单次兑换金额上限（0 表示不限制）</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="exchange_max_amount_per_day">每日兑换上限</label></th>
+                            <td>
+                                ¥ <input type="number" name="exchange_max_amount_per_day" id="exchange_max_amount_per_day"
+                                         value="<?php echo esc_attr($settings['exchange_max_amount_per_day']); ?>"
+                                         min="0" step="0.01" style="width: 100px;">
+                                <p class="description">每日可兑换的总金额（0 表示不限制）</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="exchange_max_requests_per_day">每日申请次数</label></th>
+                            <td>
+                                <input type="number" name="exchange_max_requests_per_day" id="exchange_max_requests_per_day"
+                                       value="<?php echo esc_attr($settings['exchange_max_requests_per_day']); ?>"
+                                       min="0" step="1" style="width: 100px;">
+                                次
+                                <p class="description">每日可提交的兑换次数（0 表示不限制）</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="exchange_fee_rate">手续费比例</label></th>
+                            <td>
+                                <input type="number" name="exchange_fee_rate" id="exchange_fee_rate"
+                                       value="<?php echo esc_attr($settings['exchange_fee_rate']); ?>"
+                                       min="0" max="100" step="0.1" style="width: 100px;">
+                                %
+                                <p class="description">按兑换金额收取手续费（0 表示不收取）</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
                 
                 <div style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #ccc; border-radius: 8px;">
                     <h2>⏰ 积分有效期</h2>
@@ -795,6 +912,8 @@ class MyShop_Points_Manager {
                     <li><strong>积分价值</strong>: 每 <?php echo $settings['redeem_rate']; ?> 积分可抵扣 ¥1</li>
                     <li><strong>最大抵扣</strong>: 最多可抵扣订单金额的 <?php echo $settings['max_discount_percent']; ?>%</li>
                     <li><strong>注册奖励</strong>: 新用户注册赠送 <?php echo $settings['register_bonus']; ?> 积分</li>
+                    <li><strong>分销奖励</strong>: 一级 <?php echo $settings['referral_points_rate_level1']; ?> / 二级 <?php echo $settings['referral_points_rate_level2']; ?> 积分/元</li>
+                    <li><strong>积分兑换</strong>: 每 <?php echo $settings['exchange_rate']; ?> 积分兑换 ¥1，手续费 <?php echo $settings['exchange_fee_rate']; ?>%</li>
                 </ul>
             </div>
         </div>
@@ -969,6 +1088,17 @@ class MyShop_Points_Manager {
             'min_order_amount_to_use' => 0,
             'enable_expiry' => 0,
             'expiry_days' => 365,
+            'enable_referral_points' => 0,
+            'referral_points_rate_level1' => 0,
+            'referral_points_rate_level2' => 0,
+            'enable_points_exchange' => 0,
+            'exchange_rate' => 100,
+            'exchange_min_points' => 100,
+            'exchange_min_amount' => 0,
+            'exchange_max_amount' => 0,
+            'exchange_max_amount_per_day' => 0,
+            'exchange_max_requests_per_day' => 0,
+            'exchange_fee_rate' => 0,
             'redeem_allowed_product_ids' => [],
             'redeem_allowed_variation_ids' => []
         ];
@@ -1009,7 +1139,18 @@ class MyShop_Points_Manager {
             'max_discount_percent' => intval($_POST['max_discount_percent'] ?? 50),
             'min_order_amount_to_use' => floatval($_POST['min_order_amount_to_use'] ?? 0),
             'enable_expiry' => isset($_POST['enable_expiry']) ? 1 : 0,
-            'expiry_days' => intval($_POST['expiry_days'] ?? 365)
+            'expiry_days' => intval($_POST['expiry_days'] ?? 365),
+            'enable_referral_points' => isset($_POST['enable_referral_points']) ? 1 : 0,
+            'referral_points_rate_level1' => floatval($_POST['referral_points_rate_level1'] ?? 0),
+            'referral_points_rate_level2' => floatval($_POST['referral_points_rate_level2'] ?? 0),
+            'enable_points_exchange' => isset($_POST['enable_points_exchange']) ? 1 : 0,
+            'exchange_rate' => floatval($_POST['exchange_rate'] ?? 100),
+            'exchange_min_points' => intval($_POST['exchange_min_points'] ?? 0),
+            'exchange_min_amount' => floatval($_POST['exchange_min_amount'] ?? 0),
+            'exchange_max_amount' => floatval($_POST['exchange_max_amount'] ?? 0),
+            'exchange_max_amount_per_day' => floatval($_POST['exchange_max_amount_per_day'] ?? 0),
+            'exchange_max_requests_per_day' => intval($_POST['exchange_max_requests_per_day'] ?? 0),
+            'exchange_fee_rate' => floatval($_POST['exchange_fee_rate'] ?? 0)
         ];
         
         update_option('myshop_points_settings', $settings);

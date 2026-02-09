@@ -24,6 +24,12 @@ class Product_Controller {
     }
 
     public static function list_products() {
+        $cache_key = 'myshop_products_list_v1';
+        $cached = get_transient($cache_key);
+        if (is_array($cached)) {
+            return rest_ensure_response(['products' => $cached]);
+        }
+
         $products = get_posts([
             'post_type'      => 'product',
             'posts_per_page' => -1,
@@ -90,6 +96,7 @@ class Product_Controller {
                 'variations'  => $variations
             ];
         }
+        set_transient($cache_key, $data, 300);
         return rest_ensure_response(['products' => $data]);
     }
 
@@ -97,6 +104,12 @@ class Product_Controller {
         $id = (int) $request->get_param('id');
         if ($id <= 0) {
             return new WP_Error('invalid_id', '无效的商品ID', ['status' => 400]);
+        }
+
+        $detail_cache_key = 'myshop_product_detail_' . $id;
+        $cached = get_transient($detail_cache_key);
+        if (is_array($cached)) {
+            return rest_ensure_response($cached);
         }
 
         $product = wc_get_product($id);
@@ -113,7 +126,7 @@ class Product_Controller {
                 $attributes[$label] = $attr_value;
             }
 
-            return rest_ensure_response([
+            $payload = [
                 'id'             => $product->get_id(),
                 'name'           => $product->get_name(),
                 'price'          => $product->get_price(),
@@ -124,7 +137,9 @@ class Product_Controller {
                 'attributes'     => $attributes,
                 'image_url'      => get_the_post_thumbnail_url($product->get_id(), 'full'),
                 'type'           => 'variation'
-            ]);
+            ];
+            set_transient($detail_cache_key, $payload, 300);
+            return rest_ensure_response($payload);
         }
 
         // 如果是简单商品或可变商品父产品
@@ -152,7 +167,7 @@ class Product_Controller {
                 }
             }
 
-            return rest_ensure_response([
+            $payload = [
                 'id'             => $product->get_id(),
                 'name'           => $product->get_name(), // ← title → name
                 'description'    => $product->get_description(),
@@ -164,7 +179,9 @@ class Product_Controller {
                 'type'           => $product->get_type(),
                 'image_url'      => get_the_post_thumbnail_url($product->get_id(), 'full'),
                 'variations'     => $variations
-            ]);
+            ];
+            set_transient($detail_cache_key, $payload, 300);
+            return rest_ensure_response($payload);
         }
 
         // 商品不存在或不支持
