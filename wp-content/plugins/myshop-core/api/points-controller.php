@@ -23,6 +23,8 @@ class Points_Controller {
                 'per_page' => ['type' => 'integer', 'default' => 20],
                 'status'   => ['type' => 'string', 'required' => false],
                 'type'     => ['type' => 'string', 'required' => false],
+                'channel'  => ['type' => 'string', 'required' => false],
+                'channel_prefix' => ['type' => 'string', 'required' => false],
                 'from'     => ['type' => 'string', 'required' => false],
                 'to'       => ['type' => 'string', 'required' => false]
             ]
@@ -97,6 +99,25 @@ class Points_Controller {
             'callback' => [self::class, 'daily_signin'],
             'permission_callback' => ['MyShop_Auth', 'check_permission']
         ]);
+
+        register_rest_route('myshop/v1', '/points/exchange', [
+            'methods'  => \WP_REST_Server::CREATABLE,
+            'callback' => [self::class, 'exchange_points'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission'],
+            'args' => [
+                'points'        => ['required' => true, 'type' => 'integer'],
+                'payout_method' => ['required' => false, 'type' => 'string'],
+                'account_name'  => ['required' => false, 'type' => 'string'],
+                'account_no'    => ['required' => false, 'type' => 'string'],
+                'bank_name'     => ['required' => false, 'type' => 'string']
+            ]
+        ]);
+
+        register_rest_route('myshop/v1', '/points/exchange/rules', [
+            'methods'  => \WP_REST_Server::READABLE,
+            'callback' => [self::class, 'get_exchange_rules'],
+            'permission_callback' => ['MyShop_Auth', 'check_permission']
+        ]);
     }
 
     private static function get_internal_settings() {
@@ -112,7 +133,18 @@ class Points_Controller {
             'max_discount_percent' => 50,
             'min_order_amount_to_use' => 0,
             'enable_expiry' => 0,
-            'expiry_days' => 365
+            'expiry_days' => 365,
+            'enable_referral_points' => 0,
+            'referral_points_rate_level1' => 0,
+            'referral_points_rate_level2' => 0,
+            'enable_points_exchange' => 0,
+            'exchange_rate' => 100,
+            'exchange_min_points' => 100,
+            'exchange_min_amount' => 0,
+            'exchange_max_amount' => 0,
+            'exchange_max_amount_per_day' => 0,
+            'exchange_max_requests_per_day' => 0,
+            'exchange_fee_rate' => 0
         ];
 
         $settings = get_option('myshop_points_settings', []);
@@ -256,6 +288,31 @@ class Points_Controller {
             if ($type) {
                 $where[] = 'type = %s';
                 $params[] = $type;
+            }
+        }
+
+        $channel_filter = $request->get_param('channel');
+        if ($channel_filter) {
+            $channel = sanitize_text_field($channel_filter);
+            if (strpos($channel, ',') !== false) {
+                $channels = array_filter(array_map('trim', explode(',', $channel)));
+                if (!empty($channels)) {
+                    $placeholders = implode(',', array_fill(0, count($channels), '%s'));
+                    $where[] = "channel IN ({$placeholders})";
+                    $params = array_merge($params, $channels);
+                }
+            } else {
+                $where[] = 'channel = %s';
+                $params[] = $channel;
+            }
+        }
+
+        $channel_prefix = $request->get_param('channel_prefix');
+        if ($channel_prefix) {
+            $prefix = sanitize_text_field($channel_prefix);
+            if ($prefix !== '') {
+                $where[] = 'channel LIKE %s';
+                $params[] = $prefix . '%';
             }
         }
 
@@ -885,6 +942,174 @@ class Points_Controller {
             ]
         ]);
     }
+
+    public static function get_exchange_rules($request) {
+        $settings = self::get_internal_settings();
+
+        return rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'enable_points_exchange' => (bool) $settings['enable_points_exchange'],
+                'exchange_rate' => (float) $settings['exchange_rate'],
+                'exchange_min_points' => (int) $settings['exchange_min_points'],
+                'exchange_min_amount' => (float) $settings['exchange_min_amount'],
+                'exchange_max_amount' => (float) $settings['exchange_max_amount'],
+                'exchange_max_amount_per_day' => (float) $settings['exchange_max_amount_per_day'],
+                'exchange_max_requests_per_day' => (int) $settings['exchange_max_requests_per_day'],
+                'exchange_fee_rate' => (float) $settings['exchange_fee_rate']
+            ]
+        ]);
+    }
+
+    public static function exchange_points($request) {
+        global $wpdb;
+
+        $user = MyShop_Auth::get_user_from_request($request);
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        $settings = self::get_internal_settings();
+        if (empty($settings['enable_points']) || empty($settings['enable_points_exchange'])) {
+            return new WP_Error('exchange_disabled', '积分兑换已关闭', ['status' => 403]);
+        }
+
+        $params = $request->get_json_params();
+        $points = isset($params['points']) ? (int) $params['points'] : 0;
+        if ($points <= 0) {
+            return new WP_Error('invalid_points', '兑换积分无效', ['status' => 400]);
+        }
+
+        $min_points = (int) $settings['exchange_min_points'];
+        if ($min_points > 0 && $points < $min_points) {
+            return new WP_Error('points_below_minimum', '未达到最低兑换积分', ['status' => 400]);
+        }
+
+        $rate = (float) $settings['exchange_rate'];
+        if ($rate <= 0) {
+            return new WP_Error('invalid_exchange_rate', '兑换比例未配置', ['status' => 500]);
+        }
+
+        $gross_amount = $points / $rate;
+        $min_amount = (float) $settings['exchange_min_amount'];
+        if ($min_amount > 0 && $gross_amount + 0.0001 < $min_amount) {
+            return new WP_Error('amount_below_minimum', '未达到最低兑换金额', ['status' => 400]);
+        }
+
+        $max_amount = (float) $settings['exchange_max_amount'];
+        if ($max_amount > 0 && $gross_amount - 0.0001 > $max_amount) {
+            return new WP_Error('amount_exceeds_maximum', '超过单次兑换上限', ['status' => 400]);
+        }
+
+        $user_id = (int) $user->ID;
+        $ledger_table = $wpdb->prefix . 'myshop_point_ledger';
+        $available = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$ledger_table} WHERE user_id = %d AND status = 'confirmed'",
+            $user_id
+        ));
+
+        if ($available < $points) {
+            return new WP_Error('insufficient_points', '积分不足', ['status' => 400]);
+        }
+
+        $today = current_time('Y-m-d');
+        $payout_table = $wpdb->prefix . 'myshop_commission_payouts';
+
+        $daily_count = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$payout_table}
+             WHERE earner_id = %d AND note = 'points_exchange' AND requested_at >= %s",
+            $user_id,
+            $today . ' 00:00:00'
+        ));
+        $max_requests = (int) $settings['exchange_max_requests_per_day'];
+        if ($max_requests > 0 && $daily_count >= $max_requests) {
+            return new WP_Error('exchange_too_frequent', '今日兑换次数已达上限', ['status' => 429]);
+        }
+
+        $daily_amount = (float) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(amount), 0) FROM {$payout_table}
+             WHERE earner_id = %d AND note = 'points_exchange' AND requested_at >= %s",
+            $user_id,
+            $today . ' 00:00:00'
+        ));
+        $max_amount_per_day = (float) $settings['exchange_max_amount_per_day'];
+        if ($max_amount_per_day > 0 && ($daily_amount + $gross_amount) - 0.0001 > $max_amount_per_day) {
+            return new WP_Error('exchange_daily_limit', '今日兑换金额已达上限', ['status' => 429]);
+        }
+
+        $fee_rate = (float) $settings['exchange_fee_rate'];
+        $fee = $fee_rate > 0 ? round($gross_amount * ($fee_rate / 100), 2) : 0.0;
+        $net_amount = round($gross_amount - $fee, 2);
+        if ($net_amount <= 0) {
+            return new WP_Error('invalid_net_amount', '兑换金额无效', ['status' => 400]);
+        }
+
+        $payout_method = isset($params['payout_method']) ? sanitize_text_field($params['payout_method']) : 'manual';
+        $account_name = isset($params['account_name']) ? sanitize_text_field($params['account_name']) : null;
+        $account_no = isset($params['account_no']) ? sanitize_text_field($params['account_no']) : null;
+        $bank_name = isset($params['bank_name']) ? sanitize_text_field($params['bank_name']) : null;
+
+        $now = current_time('mysql');
+        $inserted = $wpdb->insert(
+            $payout_table,
+            [
+                'earner_id' => $user_id,
+                'amount' => $net_amount,
+                'payout_method' => $payout_method,
+                'account_name' => $account_name,
+                'account_no' => $account_no,
+                'bank_name' => $bank_name,
+                'status' => 'processing',
+                'requested_at' => $now,
+                'note' => 'points_exchange',
+                'created_at' => $now,
+                'updated_at' => $now
+            ],
+            ['%d', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+        );
+
+        if ($inserted === false) {
+            return new WP_Error('exchange_create_failed', '兑换申请失败', ['status' => 500]);
+        }
+
+        $payout_id = (int) $wpdb->insert_id;
+        $balance_after = $available - $points;
+        $ledger_inserted = $wpdb->insert(
+            $ledger_table,
+            [
+                'user_id' => $user_id,
+                'type' => 'spend',
+                'delta' => -$points,
+                'balance_after' => $balance_after,
+                'status' => 'confirmed',
+                'channel' => 'points_exchange',
+                'reservation_id' => 'payout:' . $payout_id,
+                'created_at' => $now,
+                'updated_at' => $now
+            ],
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s']
+        );
+
+        if ($ledger_inserted === false) {
+            $wpdb->delete($payout_table, ['id' => $payout_id], ['%d']);
+            return new WP_Error('exchange_ledger_failed', '兑换积分失败', ['status' => 500]);
+        }
+
+        $response = rest_ensure_response([
+            'success' => true,
+            'data' => [
+                'payout_id' => $payout_id,
+                'points' => $points,
+                'gross_amount' => number_format($gross_amount, 2, '.', ''),
+                'fee' => number_format($fee, 2, '.', ''),
+                'amount' => number_format($net_amount, 2, '.', ''),
+                'status' => 'processing',
+                'requested_at' => mysql2date('c', $now)
+            ]
+        ]);
+        $response->set_status(201);
+        return $response;
+    }
     
     /**
      * 获取积分规则列表
@@ -954,6 +1179,30 @@ class Points_Controller {
             'title' => '积分有效期',
             'description' => $expiry_desc,
             'status' => $enable_points ? 'active' : 'inactive'
+        ];
+
+        $enable_referral = !empty($settings['enable_referral_points']);
+        $level1_rate = (float) $settings['referral_points_rate_level1'];
+        $level2_rate = (float) $settings['referral_points_rate_level2'];
+        $referral_desc = $enable_referral
+            ? sprintf('一级奖励 %.2f 积分/元，二级奖励 %.2f 积分/元', $level1_rate, $level2_rate)
+            : '分销奖励积分已关闭';
+        $rules[] = [
+            'rule_id' => 'referral_reward',
+            'title' => '分销奖励',
+            'description' => $referral_desc,
+            'status' => $enable_referral && $enable_points ? 'active' : 'inactive'
+        ];
+
+        $enable_exchange = !empty($settings['enable_points_exchange']);
+        $exchange_desc = $enable_exchange
+            ? sprintf('每 %.2f 积分可兑换 1 元，手续费 %.2f%%', (float) $settings['exchange_rate'], (float) $settings['exchange_fee_rate'])
+            : '积分兑换已关闭';
+        $rules[] = [
+            'rule_id' => 'points_exchange',
+            'title' => '积分兑换佣金',
+            'description' => $exchange_desc,
+            'status' => $enable_exchange && $enable_points ? 'active' : 'inactive'
         ];
 
         return rest_ensure_response([

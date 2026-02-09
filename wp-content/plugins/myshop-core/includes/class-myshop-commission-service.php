@@ -46,6 +46,9 @@ class MyShop_Commission_Service {
         ));
 
         if ($referral) {
+            $points_settings = self::get_points_settings();
+            $use_points_reward = !empty($points_settings['enable_points']) && !empty($points_settings['enable_referral_points']);
+
             if ($referral->first_order_status !== 'completed') {
                 $wpdb->update(
                     $referral_table,
@@ -62,33 +65,57 @@ class MyShop_Commission_Service {
                 self::backfill_attribution($order_id, $customer_id, $referral);
             }
 
-            $channel_code = $referral->channel_code ?: null;
-            $level1_rate = self::get_commission_rate(1, $channel_code);
-            self::create_commission_if_needed(
-                $commission_table,
-                $order_id,
-                (int) $referral->inviter_id,
-                $total,
-                $level1_rate,
-                $order->get_currency(),
-                (int) $referral->inviter_id
-            );
+            if ($use_points_reward) {
+                $level1_rate = (float) $points_settings['referral_points_rate_level1'];
+                self::grant_referral_points(
+                    (int) $referral->inviter_id,
+                    $order_id,
+                    $total,
+                    $level1_rate,
+                    1,
+                    $points_settings
+                );
+            } else {
+                $channel_code = $referral->channel_code ?: null;
+                $level1_rate = self::get_commission_rate(1, $channel_code);
+                self::create_commission_if_needed(
+                    $commission_table,
+                    $order_id,
+                    (int) $referral->inviter_id,
+                    $total,
+                    $level1_rate,
+                    $order->get_currency(),
+                    (int) $referral->inviter_id
+                );
+            }
 
             $parent = $wpdb->get_row($wpdb->prepare(
                 "SELECT inviter_id FROM {$referral_table} WHERE invitee_id = %d LIMIT 1",
                 (int) $referral->inviter_id
             ));
             if ($parent && (int) $parent->inviter_id > 0 && (int) $parent->inviter_id !== (int) $referral->inviter_id) {
-                $level2_rate = self::get_commission_rate(2, $channel_code);
-                self::create_commission_if_needed(
-                    $commission_table,
-                    $order_id,
-                    (int) $parent->inviter_id,
-                    $total,
-                    $level2_rate,
-                    $order->get_currency(),
-                    (int) $referral->inviter_id
-                );
+                if ($use_points_reward) {
+                    $level2_rate = (float) $points_settings['referral_points_rate_level2'];
+                    self::grant_referral_points(
+                        (int) $parent->inviter_id,
+                        $order_id,
+                        $total,
+                        $level2_rate,
+                        2,
+                        $points_settings
+                    );
+                } else {
+                    $level2_rate = self::get_commission_rate(2, $channel_code);
+                    self::create_commission_if_needed(
+                        $commission_table,
+                        $order_id,
+                        (int) $parent->inviter_id,
+                        $total,
+                        $level2_rate,
+                        $order->get_currency(),
+                        (int) $referral->inviter_id
+                    );
+                }
             }
         }
 
@@ -103,6 +130,7 @@ class MyShop_Commission_Service {
         global $wpdb;
         $commission_table = $wpdb->prefix . 'myshop_commissions';
         $referral_table = $wpdb->prefix . 'myshop_referrals';
+        $ledger_table = $wpdb->prefix . 'myshop_point_ledger';
         $now = current_time('mysql');
 
         $wpdb->query($wpdb->prepare(
@@ -119,6 +147,54 @@ class MyShop_Commission_Service {
              WHERE first_order_id = %d AND first_order_status = 'completed'",
             $order_id
         ));
+
+        $reward_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT user_id, COALESCE(SUM(delta), 0) AS total_points
+             FROM {$ledger_table}
+             WHERE reference_order_id = %d AND channel LIKE %s AND type = 'earn' AND status = 'confirmed'
+             GROUP BY user_id",
+            $order_id,
+            'referral_reward%'
+        ));
+
+        foreach ($reward_rows as $row) {
+            $user_id = (int) $row->user_id;
+            $reward_points = (int) $row->total_points;
+            if ($user_id <= 0 || $reward_points <= 0) {
+                continue;
+            }
+
+            $existing_reversal = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$ledger_table}
+                 WHERE reference_order_id = %d AND channel = 'referral_reward_reversal' AND user_id = %d",
+                $order_id,
+                $user_id
+            ));
+            if ($existing_reversal > 0) {
+                continue;
+            }
+
+            $available = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COALESCE(SUM(delta), 0) FROM {$ledger_table} WHERE user_id = %d AND status = 'confirmed'",
+                $user_id
+            ));
+            $balance_after = $available - $reward_points;
+            $wpdb->insert(
+                $ledger_table,
+                [
+                    'user_id' => $user_id,
+                    'type' => 'adjust',
+                    'delta' => -$reward_points,
+                    'balance_after' => $balance_after,
+                    'status' => 'confirmed',
+                    'channel' => 'referral_reward_reversal',
+                    'reference_order_id' => $order_id,
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ],
+                ['%d', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s']
+            );
+        }
     }
 
     private static function get_commission_rate($level, $channel_code = null) {
@@ -238,5 +314,77 @@ class MyShop_Commission_Service {
                 update_post_meta($order_id, $key, $value);
             }
         }
+    }
+
+    private static function get_points_settings() {
+        $defaults = [
+            'enable_points' => 1,
+            'enable_expiry' => 0,
+            'expiry_days' => 365,
+            'enable_referral_points' => 0,
+            'referral_points_rate_level1' => 0,
+            'referral_points_rate_level2' => 0
+        ];
+        $settings = get_option('myshop_points_settings', []);
+        return wp_parse_args($settings, $defaults);
+    }
+
+    private static function build_points_expire_at($settings) {
+        if (!empty($settings['enable_expiry']) && (int) $settings['expiry_days'] > 0) {
+            return date('Y-m-d H:i:s', strtotime('+' . (int) $settings['expiry_days'] . ' days'));
+        }
+        return null;
+    }
+
+    private static function grant_referral_points($user_id, $order_id, $order_total, $rate, $level, $settings) {
+        $user_id = (int) $user_id;
+        if ($user_id <= 0 || $rate <= 0) {
+            return;
+        }
+
+        $points = (int) floor($order_total * $rate);
+        if ($points <= 0) {
+            return;
+        }
+
+        global $wpdb;
+        $ledger_table = $wpdb->prefix . 'myshop_point_ledger';
+        $channel = $level === 2 ? 'referral_reward_l2' : 'referral_reward_l1';
+
+        $exists = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$ledger_table}
+             WHERE user_id = %d AND reference_order_id = %d AND channel = %s AND type = 'earn'",
+            $user_id,
+            $order_id,
+            $channel
+        ));
+        if ($exists > 0) {
+            return;
+        }
+
+        $available = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(delta), 0) FROM {$ledger_table} WHERE user_id = %d AND status = 'confirmed'",
+            $user_id
+        ));
+
+        $expire_at = self::build_points_expire_at($settings);
+        $now = current_time('mysql');
+        $wpdb->insert(
+            $ledger_table,
+            [
+                'user_id' => $user_id,
+                'type' => 'earn',
+                'delta' => $points,
+                'balance_after' => $available + $points,
+                'status' => 'confirmed',
+                'channel' => $channel,
+                'reference_order_id' => $order_id,
+                'reservation_id' => 'referral_order_' . $order_id . '_l' . (int) $level,
+                'expire_at' => $expire_at,
+                'created_at' => $now,
+                'updated_at' => $now
+            ],
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
+        );
     }
 }

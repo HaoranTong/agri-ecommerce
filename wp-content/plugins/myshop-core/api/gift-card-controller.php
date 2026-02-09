@@ -341,15 +341,33 @@ class Gift_Card_Controller {
 
         $cards_table = $wpdb->prefix . 'myshop_gift_cards';
         $templates_table = $wpdb->prefix . 'myshop_gift_card_templates';
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT c.*, t.name AS template_name, t.delivery_modes AS template_delivery_modes, t.print_template_url AS template_print_template_url
-             FROM {$cards_table} c
-             LEFT JOIN {$templates_table} t ON c.template_id = t.id
-             WHERE c.redeemer_id = %d OR (c.redeemer_id IS NULL AND c.purchaser_id = %d)
-             ORDER BY c.created_at DESC",
-            $user->ID,
-            $user->ID
-        ));
+        $scope = $request->get_param('scope');
+        $within_days = absint($request->get_param('within_days') ?: 365);
+        $within_days = $within_days > 0 ? min($within_days, 3650) : 365;
+        $cutoff = gmdate('Y-m-d H:i:s', strtotime('-' . $within_days . ' days'));
+
+        if ($scope === 'history') {
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT c.*, t.name AS template_name, t.delivery_modes AS template_delivery_modes, t.print_template_url AS template_print_template_url
+                 FROM {$cards_table} c
+                 LEFT JOIN {$templates_table} t ON c.template_id = t.id
+                 WHERE (c.purchaser_id = %d OR c.redeemer_id = %d) AND c.created_at >= %s
+                 ORDER BY c.created_at DESC",
+                $user->ID,
+                $user->ID,
+                $cutoff
+            ));
+        } else {
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT c.*, t.name AS template_name, t.delivery_modes AS template_delivery_modes, t.print_template_url AS template_print_template_url
+                 FROM {$cards_table} c
+                 LEFT JOIN {$templates_table} t ON c.template_id = t.id
+                 WHERE c.redeemer_id = %d OR (c.redeemer_id IS NULL AND c.purchaser_id = %d)
+                 ORDER BY c.created_at DESC",
+                $user->ID,
+                $user->ID
+            ));
+        }
 
         $cards = [];
         foreach ($rows as $row) {

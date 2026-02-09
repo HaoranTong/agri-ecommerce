@@ -21,6 +21,7 @@ require_once MYSHOP_PLUGIN_DIR . 'db/class-myshop-db.php';
 require_once MYSHOP_PLUGIN_DIR . 'includes/class-myshop-loader.php';
 require_once MYSHOP_PLUGIN_DIR . 'admin/points-manager.php';
 require_once MYSHOP_PLUGIN_DIR . 'admin/commission-manager.php';
+require_once MYSHOP_PLUGIN_DIR . 'admin/promo-poster-manager.php';
 
 // 引入后台管理页面
 if (is_admin()) {
