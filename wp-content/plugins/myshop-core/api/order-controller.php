@@ -401,8 +401,26 @@ class Order_Controller {
         foreach ($openids as $openid) {
             $result = MyShop_Wechat::send_custom_message($openid, $content);
             if (is_wp_error($result)) {
-                error_log('[MyShop Core] WeChat notify failed: ' . $result->get_error_message());
+                self::log_admin_notify('wechat notify failed', [
+                    'error' => $result->get_error_message(),
+                    'openid' => $openid ? substr((string) $openid, 0, 6) . '***' : ''
+                ]);
             }
+        }
+    }
+
+    private static function log_admin_notify($message, $context = null) {
+        try {
+            $dir = defined('WP_CONTENT_DIR') ? WP_CONTENT_DIR : (defined('ABSPATH') ? ABSPATH . 'wp-content' : __DIR__);
+            $log_path = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . 'myshop-admin-notify.log';
+            $ts = gmdate('Y-m-d H:i:s');
+            $payload = '';
+            if (!is_null($context)) {
+                $payload = ' ' . wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            @file_put_contents($log_path, '[' . $ts . '] ' . $message . $payload . PHP_EOL, FILE_APPEND);
+        } catch (Exception $e) {
+            // ignore logging failures
         }
     }
 

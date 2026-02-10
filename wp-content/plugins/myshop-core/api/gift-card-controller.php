@@ -162,8 +162,11 @@ class Gift_Card_Controller {
         if ($activated > 0) {
             $order->add_order_note(sprintf('订单状态变为已完成，已激活该订单关联的购物卡 %d 张', $activated));
         } else {
-            // 即使没有激活，也记录日志以便调试
-            error_log(sprintf('[GiftCard] Order #%d status changed to completed, but no cards were activated. Old status: %s', $order_id, $old_status));
+            // 即使没有激活，也记录日志以便调试（写入独立日志，避免污染 debug.log）
+            self::log_giftcard('order completed: no cards activated', [
+                'order_id' => (int) $order_id,
+                'old_status' => (string) $old_status
+            ]);
         }
     }
 
@@ -1476,13 +1479,16 @@ class Gift_Card_Controller {
             $order_id
         ));
 
-        // 记录调试信息
+        // 记录调试信息（写入独立日志，避免污染 debug.log）
         if (!empty($cards_before)) {
             $statuses = array_map(function($card) {
                 return $card->card_number . ':' . $card->status;
             }, $cards_before);
-            error_log(sprintf('[GiftCard] Order #%d: Cards before activation: %s, Updated: %d', 
-                $order_id, implode(', ', $statuses), $updated !== false ? (int) $updated : 0));
+            self::log_giftcard('order cards before activation', [
+                'order_id' => (int) $order_id,
+                'cards' => $statuses,
+                'updated' => $updated !== false ? (int) $updated : 0
+            ]);
         }
 
         return $updated !== false ? (int) $updated : 0;
