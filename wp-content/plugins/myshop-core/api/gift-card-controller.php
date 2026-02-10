@@ -1002,10 +1002,15 @@ class Gift_Card_Controller {
         $print_template_source = ($template && !empty($template->print_template_url)) ? $template->print_template_url : '';
         $print_template_url = self::resolve_print_template_url($print_template_source);
         $share_template_config = $template ? self::decode_share_template_config($template->share_template_config ?? null) : null;
+        $referrer_code = null;
+        if (class_exists('Referral_Controller')) {
+            $referrer_code = Referral_Controller::ensure_referral_code((int) $user->ID);
+        }
         $share_meta = [
             'message' => $message ?: null,
             'theme'   => $theme ?: self::DEFAULT_SHARE_THEME,
             'format'  => $format,
+            'referrer_code' => $referrer_code,
             'template'=> [
                 'print_template_url' => $print_template_url,
                 'share_template_config' => $share_template_config
@@ -1042,7 +1047,7 @@ class Gift_Card_Controller {
             $share_style_config = self::get_share_style_config(self::DEFAULT_SHARE_THEME);
         }
 
-        $share_payload = self::build_share_urls($token, null, $share_style_config, $message, $card, $template);
+        $share_payload = self::build_share_urls($token, null, $share_style_config, $message, $card, $template, $referrer_code);
         error_log('[GiftCard] share payload: ' . wp_json_encode([
             'card_number' => $card->card_number,
             'token' => $token,
@@ -1110,7 +1115,8 @@ class Gift_Card_Controller {
         }
         
         $message = is_array($share_meta) ? ($share_meta['message'] ?? null) : null;
-        $share_payload = self::build_share_urls($card->share_token, null, $share_style_config, $message, $card, $template);
+        $referrer_code = is_array($share_meta) ? ($share_meta['referrer_code'] ?? null) : null;
+        $share_payload = self::build_share_urls($card->share_token, null, $share_style_config, $message, $card, $template, $referrer_code);
         error_log('[GiftCard] share detail payload: ' . wp_json_encode([
             'card_number' => $card->card_number,
             'token' => $card->share_token,
@@ -1782,7 +1788,7 @@ class Gift_Card_Controller {
         return isset($card->purchaser_id) ? (int) $card->purchaser_id : 0;
     }
 
-    private static function build_share_urls($token, $qr_payload = null, $share_style_config = null, $message = null, $card = null, $template = null) {
+    private static function build_share_urls($token, $qr_payload = null, $share_style_config = null, $message = null, $card = null, $template = null, $referrer_code = null) {
         if (empty($token)) {
             return [
                 'share_token' => null,
@@ -1794,9 +1800,16 @@ class Gift_Card_Controller {
             ];
         }
 
+        $clean_referrer = is_string($referrer_code) ? trim($referrer_code) : '';
         $mini_program_path = '/pages/shopping-card/claim?token=' . rawurlencode($token);
+        if ($clean_referrer !== '') {
+            $mini_program_path .= '&referrer_code=' . rawurlencode($clean_referrer);
+        }
         $share_url = add_query_arg(
-            ['giftcard_token' => rawurlencode($token)],
+            array_filter([
+                'giftcard_token' => rawurlencode($token),
+                'referrer_code' => $clean_referrer !== '' ? $clean_referrer : null
+            ]),
             home_url('/')
         );
         if (empty($qr_payload)) {
@@ -1807,7 +1820,16 @@ class Gift_Card_Controller {
         if (is_array($share_style_config) && !empty($share_style_config['qr_size'])) {
             $qr_size = absint($share_style_config['qr_size']);
         }
-        $mini_program_qr = self::generate_miniprogram_qr_image($mini_program_path, $token, $qr_size);
+        $scene = $token;
+        if ($clean_referrer !== '') {
+            $scene = 'gc_' . $token . '_rc_' . $clean_referrer;
+        } else {
+            $scene = 'gc_' . $token;
+        }
+        if (strlen($scene) > 32) {
+            $scene = substr($scene, 0, 32);
+        }
+        $mini_program_qr = self::generate_miniprogram_qr_image($mini_program_path, $token, $qr_size, $scene);
         if ($mini_program_qr && is_array($share_style_config)) {
             $qr_image_for_style = $mini_program_qr;
             $upload_dir = wp_upload_dir();
@@ -1844,7 +1866,7 @@ class Gift_Card_Controller {
         ];
     }
 
-    private static function generate_miniprogram_qr_image($path, $token, $width = null) {
+    private static function generate_miniprogram_qr_image($path, $token, $width = null, $scene_override = null) {
         $access_token = self::get_wechat_access_token();
         if (empty($access_token)) {
             error_log('[GiftCard] mini program qr failed: access token missing');
@@ -1861,7 +1883,7 @@ class Gift_Card_Controller {
 
         $env_version = self::resolve_env_version();
 
-        $scene = $token;
+        $scene = $scene_override ?: $token;
         if (is_string($scene) && strlen($scene) > 32) {
             $scene = substr($scene, 0, 32);
         }
