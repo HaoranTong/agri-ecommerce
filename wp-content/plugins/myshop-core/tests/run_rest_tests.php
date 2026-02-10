@@ -68,6 +68,14 @@ register_shutdown_function(function () use ($old_missions, $old_redeem_options, 
 
 do_action('rest_api_init');
 
+$maintenance_flag = ABSPATH . '.maintenance_flag';
+if (!file_exists($maintenance_flag)) {
+    file_put_contents($maintenance_flag, '1');
+}
+$maintenance_resp = call_api('GET', '/myshop/v1/config/public');
+assert_true($maintenance_resp->get_status() === 503, 'maintenance mode status');
+@unlink($maintenance_flag);
+
 $login_response = call_api('POST', '/myshop/v1/auth/login', ['code' => 'test001']);
 $token = null;
 $auth_header = [];

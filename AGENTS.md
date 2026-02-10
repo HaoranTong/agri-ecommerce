@@ -31,6 +31,15 @@ Key points:
 - Git whitelist only publishes self-owned code (plugin/theme/loco).
 - WP-Lock aligns core + third-party plugins/themes to local truth source.
 
+## Commit / Merge / Push Rules (Must Follow)
+- Always work on `dev` and commit there.
+- Before merging: ensure tests are green and docs are aligned.
+- Backend deploy flow (no scripts in this repo):
+  1) Push `dev` to both remotes.
+  2) Merge `dev` -> `trial`.
+  3) Push `trial` to both remotes to trigger webhook deploy.
+- Never merge into `master` unless explicitly instructed.
+
 ## Workflow Expectations
 - Any new/changed feature must include tests. All tests must be green.
 - Backend tests: `php tests\run_rest_tests.php`.

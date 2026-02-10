@@ -5,6 +5,7 @@ class MyShop_Loader {
             'includes/class-myshop-auth.php',
             'includes/class-myshop-wechat.php',
             'includes/class-myshop-commission-service.php',
+            'includes/class-myshop-maintenance.php',
             'api/auth-controller.php',
             'api/user-controller.php',
             'api/product-controller.php',
@@ -45,6 +46,10 @@ class MyShop_Loader {
 
         if (class_exists('MyShop_Commission_Service') && method_exists('MyShop_Commission_Service', 'boot')) {
             MyShop_Commission_Service::boot();
+        }
+
+        if (class_exists('MyShop_Maintenance') && method_exists('MyShop_Maintenance', 'boot')) {
+            MyShop_Maintenance::boot();
         }
 
         add_action('init', function () {
