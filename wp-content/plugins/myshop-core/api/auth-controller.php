@@ -81,7 +81,7 @@ class Auth_Controller {
             $channel_code = $scene_param;
         }
 
-        if ($is_new_user || $inviter_id || $referrer_code) {
+        if ($is_new_user && ($inviter_id || $referrer_code)) {
             if (!$inviter_id && $referrer_code) {
                 $matched = get_users([
                     'meta_key' => 'myshop_referral_code',
@@ -92,6 +92,7 @@ class Auth_Controller {
                 $inviter_id = $matched ? (int) $matched[0] : 0;
             }
             if ($inviter_id > 0 && class_exists('Referral_Controller')) {
+                // 仅新用户首次登录可绑定推荐关系，避免存量用户反向/重复绑定
                 Referral_Controller::bind_referral($user_id, $inviter_id, $channel_code);
             }
         }

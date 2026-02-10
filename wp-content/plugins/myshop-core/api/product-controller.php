@@ -24,7 +24,8 @@ class Product_Controller {
     }
 
     public static function list_products() {
-        $cache_key = 'myshop_products_list_v1';
+        // Cache key version bump ensures stock fields refresh on clients.
+        $cache_key = 'myshop_products_list_v2';
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
             return rest_ensure_response(['products' => $cached]);
@@ -56,12 +57,15 @@ class Product_Controller {
                         $attributes[$label] = $attr_value; // 或直接 $attributes[$label] = $label;
                     }
 
+                    $variation_obj = wc_get_product($v['variation_id']);
                     $variations[] = [
-                        'variation_id' => $v['variation_id'],
-                        'attributes'   => $attributes,
-                        'price'        => $v['display_price'],
-                        'image_url'    => !empty($v['image']) ? $v['image']['url'] : null,
-                        'in_stock'     => $v['is_in_stock']
+                        'variation_id'   => $v['variation_id'],
+                        'attributes'     => $attributes,
+                        'price'          => $v['display_price'],
+                        'image_url'      => !empty($v['image']) ? $v['image']['url'] : null,
+                        'in_stock'       => $v['is_in_stock'],
+                        'stock_status'   => $variation_obj ? $variation_obj->get_stock_status() : null,
+                        'stock_quantity' => $variation_obj ? $variation_obj->get_stock_quantity() : null
                     ];
                 }
             }
@@ -106,7 +110,7 @@ class Product_Controller {
             return new WP_Error('invalid_id', '无效的商品ID', ['status' => 400]);
         }
 
-        $detail_cache_key = 'myshop_product_detail_' . $id;
+        $detail_cache_key = 'myshop_product_detail_v2_' . $id;
         $cached = get_transient($detail_cache_key);
         if (is_array($cached)) {
             return rest_ensure_response($cached);
@@ -157,12 +161,15 @@ class Product_Controller {
                         $attributes[$label] = $attr_value;
                     }
 
+                    $variation_obj = wc_get_product($v['variation_id']);
                     $variations[] = [
-                        'id'         => $v['variation_id'],
-                        'attributes' => $attributes,
-                        'price'      => $v['display_price'],
-                        'image_url'  => !empty($v['image']) ? $v['image']['url'] : null,
-                        'in_stock'   => $v['is_in_stock']
+                        'id'             => $v['variation_id'],
+                        'attributes'     => $attributes,
+                        'price'          => $v['display_price'],
+                        'image_url'      => !empty($v['image']) ? $v['image']['url'] : null,
+                        'in_stock'       => $v['is_in_stock'],
+                        'stock_status'   => $variation_obj ? $variation_obj->get_stock_status() : null,
+                        'stock_quantity' => $variation_obj ? $variation_obj->get_stock_quantity() : null
                     ];
                 }
             }
@@ -279,12 +286,15 @@ class Product_Controller {
                         $attributes[$label] = $attr_value;
                     }
                     
+                    $variation_obj = wc_get_product($variation_id);
                     $variations[] = [
-                        'variation_id' => $variation_id,
-                        'attributes' => $attributes,
-                        'price' => $v['display_price'],
-                        'image_url' => !empty($v['image']) ? $v['image']['url'] : null,
-                        'in_stock' => $v['is_in_stock']
+                        'variation_id'   => $variation_id,
+                        'attributes'     => $attributes,
+                        'price'          => $v['display_price'],
+                        'image_url'      => !empty($v['image']) ? $v['image']['url'] : null,
+                        'in_stock'       => $v['is_in_stock'],
+                        'stock_status'   => $variation_obj ? $variation_obj->get_stock_status() : null,
+                        'stock_quantity' => $variation_obj ? $variation_obj->get_stock_quantity() : null
                     ];
                 }
             } else {
@@ -382,11 +392,13 @@ class Product_Controller {
                         'image_url' => get_the_post_thumbnail_url($variation_id, 'full') ?: get_the_post_thumbnail_url($parent_id, 'full'),
                         'type' => 'variable',
                         'variations' => [[
-                            'variation_id' => $variation_id,
-                            'attributes' => $attributes,
-                            'price' => $variation->get_price(),
-                            'image_url' => get_the_post_thumbnail_url($variation_id, 'full') ?: get_the_post_thumbnail_url($parent_id, 'full'),
-                            'in_stock' => $variation->is_in_stock()
+                            'variation_id'   => $variation_id,
+                            'attributes'     => $attributes,
+                            'price'          => $variation->get_price(),
+                            'image_url'      => get_the_post_thumbnail_url($variation_id, 'full') ?: get_the_post_thumbnail_url($parent_id, 'full'),
+                            'in_stock'       => $variation->is_in_stock(),
+                            'stock_status'   => $variation->get_stock_status(),
+                            'stock_quantity' => $variation->get_stock_quantity()
                         ]]
                     ];
                 } elseif ($already_included && $existing_item_index >= 0) {
@@ -413,11 +425,13 @@ class Product_Controller {
                         }
                         
                         $existing_item['variations'][] = [
-                            'variation_id' => $variation_id,
-                            'attributes' => $attributes,
-                            'price' => $variation->get_price(),
-                            'image_url' => get_the_post_thumbnail_url($variation_id, 'full') ?: get_the_post_thumbnail_url($parent_id, 'full'),
-                            'in_stock' => $variation->is_in_stock()
+                            'variation_id'   => $variation_id,
+                            'attributes'     => $attributes,
+                            'price'          => $variation->get_price(),
+                            'image_url'      => get_the_post_thumbnail_url($variation_id, 'full') ?: get_the_post_thumbnail_url($parent_id, 'full'),
+                            'in_stock'       => $variation->is_in_stock(),
+                            'stock_status'   => $variation->get_stock_status(),
+                            'stock_quantity' => $variation->get_stock_quantity()
                         ];
                         
                         // 重新计算价格区间

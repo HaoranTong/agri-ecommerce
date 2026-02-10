@@ -250,7 +250,14 @@ class MyShop_Auth {
             "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = '_wechat_openid' AND meta_value = %s",
             $openid
         ));
-        if ($user_id) return $user_id;
+        if ($user_id) {
+            $user = get_userdata((int) $user_id);
+            if ($user instanceof WP_User) {
+                return (int) $user_id;
+            }
+            // Cleanup orphaned openid mapping and treat as new user.
+            delete_user_meta((int) $user_id, '_wechat_openid');
+        }
 
         // 检查是否为测试用户
         $test_users = self::get_test_users();
@@ -314,7 +321,14 @@ class MyShop_Auth {
             "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = '_wechat_openid' AND meta_value = %s",
             $openid
         ));
-        return $user_id ? (int) $user_id : null;
+        if ($user_id) {
+            $user = get_userdata((int) $user_id);
+            if ($user instanceof WP_User) {
+                return (int) $user_id;
+            }
+            delete_user_meta((int) $user_id, '_wechat_openid');
+        }
+        return null;
     }
     public static function check_permission($request) {
         $user = self::get_user_from_request($request);
@@ -367,24 +381,40 @@ class MyShop_Auth {
         if (!is_string($token) || empty($token)) {
             return false;
         }
+        $token = trim($token);
         $parts = explode('.', $token);
         if (count($parts) !== 3) {
             return false;
         }
         [$h, $p, $s] = $parts;
-        $h = str_pad(strtr($h, '-_', '+/'), strlen($h) % 4, '=', STR_PAD_RIGHT);
-        $p = str_pad(strtr($p, '-_', '+/'), strlen($p) % 4, '=', STR_PAD_RIGHT);
-        $s = str_pad(strtr($s, '-_', '+/'), strlen($s) % 4, '=', STR_PAD_RIGHT);
-        $payload = json_decode(base64_decode($p), true);
+        $h = self::base64url_decode($h);
+        $p = self::base64url_decode($p);
+        if ($h === false || $p === false) {
+            return false;
+        }
+        $payload = json_decode($p, true);
         if (!$payload || !isset($payload['user_id']) || !isset($payload['exp']) || $payload['exp'] < time()) {
             return false;
         }
-        $expected_sig = hash_hmac('sha256', "$h.$p", self::SECRET_KEY, true);
-        $provided_sig = base64_decode($s);
-        if ($provided_sig === false || !hash_equals($expected_sig, $provided_sig)) {
+        $signing_input = $parts[0] . '.' . $parts[1];
+        $expected_raw = hash_hmac('sha256', $signing_input, self::SECRET_KEY, true);
+        $expected_sig = rtrim(strtr(base64_encode($expected_raw), '+/', '-_'), '=');
+        if (!hash_equals($expected_sig, $parts[2])) {
             return false;
         }
         return get_userdata((int) $payload['user_id']);
+    }
+
+    private static function base64url_decode($input) {
+        if (!is_string($input) || $input === '') {
+            return false;
+        }
+        $input = strtr($input, '-_', '+/');
+        $pad = strlen($input) % 4;
+        if ($pad) {
+            $input .= str_repeat('=', 4 - $pad);
+        }
+        return base64_decode($input);
     }
 
     public static function extract_token_from_request($request) {
