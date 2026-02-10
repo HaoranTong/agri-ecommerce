@@ -24,7 +24,8 @@ class Product_Controller {
     }
 
     public static function list_products() {
-        $cache_key = 'myshop_products_list_v1';
+        // Cache key version bump ensures stock fields refresh on clients.
+        $cache_key = 'myshop_products_list_v2';
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
             return rest_ensure_response(['products' => $cached]);
@@ -109,7 +110,7 @@ class Product_Controller {
             return new WP_Error('invalid_id', '无效的商品ID', ['status' => 400]);
         }
 
-        $detail_cache_key = 'myshop_product_detail_' . $id;
+        $detail_cache_key = 'myshop_product_detail_v2_' . $id;
         $cached = get_transient($detail_cache_key);
         if (is_array($cached)) {
             return rest_ensure_response($cached);
