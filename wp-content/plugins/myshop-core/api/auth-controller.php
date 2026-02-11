@@ -50,6 +50,9 @@ class Auth_Controller {
                 update_user_meta($user_id, '_wechat_unionid', $login_result['unionid']);
             }
         }
+        if ($is_new_user && !get_user_meta($user_id, '_myshop_first_login_at', true)) {
+            update_user_meta($user_id, '_myshop_first_login_at', current_time('mysql'));
+        }
 
         // 保存微信昵称和头像（如果前端提供）
         $json_params = $request->get_json_params();

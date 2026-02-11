@@ -1175,6 +1175,7 @@ class Gift_Card_Controller {
             'token' => $token,
             'user_id' => (int) $user->ID
         ]);
+        $referrer_from_param = sanitize_text_field($request->get_param('referrer_code'));
         $card = self::get_card_by_share_token($token);
         if (!$card) {
             error_log(sprintf('[GiftCard] claim failed: share token not found. token=%s, user_id=%d', $token, (int) $user->ID));
@@ -1228,6 +1229,72 @@ class Gift_Card_Controller {
         }
 
         error_log(sprintf('[GiftCard] claim success: token=%s, card_number=%s, from_user=%d, to_user=%d', $token, $card->card_number, (int) $current_holder_id, (int) $user->ID));
+
+        // 礼品卡分享绑定推荐关系（仅首登的新用户且未绑定过）
+        try {
+            $share_meta = self::decode_share_meta($card->share_meta ?? null);
+            $referrer_code = is_array($share_meta) ? ($share_meta['referrer_code'] ?? null) : null;
+            if (!empty($referrer_from_param) && empty($referrer_code)) {
+                $referrer_code = $referrer_from_param;
+            }
+            $first_login_at = get_user_meta($user->ID, '_myshop_first_login_at', true);
+            $within_first_day = false;
+            if (!empty($first_login_at)) {
+                $first_login_ts = strtotime($first_login_at);
+                if ($first_login_ts) {
+                    $within_first_day = (current_time('timestamp') - $first_login_ts) <= DAY_IN_SECONDS;
+                }
+            }
+            error_log('[GiftCard] referral bind check: ' . wp_json_encode([
+                'token' => $token,
+                'invitee_id' => (int) $user->ID,
+                'referrer_code' => $referrer_code ?: null,
+                'referrer_from_param' => $referrer_from_param ?: null,
+                'referrer_from_meta' => is_array($share_meta) ? ($share_meta['referrer_code'] ?? null) : null,
+                'first_login_at' => $first_login_at ?: null,
+                'within_first_day' => $within_first_day ? 'yes' : 'no',
+                'has_referral_controller' => class_exists('Referral_Controller') ? 'yes' : 'no'
+            ]));
+            if (!empty($referrer_code) && $within_first_day && class_exists('Referral_Controller')) {
+                $matched = get_users([
+                    'meta_key' => 'myshop_referral_code',
+                    'meta_value' => sanitize_text_field($referrer_code),
+                    'number' => 1,
+                    'fields' => 'ID'
+                ]);
+                $inviter_id = $matched ? (int) $matched[0] : 0;
+                if ($inviter_id > 0) {
+                    $bound = Referral_Controller::bind_referral($user->ID, $inviter_id, 'giftcard');
+                    self::log_giftcard('referral bind on claim', [
+                        'token' => $token,
+                        'invitee_id' => (int) $user->ID,
+                        'inviter_id' => $inviter_id,
+                        'referrer_code' => $referrer_code,
+                        'bound' => $bound ? 'yes' : 'no',
+                        'referrer_from_param' => $referrer_from_param ?: null,
+                        'referrer_from_meta' => is_array($share_meta) ? ($share_meta['referrer_code'] ?? null) : null
+                    ]);
+                    error_log('[GiftCard] referral bind result: ' . wp_json_encode([
+                        'token' => $token,
+                        'invitee_id' => (int) $user->ID,
+                        'inviter_id' => $inviter_id,
+                        'bound' => $bound ? 'yes' : 'no'
+                    ]));
+                }
+            } else {
+                error_log('[GiftCard] referral bind skipped: ' . wp_json_encode([
+                    'token' => $token,
+                    'invitee_id' => (int) $user->ID,
+                    'reason' => empty($referrer_code) ? 'missing_referrer_code' : ($within_first_day ? (class_exists('Referral_Controller') ? 'inviter_not_found' : 'missing_referral_controller') : 'outside_first_day')
+                ]));
+            }
+        } catch (Throwable $e) {
+            self::log_giftcard('referral bind on claim failed', [
+                'token' => $token,
+                'user_id' => (int) $user->ID,
+                'error' => $e->getMessage()
+            ]);
+        }
 
         return rest_ensure_response([
             'success' => true,
