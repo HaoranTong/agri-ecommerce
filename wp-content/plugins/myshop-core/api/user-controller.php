@@ -66,7 +66,6 @@ class User_Controller {
         $has_profile = !empty($wechat_nickname) || !empty($wechat_avatar) || ($user->display_name && $user->display_name !== '微信用户');
         $has_realname = !empty($user->first_name);
         $has_phone = !empty($phone);
-
         return rest_ensure_response([
             'success' => true,
             'data' => [

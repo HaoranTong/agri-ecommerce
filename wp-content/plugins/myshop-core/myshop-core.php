@@ -34,6 +34,8 @@ if (is_admin()) {
     require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-template-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-manager.php';
     require_once MYSHOP_PLUGIN_DIR . 'admin/gift-card-share-style-manager.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/referral-analytics.php';
+    require_once MYSHOP_PLUGIN_DIR . 'admin/operations-dashboard.php';
     
     // 测试用户清理工具（仅开发环境）
     add_action('admin_menu', function() {
@@ -48,6 +50,10 @@ if (is_admin()) {
             }
         );
     }, 100);
+
+    if (class_exists('MyShop_Operations_Dashboard') && method_exists('MyShop_Operations_Dashboard', 'init')) {
+        MyShop_Operations_Dashboard::init();
+    }
 }
 
 // 引入轮播图短代码（PC端使用）
