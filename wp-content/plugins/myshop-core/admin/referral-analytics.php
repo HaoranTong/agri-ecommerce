@@ -225,6 +225,7 @@ class MyShop_Referral_Analytics_Manager {
         ));
 
         ?>
+        <?php self::render_inviter_ranking($referral_table, $users_table); ?>
         <?php if ($inviter_focus_id > 0): ?>
             <?php self::render_inviter_tree($referral_table, $users_table, $inviter_focus_id); ?>
         <?php endif; ?>
@@ -562,6 +563,53 @@ class MyShop_Referral_Analytics_Manager {
                     <?php endforeach; ?>
                 </ul>
             <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    private static function render_inviter_ranking($referral_table, $users_table) {
+        global $wpdb;
+
+        $start = date('Y-m-d 00:00:00', strtotime('-30 days', current_time('timestamp')));
+        $end = current_time('mysql');
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT r.inviter_id, COUNT(*) AS total,
+                    u.display_name AS inviter_name, u.user_login AS inviter_login
+             FROM {$referral_table} r
+             LEFT JOIN {$users_table} u ON u.ID = r.inviter_id
+             WHERE r.created_at BETWEEN %s AND %s
+             GROUP BY r.inviter_id
+             ORDER BY total DESC
+             LIMIT 10",
+            $start,
+            $end
+        ));
+
+        ?>
+        <div style="margin: 0 0 16px; padding: 12px 16px; background:#fff; border:1px solid #e5e5e5;">
+            <h3 style="margin:0 0 10px;">邀请人排行（近30天新增下级）</h3>
+            <table class="widefat striped" style="max-width: 520px;">
+                <thead>
+                    <tr>
+                        <th>邀请人</th>
+                        <th style="width:120px;">新增人数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($rows)): ?>
+                    <tr><td colspan="2" style="text-align:center;color:#999;">暂无数据</td></tr>
+                <?php else: ?>
+                    <?php foreach ($rows as $row): ?>
+                        <tr>
+                            <td><?php echo self::render_user_link($row->inviter_name, $row->inviter_login, (int) $row->inviter_id); ?></td>
+                            <td><?php echo (int) $row->total; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+            <p style="margin:8px 0 0;color:#666;">默认统计最近30天新增绑定人数，Top 10。</p>
         </div>
         <?php
     }
