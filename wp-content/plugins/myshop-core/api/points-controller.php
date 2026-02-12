@@ -968,6 +968,10 @@ class Points_Controller {
         if (is_wp_error($user)) {
             return $user;
         }
+        $verified = self::ensure_verified_identity($user);
+        if (is_wp_error($verified)) {
+            return $verified;
+        }
 
         $settings = self::get_internal_settings();
         if (empty($settings['enable_points']) || empty($settings['enable_points_exchange'])) {
@@ -1109,6 +1113,22 @@ class Points_Controller {
         ]);
         $response->set_status(201);
         return $response;
+    }
+
+    private static function ensure_verified_identity($user) {
+        if (!$user instanceof WP_User) {
+            return new WP_Error('user_invalid', '用户无效', ['status' => 401]);
+        }
+        $first_name = trim((string) $user->first_name);
+        $phone = get_user_meta($user->ID, 'billing_phone', true);
+        if (!$phone) {
+            $phone = get_user_meta($user->ID, '_wechat_phone', true);
+        }
+        $phone = trim((string) $phone);
+        if ($first_name === '' || $phone === '') {
+            return new WP_Error('verification_required', '请先完成实名认证', ['status' => 403]);
+        }
+        return true;
     }
     
     /**
