@@ -23,6 +23,7 @@ if (!$wp_load) {
 }
 
 require_once $wp_load;
+require_once ABSPATH . 'wp-admin/includes/user.php';
 
 if (!defined('MYSHOP_ALLOW_TEST_LOGIN')) {
     define('MYSHOP_ALLOW_TEST_LOGIN', true);
@@ -57,16 +58,40 @@ $old_redeem_options = get_option('myshop_points_redeem_options');
 $old_posters = get_option('myshop_promo_posters');
 $old_points_settings = get_option('myshop_points_settings');
 $old_payout_min = get_option('myshop_commission_payout_min');
+$old_referral_qr_settings = get_option('myshop_referral_qr_settings');
 
-register_shutdown_function(function () use ($old_missions, $old_redeem_options, $old_posters, $old_points_settings, $old_payout_min) {
+register_shutdown_function(function () use ($old_missions, $old_redeem_options, $old_posters, $old_points_settings, $old_payout_min, $old_referral_qr_settings) {
     update_option('myshop_points_missions', $old_missions);
     update_option('myshop_points_redeem_options', $old_redeem_options);
     update_option('myshop_promo_posters', $old_posters);
     update_option('myshop_points_settings', $old_points_settings);
     update_option('myshop_commission_payout_min', $old_payout_min);
+    update_option('myshop_referral_qr_settings', $old_referral_qr_settings);
 });
 
 do_action('rest_api_init');
+add_filter('myshop_allow_test_login', '__return_true');
+add_filter('pre_http_request', function ($preempt, $args, $url) {
+    if (strpos($url, 'https://api.weixin.qq.com/cgi-bin/stable_token') === 0) {
+        return [
+            'headers' => ['content-type' => 'application/json'],
+            'body' => wp_json_encode(['access_token' => 'test_access_token', 'expires_in' => 7200]),
+            'response' => ['code' => 200, 'message' => 'OK'],
+            'cookies' => [],
+            'filename' => null
+        ];
+    }
+    if (strpos($url, 'https://api.weixin.qq.com/wxa/getwxacodeunlimit') === 0) {
+        return [
+            'headers' => ['content-type' => 'image/png'],
+            'body' => 'fakepng',
+            'response' => ['code' => 200, 'message' => 'OK'],
+            'cookies' => [],
+            'filename' => null
+        ];
+    }
+    return $preempt;
+}, 10, 3);
 
 $maintenance_flag = ABSPATH . '.maintenance_flag';
 if (!file_exists($maintenance_flag)) {
@@ -178,6 +203,11 @@ update_option('myshop_promo_posters', [
     ]
 ]);
 
+update_option('myshop_referral_qr_settings', [
+    'fixed_qr_url' => 'https://example.com/fixed-qr.png',
+    'logo_url' => ''
+]);
+
 global $wpdb;
 $ledger_table = $wpdb->prefix . 'myshop_point_ledger';
 $available_points = (int) $wpdb->get_var($wpdb->prepare(
@@ -238,6 +268,33 @@ $invitee_user_id = MyShop_Auth::get_or_create_user_by_openid('oTest_User_002_Fix
 assert_true((bool) $invitee_user_id, 'invitee user');
 
 $referral_table = $wpdb->prefix . 'myshop_referrals';
+$referral_code = null;
+if (class_exists('Referral_Controller') && method_exists('Referral_Controller', 'ensure_referral_code')) {
+    $referral_code = Referral_Controller::ensure_referral_code($user->ID);
+}
+$invitee_openid = 'oTest_User_002_FixedOpenID';
+$existing_invitee_id = MyShop_Auth::find_user_id_by_openid($invitee_openid);
+if ($existing_invitee_id) {
+    $wpdb->delete($referral_table, ['invitee_id' => $existing_invitee_id], ['%d']);
+    wp_delete_user($existing_invitee_id);
+}
+if ($referral_code) {
+    $login_bind_resp = call_api('POST', '/myshop/v1/auth/login', [
+        'code' => 'test002',
+        'referrer_code' => $referral_code
+    ]);
+    assert_true($login_bind_resp->get_status() === 200, 'login bind status');
+    $login_bind_payload = $login_bind_resp->get_data();
+    $bound_invitee_id = (int) ($login_bind_payload['data']['user_id'] ?? 0);
+    assert_true($bound_invitee_id > 0, 'login bind invitee');
+    $bind_count = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM {$referral_table} WHERE inviter_id = %d AND invitee_id = %d",
+        $user->ID,
+        $bound_invitee_id
+    ));
+    assert_true($bind_count > 0, 'login bind referral row');
+}
+
 $exists = $wpdb->get_var($wpdb->prepare(
     "SELECT COUNT(*) FROM {$referral_table} WHERE inviter_id = %d AND invitee_id = %d",
     $user->ID,
@@ -315,11 +372,6 @@ if ((int) $commission_exists === 0) {
 $resp = call_api('GET', '/myshop/v1/referrals/my-downlines', null, $auth_header);
 assert_true($resp->get_status() === 200, 'downlines status');
 
-$referral_code = null;
-if (class_exists('Referral_Controller') && method_exists('Referral_Controller', 'ensure_referral_code')) {
-    $referral_code = Referral_Controller::ensure_referral_code($user->ID);
-}
-
 $resp = call_api('GET', '/myshop/v1/invitations/summary', null, $auth_header);
 assert_true($resp->get_status() === 200, 'invitations/summary status');
 $invitation_payload = $resp->get_data();
@@ -368,10 +420,82 @@ assert_true($resp->get_status() === 200, 'points/redeem status');
 $redeem_payload = $resp->get_data();
 assert_true(isset($redeem_payload['data']['coupon_code']), 'points/redeem coupon_code');
 
+$landing_page = 'pages/index/index';
+if ($referral_code) {
+    $cache_key = 'myshop_poster_qr_' . md5('poster-test|' . $landing_page);
+    update_user_meta($user->ID, $cache_key, [
+        'scene' => $referral_code,
+        'page' => $landing_page,
+        'url' => 'https://example.com/poster-qr.png',
+        'logo_url' => '',
+        'updated_at' => current_time('mysql')
+    ]);
+}
 $resp = call_api('GET', '/myshop/v1/promo/poster', ['template_code' => 'poster-test'], $auth_header);
 assert_true($resp->get_status() === 200, 'promo/poster status');
 $poster_payload = $resp->get_data();
 assert_true(isset($poster_payload['poster_url']), 'promo/poster poster_url');
+if ($referral_code) {
+    assert_true(($poster_payload['personal_qr'] ?? '') === 'https://example.com/poster-qr.png', 'promo/poster personal_qr');
+}
+
+$resp = call_api('GET', '/myshop/v1/referral/qr', null, $auth_header);
+assert_true($resp->get_status() === 200, 'referral/qr status');
+$qr_payload = $resp->get_data();
+assert_true(($qr_payload['data']['qr_mode'] ?? '') === 'fixed', 'referral/qr fixed mode');
+assert_true(!empty($qr_payload['data']['qr_url']), 'referral/qr url');
+
+$template_id = 0;
+$templates_table = $wpdb->prefix . 'myshop_gift_card_templates';
+$wpdb->insert(
+    $templates_table,
+    [
+        'name' => '测试礼品卡模板',
+        'type' => 'fixed_amount',
+        'fixed_amount' => 100,
+        'currency' => 'CNY',
+        'delivery_modes' => wp_json_encode(['digital_share']),
+        'valid_days' => 365,
+        'created_at' => current_time('mysql'),
+        'updated_at' => current_time('mysql')
+    ],
+    ['%s', '%s', '%f', '%s', '%s', '%d', '%s', '%s']
+);
+$template_id = (int) $wpdb->insert_id;
+assert_true($template_id > 0, 'gift card template');
+
+$cards_table = $wpdb->prefix . 'myshop_gift_cards';
+$card_number = 'GC' . time();
+$wpdb->insert(
+    $cards_table,
+    [
+        'card_code' => 'CODE' . $card_number,
+        'amount' => 100,
+        'status' => 'active',
+        'card_number' => $card_number,
+        'template_id' => $template_id,
+        'template_type' => 'fixed_amount',
+        'initial_amount' => 100,
+        'balance' => 100,
+        'currency' => 'CNY',
+        'purchaser_id' => $user->ID,
+        'expires_at' => date('Y-m-d H:i:s', time() + 86400 * 365),
+        'created_at' => current_time('mysql'),
+        'updated_at' => current_time('mysql')
+    ],
+    ['%s', '%f', '%s', '%s', '%d', '%s', '%f', '%f', '%s', '%d', '%s', '%s', '%s']
+);
+assert_true((int) $wpdb->insert_id > 0, 'gift card');
+
+$share_payload = ['card_number' => $card_number, 'channel' => 'test', 'delivery_mode' => 'digital_share'];
+if ($referral_code) {
+    $share_payload['referrer_code'] = $referral_code;
+}
+$resp = call_api('POST', '/myshop/v1/gift-cards/share', $share_payload, $auth_header);
+assert_true($resp->get_status() === 200, 'gift-cards/share status');
+$share_resp = $resp->get_data();
+assert_true(!empty($share_resp['data']['share_token']), 'gift-cards/share token');
+assert_true(!empty($share_resp['data']['mini_program_path']), 'gift-cards/share mini_program_path');
 
 $payments_ready = false;
 $diag_resp = call_api('GET', '/myshop/v1/payments/diagnose', null, $auth_header);

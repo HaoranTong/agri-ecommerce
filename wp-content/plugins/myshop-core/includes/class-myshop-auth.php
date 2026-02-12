@@ -69,7 +69,8 @@ class MyShop_Auth {
             return new WP_Error('missing_code', '缺少登录码', ['status' => 400]);
         }
 
-        $allow_test = defined('MYSHOP_ALLOW_TEST_LOGIN') && MYSHOP_ALLOW_TEST_LOGIN;
+        $allow_test = (defined('MYSHOP_ALLOW_TEST_LOGIN') && MYSHOP_ALLOW_TEST_LOGIN)
+            || apply_filters('myshop_allow_test_login', false);
         if ($allow_test) {
             $test_users = self::get_test_users();
             if (isset($test_users[$code])) {

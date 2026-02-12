@@ -83,6 +83,9 @@ class Auth_Controller {
         } elseif ($scene_param) {
             $channel_code = $scene_param;
         }
+        if (!$referrer_code && $scene_param && self::is_referral_scene_fallback_enabled()) {
+            $referrer_code = self::parse_referrer_from_scene($scene_param);
+        }
 
         if ($is_new_user && ($inviter_id || $referrer_code)) {
             if (!$inviter_id && $referrer_code) {
@@ -157,6 +160,31 @@ class Auth_Controller {
         }
 
         update_user_meta($user_id, '_myshop_attr_recorded_at', current_time('mysql'));
+    }
+
+    private static function is_referral_scene_fallback_enabled() {
+        return defined('MYSHOP_REFERRAL_SCENE_FALLBACK') && MYSHOP_REFERRAL_SCENE_FALLBACK;
+    }
+
+    private static function parse_referrer_from_scene($scene) {
+        $scene = trim((string) $scene);
+        if ($scene === '') {
+            return null;
+        }
+        if (strpos($scene, 'gc_') === 0) {
+            $rest = substr($scene, 3);
+            $rc_index = strpos($rest, '_rc_');
+            if ($rc_index !== false) {
+                return substr($rest, $rc_index + 4);
+            }
+        }
+        if (strpos($scene, 'rc_') === 0) {
+            return substr($scene, 3);
+        }
+        if (preg_match('/^U\\d+[A-Za-z0-9]{4}$/', $scene)) {
+            return $scene;
+        }
+        return null;
     }
 
     /**
