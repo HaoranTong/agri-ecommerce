@@ -121,6 +121,13 @@ if ($login_response->get_status() === 200) {
 $user = MyShop_Auth::validate_token($token);
 assert_true($user instanceof WP_User, 'user from token');
 
+wp_update_user([
+    'ID' => $user->ID,
+    'first_name' => '测试',
+    'last_name' => '用户'
+]);
+update_user_meta($user->ID, 'billing_phone', '13800138000');
+
 $operator_cap_added = false;
 if (!user_can($user, 'manage_woocommerce') && !user_can($user, 'manage_options')) {
     $user->add_cap('manage_woocommerce');

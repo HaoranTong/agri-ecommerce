@@ -82,6 +82,12 @@ class MyShop_Referral_Analytics_Manager {
                 渠道：
                 <input type="text" name="channel" placeholder="如 giftcard/qr/poster" value="<?php echo esc_attr($filters['channel']); ?>" />
             </label>
+            <?php if ($filters['tab'] === 'bindings'): ?>
+                <label style="margin-left: 10px;">
+                    邀请人ID：
+                    <input type="number" name="inviter_id" placeholder="仅绑定关系" value="<?php echo esc_attr($filters['inviter_id']); ?>" />
+                </label>
+            <?php endif; ?>
             <button type="submit" class="button">筛选</button>
         </form>
         <?php
@@ -190,6 +196,7 @@ class MyShop_Referral_Analytics_Manager {
         $page = max(1, $filters['paged']);
         $per_page = $filters['per_page'];
         $offset = ($page - 1) * $per_page;
+        $inviter_focus_id = (int) $filters['inviter_id'];
 
         $where = ['r.created_at BETWEEN %s AND %s'];
         $params = [$start, $end];
@@ -206,7 +213,8 @@ class MyShop_Referral_Analytics_Manager {
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT r.inviter_id, r.invitee_id, r.level, r.channel_code, r.first_order_status, r.created_at,
-                    inviter.display_name AS inviter_name, invitee.display_name AS invitee_name
+                    inviter.display_name AS inviter_name, inviter.user_login AS inviter_login,
+                    invitee.display_name AS invitee_name, invitee.user_login AS invitee_login
              FROM {$referral_table} r
              LEFT JOIN {$users_table} inviter ON inviter.ID = r.inviter_id
              LEFT JOIN {$users_table} invitee ON invitee.ID = r.invitee_id
@@ -217,6 +225,10 @@ class MyShop_Referral_Analytics_Manager {
         ));
 
         ?>
+        <?php self::render_inviter_ranking($referral_table, $users_table); ?>
+        <?php if ($inviter_focus_id > 0): ?>
+            <?php self::render_inviter_tree($referral_table, $users_table, $inviter_focus_id); ?>
+        <?php endif; ?>
         <table class="widefat striped">
             <thead>
                 <tr>
@@ -234,8 +246,8 @@ class MyShop_Referral_Analytics_Manager {
             <?php else: ?>
                 <?php foreach ($rows as $row): ?>
                     <tr>
-                        <td><?php echo esc_html(($row->inviter_name ?: '用户#' . (int) $row->inviter_id)); ?></td>
-                        <td><?php echo esc_html(($row->invitee_name ?: '用户#' . (int) $row->invitee_id)); ?></td>
+                        <td><?php echo self::render_user_link($row->inviter_name, $row->inviter_login, (int) $row->inviter_id); ?></td>
+                        <td><?php echo self::render_user_link($row->invitee_name, $row->invitee_login, (int) $row->invitee_id); ?></td>
                         <td><?php echo (int) $row->level; ?></td>
                         <td><?php echo esc_html($row->channel_code ?: '-'); ?></td>
                         <td><?php echo esc_html($row->first_order_status); ?></td>
@@ -279,7 +291,8 @@ class MyShop_Referral_Analytics_Manager {
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT os.order_id, os.customer_id, os.total_sales, os.status, os.date_created,
                     r.inviter_id, r.level, r.channel_code,
-                    inviter.display_name AS inviter_name, invitee.display_name AS invitee_name
+                    inviter.display_name AS inviter_name, inviter.user_login AS inviter_login,
+                    invitee.display_name AS invitee_name, invitee.user_login AS invitee_login
              FROM {$order_stats_table} os
              INNER JOIN {$referral_table} r ON r.invitee_id = os.customer_id
              LEFT JOIN {$users_table} inviter ON inviter.ID = r.inviter_id
@@ -311,8 +324,8 @@ class MyShop_Referral_Analytics_Manager {
                 <?php foreach ($rows as $row): ?>
                     <tr>
                         <td><?php echo (int) $row->order_id; ?></td>
-                        <td><?php echo esc_html(($row->invitee_name ?: '用户#' . (int) $row->customer_id)); ?></td>
-                        <td><?php echo esc_html(($row->inviter_name ?: '用户#' . (int) $row->inviter_id)); ?></td>
+                        <td><?php echo self::render_user_link($row->invitee_name, $row->invitee_login, (int) $row->customer_id); ?></td>
+                        <td><?php echo self::render_user_link($row->inviter_name, $row->inviter_login, (int) $row->inviter_id); ?></td>
                         <td><?php echo (int) $row->level; ?></td>
                         <td><?php echo esc_html($row->channel_code ?: '-'); ?></td>
                         <td><?php echo esc_html(number_format((float) $row->total_sales, 2)); ?></td>
@@ -344,7 +357,7 @@ class MyShop_Referral_Analytics_Manager {
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT l.user_id, l.delta, l.balance_after, l.reference_order_id, l.channel, l.created_at,
-                    u.display_name AS user_name
+                    u.display_name AS user_name, u.user_login AS user_login
              FROM {$ledger_table} l
              LEFT JOIN {$users_table} u ON u.ID = l.user_id
              WHERE l.created_at BETWEEN %s AND %s AND l.channel LIKE %s
@@ -376,7 +389,7 @@ class MyShop_Referral_Analytics_Manager {
             <?php else: ?>
                 <?php foreach ($rows as $row): ?>
                     <tr>
-                        <td><?php echo esc_html(($row->user_name ?: '用户#' . (int) $row->user_id)); ?></td>
+                        <td><?php echo self::render_user_link($row->user_name, $row->user_login, (int) $row->user_id); ?></td>
                         <td><?php echo (int) $row->delta; ?></td>
                         <td><?php echo (int) $row->balance_after; ?></td>
                         <td><?php echo $row->reference_order_id ? (int) $row->reference_order_id : '-'; ?></td>
@@ -405,6 +418,7 @@ class MyShop_Referral_Analytics_Manager {
                 'start_date' => $filters['start_date'],
                 'end_date' => $filters['end_date'],
                 'channel' => $filters['channel'],
+                'inviter_id' => $filters['inviter_id'],
                 'paged' => $i
             ], admin_url('admin.php'));
             if ($i === $page) {
@@ -422,9 +436,207 @@ class MyShop_Referral_Analytics_Manager {
             'start_date' => sanitize_text_field($_GET['start_date'] ?? ''),
             'end_date' => sanitize_text_field($_GET['end_date'] ?? ''),
             'channel' => sanitize_text_field($_GET['channel'] ?? ''),
+            'inviter_id' => absint($_GET['inviter_id'] ?? 0),
             'paged' => max(1, absint($_GET['paged'] ?? 1)),
             'per_page' => 20
         ];
+    }
+
+    private static function render_inviter_tree($referral_table, $users_table, $inviter_id) {
+        global $wpdb;
+
+        $inviter_id = (int) $inviter_id;
+        if ($inviter_id <= 0) {
+            return;
+        }
+
+        $inviter = $wpdb->get_row($wpdb->prepare(
+            "SELECT ID, display_name, user_login FROM {$users_table} WHERE ID = %d",
+            $inviter_id
+        ));
+
+        $inviter_level = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT level FROM {$referral_table} WHERE invitee_id = %d LIMIT 1",
+            $inviter_id
+        ));
+        if ($inviter_level < 0) {
+            $inviter_level = 0;
+        }
+
+        $pattern = '%/' . $inviter_id . '%';
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT r.inviter_id, r.invitee_id, r.level, r.path, r.channel_code, r.first_order_status, r.created_at,
+                    invitee.display_name AS invitee_name, invitee.user_login AS invitee_login
+             FROM {$referral_table} r
+             LEFT JOIN {$users_table} invitee ON invitee.ID = r.invitee_id
+             WHERE r.inviter_id = %d OR r.path LIKE %s
+             ORDER BY r.level ASC, r.created_at ASC",
+            $inviter_id,
+            $pattern
+        ));
+
+        $level_counts = [];
+        $level1 = [];
+        $level2_by_parent = [];
+        $total = 0;
+
+        foreach ($rows as $row) {
+            $path = $row->path ?: '';
+            $matches_inviter = self::path_contains_user($path, $inviter_id) || (int) $row->inviter_id === $inviter_id;
+            if (!$matches_inviter) {
+                continue;
+            }
+            $relative_level = (int) $row->level - $inviter_level;
+            if ($relative_level <= 0) {
+                continue;
+            }
+            $total += 1;
+            if (!isset($level_counts[$relative_level])) {
+                $level_counts[$relative_level] = 0;
+            }
+            $level_counts[$relative_level] += 1;
+
+            if ($relative_level === 1) {
+                $level1[(int) $row->invitee_id] = $row;
+            } elseif ($relative_level === 2) {
+                $parent_id = (int) $row->inviter_id;
+                if (!isset($level2_by_parent[$parent_id])) {
+                    $level2_by_parent[$parent_id] = [];
+                }
+                $level2_by_parent[$parent_id][] = $row;
+            }
+        }
+
+        $inviter_label = $inviter
+            ? self::format_user_label($inviter->display_name ?? '', $inviter->user_login ?? '', $inviter_id)
+            : '用户#' . $inviter_id;
+        ?>
+        <div style="padding: 12px 16px; margin-bottom: 16px; background: #fff; border: 1px solid #e5e5e5;">
+            <h3 style="margin:0 0 10px;">邀请人详情：<?php echo esc_html($inviter_label); ?></h3>
+            <p style="margin:0 0 8px;">全级别推荐人数：<?php echo (int) $total; ?></p>
+            <?php if (!empty($level_counts)): ?>
+                <table class="widefat striped" style="max-width:360px;">
+                    <thead><tr><th>层级</th><th>人数</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($level_counts as $lvl => $count): ?>
+                            <tr>
+                                <td><?php echo (int) $lvl; ?> 级</td>
+                                <td><?php echo (int) $count; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p style="color:#888;">暂无下级关系数据。</p>
+            <?php endif; ?>
+
+            <h4 style="margin:16px 0 8px;">一级 / 二级树状关系</h4>
+            <?php if (empty($level1)): ?>
+                <p style="color:#888;">暂无一级邀请用户。</p>
+            <?php else: ?>
+                <ul style="margin:0; padding-left:18px;">
+                    <?php foreach ($level1 as $user_id => $row): ?>
+                        <?php
+                        $label = self::format_user_label($row->invitee_name ?? '', $row->invitee_login ?? '', (int) $row->invitee_id);
+                        $children = $level2_by_parent[$user_id] ?? [];
+                        ?>
+                        <li style="margin-bottom:6px;">
+                            <details>
+                                <summary>
+                                    <?php echo self::render_user_link($row->invitee_name ?? '', $row->invitee_login ?? '', (int) $row->invitee_id); ?>
+                                    <span style="color:#666;">（二级 <?php echo (int) count($children); ?>）</span>
+                                </summary>
+                                <?php if (empty($children)): ?>
+                                    <div style="margin:6px 0 0 12px; color:#888;">暂无二级邀请用户</div>
+                                <?php else: ?>
+                                    <ul style="margin:6px 0 0 12px;">
+                                        <?php foreach ($children as $child): ?>
+                                            <li>
+                                                <?php echo self::render_user_link($child->invitee_name ?? '', $child->invitee_login ?? '', (int) $child->invitee_id); ?>
+                                                <span style="color:#888;">（<?php echo esc_html($child->created_at); ?>）</span>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </details>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    private static function render_inviter_ranking($referral_table, $users_table) {
+        global $wpdb;
+
+        $start = date('Y-m-d 00:00:00', strtotime('-30 days', current_time('timestamp')));
+        $end = current_time('mysql');
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT r.inviter_id, COUNT(*) AS total,
+                    u.display_name AS inviter_name, u.user_login AS inviter_login
+             FROM {$referral_table} r
+             LEFT JOIN {$users_table} u ON u.ID = r.inviter_id
+             WHERE r.created_at BETWEEN %s AND %s
+             GROUP BY r.inviter_id
+             ORDER BY total DESC
+             LIMIT 10",
+            $start,
+            $end
+        ));
+
+        ?>
+        <div style="margin: 0 0 16px; padding: 12px 16px; background:#fff; border:1px solid #e5e5e5;">
+            <h3 style="margin:0 0 10px;">邀请人排行（近30天新增下级）</h3>
+            <table class="widefat striped" style="max-width: 520px;">
+                <thead>
+                    <tr>
+                        <th>邀请人</th>
+                        <th style="width:120px;">新增人数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($rows)): ?>
+                    <tr><td colspan="2" style="text-align:center;color:#999;">暂无数据</td></tr>
+                <?php else: ?>
+                    <?php foreach ($rows as $row): ?>
+                        <tr>
+                            <td><?php echo self::render_user_link($row->inviter_name, $row->inviter_login, (int) $row->inviter_id); ?></td>
+                            <td><?php echo (int) $row->total; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+            <p style="margin:8px 0 0;color:#666;">默认统计最近30天新增绑定人数，Top 10。</p>
+        </div>
+        <?php
+    }
+
+    private static function render_user_link($display_name, $user_login, $user_id) {
+        $label = self::format_user_label($display_name, $user_login, $user_id);
+        $url = admin_url('user-edit.php?user_id=' . (int) $user_id);
+        return '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+    }
+
+    private static function format_user_label($display_name, $user_login, $user_id) {
+        $name = trim((string) $display_name);
+        if ($name === '' || $name === '微信用户') {
+            $name = trim((string) $user_login);
+        }
+        if ($name === '') {
+            $name = '用户#' . (int) $user_id;
+        }
+        return $name . '（ID:' . (int) $user_id . '）';
+    }
+
+    private static function path_contains_user($path, $user_id) {
+        if (!$path) {
+            return false;
+        }
+        $pattern = '/(^|\\/)' . preg_quote((string) $user_id, '/') . '(\\/|$)/';
+        return preg_match($pattern, $path) === 1;
     }
 
     private static function get_date_range($start_date, $end_date) {
@@ -447,4 +659,3 @@ class MyShop_Referral_Analytics_Manager {
         ];
     }
 }
-

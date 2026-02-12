@@ -161,6 +161,10 @@ class Promo_Controller {
         $payload['poster_url'] = $payload['image_url'];
         $raw_path = $matched['mini_program_path'] ?? $matched['landing_page'] ?? 'pages/index/index';
         $payload['mini_program_path'] = self::normalize_mini_program_path($raw_path);
+        // Referral entry should start at login to bind on first login; normal entry stays on landing page.
+        if ($scene === 'invite' || !empty($referrer_code)) {
+            $payload['mini_program_path'] = 'pages/auth/login';
+        }
 
         $tracking_params = [];
         if (!empty($matched['tracking_params']) && is_array($matched['tracking_params'])) {

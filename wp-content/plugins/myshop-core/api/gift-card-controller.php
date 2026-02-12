@@ -1874,7 +1874,8 @@ class Gift_Card_Controller {
         }
 
         $clean_referrer = is_string($referrer_code) ? trim($referrer_code) : '';
-        $mini_program_path = '/pages/shopping-card/claim?token=' . rawurlencode($token);
+        // Gift card share should start at login to bind referral on first login when applicable.
+        $mini_program_path = '/pages/auth/login?token=' . rawurlencode($token);
         if ($clean_referrer !== '') {
             $mini_program_path .= '&referrer_code=' . rawurlencode($clean_referrer);
         }
@@ -1961,10 +1962,15 @@ class Gift_Card_Controller {
             $scene = substr($scene, 0, 32);
         }
 
+        $page = 'pages/shopping-card/claim';
+        if (is_string($path) && $path !== '') {
+            $path = ltrim($path, '/');
+            $page = strtok($path, '?') ?: $page;
+        }
         $endpoint = 'https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=' . rawurlencode($access_token);
         $body = wp_json_encode([
             'scene' => $scene,
-            'page' => 'pages/shopping-card/claim',
+            'page' => $page,
             'width' => $width,
             'is_hyaline' => false,
             'env_version' => $env_version
